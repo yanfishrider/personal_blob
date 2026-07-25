@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+body {
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  color: #333;
+  background: #faf9f7;
+}
+
+/* 文章内容样式 */
+article h1 { font-size: 2rem; font-weight: 700; margin: 2rem 0 1rem; }
+article h2 { font-size: 1.5rem; font-weight: 600; margin: 1.8rem 0 0.8rem; }
+article h3 { font-size: 1.2rem; font-weight: 600; margin: 1.5rem 0 0.6rem; }
+article p { margin: 1rem 0; line-height: 1.85; }
+article ul, article ol { margin: 0.8rem 0; padding-left: 1.5rem; }
+article li { margin: 0.3rem 0; }
+article code {
+  background: #f3f3f3;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+article pre {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 1rem 1.2rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1.2rem 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+article pre code {
+  background: none;
+  padding: 0;
+}
+article blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #6b7280;
+}
+article a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+article img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}

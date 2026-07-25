@@ -1,0 +1,35 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+
+export interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+---
+
+<BaseLayout title={`${post.data.title} - 我的博客`} description={post.data.description}>
+  <article>
+    <header class="mb-10">
+      <h1 class="text-3xl font-bold text-gray-900 mb-3">{post.data.title}</h1>
+      <div class="flex items-center gap-4 text-sm text-gray-400">
+        <time datetime={post.data.date.toISOString()}>
+          {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </time>
+        {
+          post.data.tags && post.data.tags.length > 0 && (
+            <div class="flex gap-2">
+              {post.data.tags.map((tag: string) => (
+                <span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-xs">{tag}</span>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </header>
+
+    <Content />
+  </article>
+</BaseLayout>

@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const posts = await getCollection('posts', ({ data }) => !data.draft);
+posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+---
+
+<BaseLayout title="我的博客" description="一个安静的角落，写点东西。">
+  <div class="mb-10">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">文章</h1>
+    <p class="text-gray-500">一个安静的角落，写点东西。</p>
+  </div>
+
+  {
+    posts.length === 0 ? (
+      <p class="text-gray-400 text-center py-20">还没有文章。</p>
+    ) : (
+      <ul class="space-y-6">
+        {posts.map((post) => (
+          <li>
+            <a href={`${import.meta.env.BASE_URL}posts/${post.slug}`} class="block group">
+              <time class="text-sm text-gray-400">
+                {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </time>
+              <h2 class="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors mt-1">
+                {post.data.title}
+              </h2>
+              {post.data.description && (
+                <p class="text-gray-500 text-sm mt-1.5">{post.data.description}</p>
+              )}
+              {post.data.tags && post.data.tags.length > 0 && (
+                <div class="flex gap-2 mt-2">
+                  {post.data.tags.map((tag: string) => (
+                    <span class="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-xs">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</BaseLayout>

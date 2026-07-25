@@ -1,0 +1,103 @@
+---
+// SideToolbar.astro — 右侧悬浮工具栏
+const ANIMATIONS = [
+  { key: 'nier', label: 'NieR 风格' },
+];
+---
+
+<div id="side-toolbar" class="fixed right-4 bottom-8 z-50 flex flex-col gap-3">
+  <!-- 切换动画 -->
+  <div class="relative">
+    <button
+      id="btn-switch"
+      title="切换开场动画"
+      class="w-10 h-10 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-gray-800 hover:shadow-lg transition-all text-xs"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    </button>
+
+    <!-- 下拉菜单 -->
+    <div id="switch-menu" class="hidden absolute right-0 bottom-12 mb-2 bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[140px]">
+      <div class="px-3 py-1.5 text-[11px] text-gray-400 tracking-wider uppercase">开场动画</div>
+      {ANIMATIONS.map((a) => (
+        <button
+          data-key={a.key}
+          class="w-full text-left px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
+        >
+          <span class="w-4 text-center text-[10px] switch-dot" data-key={a.key}></span>
+          {a.label}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <!-- 重播加载动画 -->
+  <button
+    id="btn-replay"
+    title="重播开场动画"
+    class="w-10 h-10 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-gray-800 hover:shadow-lg transition-all text-sm"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  </button>
+
+  <!-- 回到顶部 -->
+  <button
+    id="btn-top"
+    title="回到顶部"
+    class="w-10 h-10 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-gray-800 hover:shadow-lg transition-all text-sm"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
+</div>
+
+<script>
+  function currentKey(): string {
+    return localStorage.getItem('loading-animation') || 'nier';
+  }
+
+  function updateDots() {
+    const cur = currentKey();
+    document.querySelectorAll('.switch-dot').forEach((el) => {
+      const key = (el as HTMLElement).dataset.key;
+      el.textContent = key === cur ? '●' : '○';
+    });
+  }
+
+  // 回到顶部
+  document.getElementById('btn-top')?.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // 下拉菜单
+  const btn = document.getElementById('btn-switch');
+  const menu = document.getElementById('switch-menu');
+
+  btn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateDots();
+    menu?.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', () => {
+    menu?.classList.add('hidden');
+  });
+
+  // 选择动画
+  menu?.querySelectorAll('button[data-key]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const key = (b as HTMLElement).dataset.key!;
+      localStorage.setItem('loading-animation', key);
+      menu?.classList.add('hidden');
+      sessionStorage.removeItem('nier-intro-done');
+      sessionStorage.removeItem('p3re-intro-done');
+      location.reload();
+    });
+  });
+
+  // 重播加载动画
+  document.getElementById('btn-replay')?.addEventListener('click', () => {
+    sessionStorage.removeItem('nier-intro-done');
+    sessionStorage.removeItem('p3re-intro-done');
+    location.reload();
+  });
+</script>
