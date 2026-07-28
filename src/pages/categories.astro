@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+const catMap = new Map<string, number>();
+allPosts.forEach(p => {
+  const cat = p.data.category || '未分类';
+  catMap.set(cat, (catMap.get(cat) || 0) + 1);
+});
+const categories = [...catMap.entries()].sort((a, b) => b[1] - a[1]);
+---
+
+<BaseLayout title="分类 - 摸鱼骑士 知识库">
+  <h1 class="text-3xl font-bold mb-8">分类</h1>
+  <div class="grid gap-4 sm:grid-cols-2">
+    {categories.map(([name, count]) => (
+      <a href={`${import.meta.env.BASE_URL}?category=${encodeURIComponent(name)}`}
+         class="card p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+        <span class="font-medium text-gray-700">{name}</span>
+        <span class="text-sm text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{count} 篇</span>
+      </a>
+    ))}
+  </div>
+</BaseLayout>

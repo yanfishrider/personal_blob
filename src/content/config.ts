@@ -6,6 +6,7 @@ const posts = defineCollection({
     description: z.string().optional(),
     date: z.date(),
     tags: z.array(z.string()).optional().default([]),
+    category: z.string().optional().default(''),
     draft: z.boolean().optional().default(false),
   }),
 });

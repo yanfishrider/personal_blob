@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+const tagMap = new Map<string, number>();
+allPosts.forEach(p => {
+  p.data.tags?.forEach(t => tagMap.set(t, (tagMap.get(t) || 0) + 1));
+});
+const tags = [...tagMap.entries()].sort((a, b) => b[1] - a[1]);
+---
+
+<BaseLayout title="标签 - 摸鱼骑士 知识库">
+  <h1 class="text-3xl font-bold mb-8">标签</h1>
+  <div class="flex flex-wrap gap-3">
+    {tags.map(([name, count]) => (
+      <a href={`${import.meta.env.BASE_URL}?tag=${encodeURIComponent(name)}`}
+         class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+        {name}
+        <span class="text-xs text-gray-400">({count})</span>
+      </a>
+    ))}
+  </div>
+</BaseLayout>
