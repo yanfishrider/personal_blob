@@ -1,55 +1,32 @@
 ---
-// LoadingScreen.astro — NieR 风格页面加载动画（代码雨背景 + 终端打字）
+// LoadingScreen.astro — NieR 风格页面加载动画（网格点阵徽章 + 代码雨 + 终端打字）
+// 徽章源码: ascii-art.txt（编辑此文件即可改徽章）
 ---
 
 <div id="nier-loading" class="fixed inset-0 z-[9999] overflow-hidden" style="background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px;">
-  <!-- 代码雨背景 -->
-  <canvas id="nier-rain" class="absolute inset-0 w-full h-full"></canvas>
+  <canvas id="nier-grid-art" class="absolute inset-0 w-full h-full z-[5] pointer-events-none"></canvas>
 
-  <!-- 顶部标题 -->
   <div class="absolute top-8 left-8 sm:top-12 sm:left-12 z-10">
     <p class="text-white tracking-[0.15em]">
       <span class="text-3xl sm:text-4xl">LOADING</span><span class="text-lg sm:text-xl">_系统启动中</span><span id="nier-dots" class="text-lg sm:text-xl"></span>
     </p>
   </div>
 
-  <!-- 状态文本 -->
-  <div
-    id="nier-lines"
-    class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"
-  ></div>
-
-  <!-- 正中：YoRHa 标识（网格纹理填充） -->
-  <div class="absolute inset-0 flex items-center justify-center select-none pointer-events-none z-10">
-    <div class="text-center">
-      <div class="text-[5rem] sm:text-[8rem] tracking-[0.25em] font-light leading-none grid-text">YoRHa</div>
-      <div class="text-xs sm:text-sm tracking-[0.3em] text-white/30 mt-2">For the Glory of Mankind</div>
-    </div>
-  </div>
+  <div id="nier-lines" class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"></div>
 </div>
 
 <script>
+  import asciiRaw from '../../ascii-art.txt?raw';
+  const ASCII_EMBLEM = asciiRaw.split('\n').filter(r => r.length > 0);
+
   const GLITCH_CHARS = '!@#$%^&*<>?|/\\{}[]±§※☆★○●◎◇◆□■△▲▽▼→←↑↓↔↕♠♣♥♦♂♀∞≈≠≤≥';
-
-  function randomGlitch(): string {
-    return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-  }
-
-  function sleep(ms: number): Promise<void> {
-    return new Promise(r => setTimeout(r, ms));
-  }
+  function randomGlitch() { return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]; }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   const lines = [
-    '正在连接服务器 - 完成',
-    '加载页面资源 - 完毕',
-    '初始化渲染引擎 - 通过',
-    '解析全局样式表 - 通过',
-    '加载字体文件 - 完成',
-    '编译脚本模块 - 完毕',
-    '建立WebSocket连接 - 完成',
-    '初始化路由表 - 通过',
-    '验证资源完整性 - 通过',
-    '页面准备就绪',
+    '正在连接服务器 - 完成','加载页面资源 - 完毕','初始化渲染引擎 - 通过',
+    '解析全局样式表 - 通过','加载字体文件 - 完成','编译脚本模块 - 完毕',
+    '建立WebSocket连接 - 完成','初始化路由表 - 通过','验证资源完整性 - 通过','页面准备就绪',
   ];
 
   if ((localStorage.getItem('loading-animation') || 'nier') !== 'nier') {
@@ -59,162 +36,87 @@
   } else {
     sessionStorage.setItem('nier-intro-done', '1');
 
-    // ── 弹幕流 ──
-    let rainId: number;
-    (function startRain() {
-      const canvas = document.getElementById('nier-rain') as HTMLCanvasElement;
+    // 5px 格 → 与 CSS 网格对齐
+    const CELL = 1.5, GAP = 0, STEP = CELL + GAP; // 缩小25%
+    const DOT = 2, OFF = (CELL - DOT) / 2;
+    const STRETCH_Y = 2.75; // 拉长10%
+    const STRETCH_X = 1.5;  // 拉宽10%
+    const DENSITY_MAP = {
+      ' ': 0, '@': 0.50, '#': 0.44, '%': 0.38, '*': 0.32, '=': 0.26,
+      '+': 0.20, '-': 0.14, ':': 0.08, '.': 0.04,
+    };
+
+    function drawGridArt() {
+      const canvas = document.getElementById('nier-grid-art');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
 
-      const fontSize = 30;
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*<>/\\|{}[]';
-
-      // 12 条弹幕轨道
-      const count = 8;
-      const lines = [];
-      for (let i = 0; i < count; i++) {
-        const len = 6 + Math.floor(Math.random() * 8); // 6~13 字符
-        let text = '';
-        for (let j = 0; j < len; j++) text += Math.random() > 0.5 ? '0' : '1';
-        const dir = Math.random() > 0.5 ? 1 : -1;
-        lines.push({
-          text,
-          dir,
-          speed: 1.8 + Math.random() * 2.4,
-          y: (canvas.height * (i + 0.5)) / count,
-          x: dir === 1 ? -text.length * fontSize : canvas.width,
-        });
-      }
-
-      function draw() {
-        // 清屏（透明，让网格背景透出）
-        ctx!.clearRect(0, 0, canvas.width, canvas.height);
-        ctx!.font = fontSize + 'px monospace';
-
-        for (let i = 0; i < lines.length; i++) {
-          const l = lines[i];
-          const w = l.text.length * fontSize;
-
-          // 尾部拖尾：反方向绘制 3 层渐淡阴影
-          for (let t = 1; t <= 3; t++) {
-            const tx = l.x - l.dir * t * fontSize * 0.6;
-            ctx!.fillStyle = `rgba(136,136,136,${0.08 / t})`;
-            ctx!.fillText(l.text, tx, l.y);
+      function drawDots(arr, ox, oy) {
+        for (let r = 0; r < arr.length; r++) {
+          const row = arr[r];
+          for (let c = 0; c < row.length; c++) {
+            const a = DENSITY_MAP[row[c]] || 0;
+            if (a > 0) {
+              ctx.fillStyle = `rgba(200,200,210,${a})`;
+              ctx.fillRect(ox + c * STEP * STRETCH_X + OFF, oy + r * STEP * STRETCH_Y + OFF, DOT * STRETCH_X, DOT * STRETCH_Y);
+            }
           }
-
-          // 主体
-          ctx!.fillStyle = '#888';
-          ctx!.fillText(l.text, l.x, l.y);
-
-          l.x += l.dir * l.speed;
-
-          if (l.dir === 1 && l.x > canvas.width) l.x = -w;
-          else if (l.dir === -1 && l.x < -w) l.x = canvas.width;
         }
-
-        rainId = requestAnimationFrame(draw);
       }
 
-      rainId = requestAnimationFrame(draw);
-    })();
+      const ew = ASCII_EMBLEM[0].length * STEP * STRETCH_X;
+      const eh = ASCII_EMBLEM.length * STEP * STRETCH_Y;
+      const ox = (canvas.width - ew) / 2; // 居中
+      const oy = (canvas.height - eh) / 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawDots(ASCII_EMBLEM, ox, oy);
+    }
+
+    drawGridArt();
+    window.addEventListener('resize', drawGridArt);
 
     const container = document.getElementById('nier-lines');
     if (!container) throw new Error('missing #nier-lines');
-
-    const CHAR_DELAY = 22;
-    const GLITCH_DURATION = 28;
+    const CHAR_DELAY = 22, GLITCH_DURATION = 28;
     const glitchChance = Math.random() * 0.08;
-
     const dotsEl = document.getElementById('nier-dots');
     const dotStates = ['_', '.', '..', '...', ''];
     let dotIdx = 0;
-    const dotTimer = setInterval(() => {
-      if (dotsEl) dotsEl.textContent = dotStates[dotIdx];
-      dotIdx = (dotIdx + 1) % dotStates.length;
-    }, 400);
+    const dotTimer = setInterval(() => { if (dotsEl) dotsEl.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
 
-    async function typeLine(text: string, isLast: boolean) {
+    async function typeLine(text, isLast) {
       const el = document.createElement('p');
       el.className = 'tracking-wider';
-      container!.appendChild(el);
-
+      container.appendChild(el);
       for (let i = 0; i < text.length; i++) {
         const span = document.createElement('span');
-        span.className = 'nier-char';
-        span.style.color = 'rgba(255,255,255,0.2)';
-        span.textContent = text[i];
-
+        span.className = 'nier-char'; span.style.color = 'rgba(255,255,255,0.2)'; span.textContent = text[i];
         if (Math.random() < glitchChance) {
-          const glitchSpan = document.createElement('span');
-          glitchSpan.textContent = randomGlitch();
-          glitchSpan.style.color = 'rgba(255,255,255,0.5)';
-          el.appendChild(glitchSpan);
-          await sleep(GLITCH_DURATION);
-          el.removeChild(glitchSpan);
+          const gs = document.createElement('span'); gs.textContent = randomGlitch(); gs.style.color = 'rgba(255,255,255,0.5)';
+          el.appendChild(gs); await sleep(GLITCH_DURATION); el.removeChild(gs);
         }
-
         el.appendChild(span);
-        requestAnimationFrame(() => {
-          span.style.transition = 'color 0.25s ease-out';
-          span.style.color = '#fff';
-        });
+        requestAnimationFrame(() => { span.style.transition = 'color 0.25s ease-out'; span.style.color = '#fff'; });
         await sleep(CHAR_DELAY);
       }
-
-      if (isLast) {
-        const cursor = document.createElement('span');
-        cursor.className = 'nier-char';
-        cursor.style.color = '#fff';
-        cursor.textContent = '_';
-        el.appendChild(cursor);
-        await sleep(300);
-        cursor.style.opacity = '0';
-        await sleep(200);
-        cursor.style.opacity = '1';
-        await sleep(300);
-      }
-
+      if (isLast) { const c = document.createElement('span'); c.className = 'nier-char'; c.style.color = '#fff'; c.textContent = '_'; el.appendChild(c); await sleep(300); c.style.opacity = '0'; await sleep(200); c.style.opacity = '1'; await sleep(300); }
       await sleep(80);
     }
 
     async function run() {
-      for (let i = 0; i < lines.length; i++) {
-        await typeLine(lines[i], i === lines.length - 1);
-      }
-
-      clearInterval(dotTimer);
-      if (dotsEl) dotsEl.textContent = '';
-      cancelAnimationFrame(rainId);
-
+      for (let i = 0; i < lines.length; i++) await typeLine(lines[i], i === lines.length - 1);
+      clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
       await sleep(500);
       const overlay = document.getElementById('nier-loading');
-      if (overlay) {
-        overlay.style.transition = 'opacity 0.6s ease-out';
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.remove(), 600);
-      }
+      if (overlay) { overlay.style.transition = 'opacity 0.6s ease-out'; overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 600); }
     }
-
     run();
   }
 </script>
 
 <style is:global>
-  #nier-loading {
-    font-family: 'Courier New', 'Source Code Pro', 'Consolas', 'Noto Sans SC', monospace;
-    letter-spacing: 0.05em;
-  }
-
-  .grid-text {
-    background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-    background-size: 5px 5px;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+  #nier-loading { font-family: 'Courier New', 'Source Code Pro', 'Consolas', 'Noto Sans SC', monospace; letter-spacing: 0.05em; }
 </style>
