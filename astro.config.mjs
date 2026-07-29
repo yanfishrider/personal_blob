@@ -6,5 +6,5 @@ import sitemap from '@astrojs/sitemap';
 export default defineConfig({
   integrations: [tailwind(), sitemap()],
   site: 'https://yanfishrider.github.io',
-  base: '/astro-blog',
+  base: '/personal_blob',
 });

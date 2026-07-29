@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://yanfishrider.github.io/astro-blog/sitemap-index.xml
+Sitemap: https://yanfishrider.github.io/personal_blob/sitemap-index.xml
