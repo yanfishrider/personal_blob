@@ -1,0 +1,406 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="ASCII 转换器 - 摸鱼骑士 知识库">
+  <div class="space-y-5 max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-800">图片转 ASCII</h1>
+
+    <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#49B1F5] hover:bg-blue-50/30 transition-colors">
+      <p class="text-gray-500 text-sm">拖拽图片到此处，或点击选择（支持 Ctrl+V 粘贴）</p>
+      <input type="file" id="file-input" accept="image/*" class="hidden" />
+    </div>
+
+    <div class="flex gap-4">
+      <div id="preview-box" class="hidden w-40 shrink-0">
+        <img id="preview-img" class="w-full rounded-lg border border-gray-200" alt="" />
+      </div>
+
+      <div id="controls" class="hidden flex-1 space-y-3">
+        <!-- 布局参数 -->
+        <div class="flex items-center gap-3">
+          <label class="text-sm text-gray-500 w-16 shrink-0">列数</label>
+          <input type="range" id="cols-slider" min="20" max="400" value="120" class="flex-1" />
+          <span id="cols-value" class="text-sm text-gray-600 w-10 text-right">120</span>
+        </div>
+
+        <!-- 模式切换 -->
+        <div class="flex gap-2">
+          <button data-mode="text" class="mode-btn px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-[#49B1F5] text-white transition-colors">文本</button>
+          <button data-mode="canvas" class="mode-btn px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:text-gray-800 transition-colors">Canvas</button>
+          <button data-mode="color" class="mode-btn px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:text-gray-800 transition-colors">彩色</button>
+        </div>
+
+        <!-- 图像预处理 - 可折叠 -->
+        <div class="border border-gray-200 rounded-lg">
+          <div id="toggle-filter" class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors">
+            <span class="text-sm text-gray-600">图像预处理</span>
+            <span id="filter-arrow" class="text-xs text-gray-400">▼</span>
+          </div>
+          <div id="filter-panel" class="px-3 pb-3 space-y-2">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">亮度</label>
+              <input type="range" id="brightness" min="0" max="200" value="100" class="flex-1" />
+              <span id="bright-val" class="text-xs text-gray-400 w-8 text-right">100%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">对比度</label>
+              <input type="range" id="contrast" min="0" max="200" value="100" class="flex-1" />
+              <span id="contrast-val" class="text-xs text-gray-400 w-8 text-right">100%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">饱和度</label>
+              <input type="range" id="saturation" min="0" max="200" value="100" class="flex-1" />
+              <span id="sat-val" class="text-xs text-gray-400 w-8 text-right">100%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">色相</label>
+              <input type="range" id="hue" min="0" max="360" value="0" class="flex-1" />
+              <span id="hue-val" class="text-xs text-gray-400 w-8 text-right">0°</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">灰度</label>
+              <input type="range" id="grayscale" min="0" max="100" value="0" class="flex-1" />
+              <span id="gray-val" class="text-xs text-gray-400 w-8 text-right">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">复古</label>
+              <input type="range" id="sepia" min="0" max="100" value="0" class="flex-1" />
+              <span id="sepia-val" class="text-xs text-gray-400 w-8 text-right">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">反色</label>
+              <input type="range" id="invert" min="0" max="100" value="0" class="flex-1" />
+              <span id="inv-val" class="text-xs text-gray-400 w-8 text-right">0%</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">阈值</label>
+              <input type="range" id="threshold" min="0" max="255" value="0" class="flex-1" />
+              <span id="thresh-val" class="text-xs text-gray-400 w-8 text-right">关</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">边缘检测</label>
+              <select id="edge" class="flex-1 text-xs border border-gray-200 rounded px-2 py-1">
+                <option value="none">关闭</option>
+                <option value="sobel">Sobel</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ASCII 样式 -->
+        <div class="border border-gray-200 rounded-lg">
+          <div class="flex items-center justify-between px-3 py-2">
+            <span class="text-sm text-gray-600">ASCII 样式</span>
+          </div>
+          <div class="px-3 pb-3 space-y-2">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">字符集</label>
+              <select id="char-set" class="flex-1 text-xs border border-gray-200 rounded px-2 py-1">
+                <option value="@%#*+=-:. ">普通 (@%#*+=-:. )</option>
+                <option value="$@B%8&amp;WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~&lt;&gt;i!lI;:,&quot;^`. ">普通2 (Extended)</option>
+                <option value="@MBHENR#KWXDFPQASUZbdehx*8Gm&amp;04LOVYkpq5Tagns69owz$CIu23Jcfry%1v7l+it[] {}?j|()=~!-/&lt;&gt;&quot;^_&apos;;,:`. ">极简 (Minimalist)</option>
+                <option value="█▓▒░ ">方块 (Blocks)</option>
+                <option value="01">二进制 (01)</option>
+                <option value=" .-~+=*#%@">反色 (Inverted)</option>
+                <option value="0123456789">数字 (Numerical)</option>
+                <option value="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">字母 (Alphabetic)</option>
+                <option value="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">字母数字 (Alphanum)</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500 w-14 shrink-0">空白密度</label>
+              <input type="range" id="space-density" min="1" max="10" value="1" class="flex-1" />
+              <span id="space-val" class="text-xs text-gray-400 w-5 text-right">1</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="output-section" class="hidden space-y-4">
+      <pre id="text-output" class="bg-white rounded-xl border border-gray-200 p-4 overflow-auto hidden" style="font-family:monospace;font-size:5px;line-height:5px;"></pre>
+      <div id="canvas-output" class="hidden bg-white rounded-xl border border-gray-200 p-2 overflow-auto">
+        <canvas id="ascii-canvas"></canvas>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-copy" class="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">复制文本</button>
+        <button id="btn-download-txt" class="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">下载 TXT</button>
+        <button id="btn-download-png" class="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors hidden">下载 PNG</button>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  var charSets = {
+    '@%#*+=-:. ':  null,
+    '█▓▒░ ':       null,
+    '01':          null,
+    'MNHQOC?7!~ ': null,
+    ' .-~+=*#%@':  null
+  };
+
+  var CHARS = '@%#*+=-:. ';
+  var DENSITY = [0, 28, 56, 84, 112, 140, 168, 196, 224, 255];
+  var mode = 'text', imgData = null, cols = 120;
+
+  // ── DOM ──
+  var dropZone = document.getElementById('drop-zone');
+  var fileInput = document.getElementById('file-input');
+  var previewBox = document.getElementById('preview-box');
+  var previewImg = document.getElementById('preview-img');
+  var controls = document.getElementById('controls');
+  var outputSection = document.getElementById('output-section');
+  var textOutput = document.getElementById('text-output');
+  var canvasOutput = document.getElementById('canvas-output');
+  var asciiCanvas = document.getElementById('ascii-canvas');
+  var btnDownloadPng = document.getElementById('btn-download-png');
+
+  // ── 折叠面板 ──
+  document.getElementById('toggle-filter').addEventListener('click', function() {
+    var panel = document.getElementById('filter-panel');
+    var arrow = document.getElementById('filter-arrow');
+    if (panel.style.display === 'none') { panel.style.display = ''; arrow.textContent = '▼'; }
+    else { panel.style.display = 'none'; arrow.textContent = '▶'; }
+  });
+
+  // ── 上传 ──
+  dropZone.addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', function(e) { loadFile(e.target.files[0]); });
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('border-[#49B1F5]'); });
+  dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('border-[#49B1F5]'); });
+  dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('border-[#49B1F5]'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+  document.addEventListener('paste', function(e) { var item = e.clipboardData.items[0]; if (item && item.type.indexOf('image') !== -1) loadFile(item.getAsFile()); });
+
+  function loadFile(file) {
+    if (!file || file.type.indexOf('image') === -1) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() { imgData = img; previewImg.src = e.target.result; previewBox.classList.remove('hidden'); controls.classList.remove('hidden'); outputSection.classList.remove('hidden'); convert(); };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── 滑块绑值 ──
+  function bindSlider(id, labelId, suffix) {
+    var s = document.getElementById(id);
+    var l = document.getElementById(labelId);
+    s.addEventListener('input', function() {
+      l.textContent = s.value + suffix;
+      convert();
+    });
+  }
+  bindSlider('cols-slider', 'cols-value', '');
+  bindSlider('brightness', 'bright-val', '%');
+  bindSlider('contrast', 'contrast-val', '%');
+  bindSlider('saturation', 'sat-val', '%');
+  bindSlider('hue', 'hue-val', '°');
+  bindSlider('grayscale', 'gray-val', '%');
+  bindSlider('sepia', 'sepia-val', '%');
+  bindSlider('invert', 'inv-val', '%');
+  bindSlider('space-density', 'space-val', '');
+
+  var threshSlider = document.getElementById('threshold');
+  var threshLabel = document.getElementById('thresh-val');
+  threshSlider.addEventListener('input', function() {
+    threshLabel.textContent = threshSlider.value == 0 ? '关' : threshSlider.value;
+    convert();
+  });
+
+  document.getElementById('cols-slider').addEventListener('input', function() { cols = parseInt(this.value); });
+  document.getElementById('char-set').addEventListener('change', function() {
+    CHARS = this.value;
+    convert();
+  });
+  document.getElementById('edge').addEventListener('change', function() { convert(); });
+
+  // ── 模式 ──
+  document.querySelectorAll('.mode-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      mode = btn.dataset.mode;
+      document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('bg-[#49B1F5]', 'text-white'); b.classList.add('text-gray-500', 'border-gray-200'); });
+      btn.classList.add('bg-[#49B1F5]', 'text-white');
+      btnDownloadPng.classList.toggle('hidden', mode === 'text');
+      convert();
+    });
+  });
+
+  // ── 密度表重建 ──
+  function buildDensity() {
+    var n = CHARS.length - 1;
+    if (n <= 0) return [0];
+    var d = [];
+    for (var i = 0; i <= n; i++) d.push(Math.floor(i * 255 / n));
+    return d;
+  }
+
+  // ── 边缘检测 Sobel ──
+  function applySobel(pixels, w, h) {
+    var gray = new Uint8Array(w * h);
+    for (var i = 0; i < w * h; i++) gray[i] = 0.299 * pixels[i*4] + 0.587 * pixels[i*4+1] + 0.114 * pixels[i*4+2];
+    var out = new Uint8ClampedArray(pixels.length);
+    for (var y = 1; y < h - 1; y++) {
+      for (var x = 1; x < w - 1; x++) {
+        var idx = (y * w + x);
+        var gx = -gray[idx-w-1] - 2*gray[idx-1] - gray[idx+w-1] + gray[idx-w+1] + 2*gray[idx+1] + gray[idx+w+1];
+        var gy = -gray[idx-w-1] - 2*gray[idx-w] - gray[idx-w+1] + gray[idx+w-1] + 2*gray[idx+w] + gray[idx+w+1];
+        var mag = Math.min(255, Math.sqrt(gx*gx + gy*gy));
+        var o = idx * 4;
+        out[o] = out[o+1] = out[o+2] = mag;
+        out[o+3] = 255;
+      }
+    }
+    return out;
+  }
+
+  // ── 核心转换 ──
+  function convert() {
+    if (!imgData) return;
+    var colsVal = parseInt(document.getElementById('cols-slider').value);
+    var w = imgData.width, h = imgData.height;
+    var cW = w / colsVal;
+    var rows = Math.floor(h / cW * 0.5);
+    if (rows < 1) rows = 1;
+
+    var offCanvas = document.createElement('canvas');
+    offCanvas.width = colsVal;
+    offCanvas.height = rows;
+    var octx = offCanvas.getContext('2d');
+
+    // CSS 滤镜
+    var f = [];
+    var b = document.getElementById('brightness').value;
+    var c = document.getElementById('contrast').value;
+    var s = document.getElementById('saturation').value;
+    var hue = document.getElementById('hue').value;
+    var gray = document.getElementById('grayscale').value;
+    var sepia = document.getElementById('sepia').value;
+    var inv = document.getElementById('invert').value;
+    if (b != 100) f.push('brightness(' + (b/100) + ')');
+    if (c != 100) f.push('contrast(' + (c/100) + ')');
+    if (s != 100) f.push('saturate(' + (s/100) + ')');
+    if (hue != 0) f.push('hue-rotate(' + hue + 'deg)');
+    if (gray > 0) f.push('grayscale(' + (gray/100) + ')');
+    if (sepia > 0) f.push('sepia(' + (sepia/100) + ')');
+    if (inv > 0) f.push('invert(' + (inv/100) + ')');
+    octx.filter = f.join(' ');
+    octx.drawImage(imgData, 0, 0, colsVal, rows);
+    var pixels = octx.getImageData(0, 0, colsVal, rows).data;
+
+    // 边缘检测
+    if (document.getElementById('edge').value === 'sobel') {
+      pixels = applySobel(pixels, colsVal, rows);
+    }
+
+    // 阈值处理
+    var thresh = parseInt(document.getElementById('threshold').value);
+    var density = buildDensity();
+
+    // 空白密度
+    var spaceDensity = parseInt(document.getElementById('space-density').value);
+
+    var asciiRows = [];
+    for (var y = 0; y < rows; y++) {
+      var line = '';
+      var skipCount = 0;
+      for (var x = 0; x < colsVal; x++) {
+        var idx = (y * colsVal + x) * 4;
+        var grayVal = 0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2];
+
+        if (thresh > 0) grayVal = grayVal < thresh ? 0 : 255;
+
+        if (spaceDensity > 1 && grayVal < 30) {
+          skipCount++;
+          if (skipCount >= spaceDensity) { line += ' '; skipCount = 0; }
+          continue;
+        }
+        skipCount = 0;
+
+        var ch = ' ';
+        for (var i = 0; i < density.length; i++) {
+          if (grayVal <= density[i]) { ch = CHARS[i] || ' '; break; }
+        }
+        line += ch;
+      }
+      asciiRows.push(line);
+    }
+
+    if (mode === 'text') {
+      renderText(asciiRows);
+    } else {
+      renderCanvas(imgData, asciiRows, w, h, colsVal, rows);
+    }
+  }
+
+  function renderText(rows) {
+    textOutput.classList.remove('hidden');
+    canvasOutput.classList.add('hidden');
+    textOutput.textContent = rows.join('\n');
+  }
+
+  function renderCanvas(img, rows, w, h, colsVal, rowCount) {
+    textOutput.classList.add('hidden');
+    canvasOutput.classList.remove('hidden');
+    var cw = Math.min(900, colsVal * 4);
+    asciiCanvas.width = cw;
+    asciiCanvas.height = rowCount * (cw / colsVal * 2);
+    var ctx = asciiCanvas.getContext('2d');
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, asciiCanvas.width, asciiCanvas.height);
+
+    var cW = asciiCanvas.width / colsVal;
+    var cH = asciiCanvas.height / rowCount;
+    var dotW = cW * 1.2, dotH = cH * 1.2;
+    var offX = (cW - dotW) / 2, offY = (cH - dotH) / 2;
+
+    var colorData = null;
+    if (mode === 'color') {
+      var offC = document.createElement('canvas');
+      offC.width = colsVal; offC.height = rowCount;
+      var cctx = offC.getContext('2d');
+      cctx.drawImage(img, 0, 0, colsVal, rowCount);
+      colorData = cctx.getImageData(0, 0, colsVal, rowCount).data;
+    }
+
+    var density = buildDensity();
+    for (var y = 0; y < rowCount; y++) {
+      for (var x = 0; x < colsVal; x++) {
+        var ch = rows[y][x];
+        if (ch === ' ') continue;
+        var alpha = 0.1 + (density[CHARS.indexOf(ch)] || 128) / 280;
+        if (mode === 'color' && colorData) {
+          var idx = (y * colsVal + x) * 4;
+          ctx.fillStyle = 'rgba(' + colorData[idx] + ',' + colorData[idx+1] + ',' + colorData[idx+2] + ',' + alpha + ')';
+        } else {
+          ctx.fillStyle = 'rgba(200,200,210,' + alpha + ')';
+        }
+        ctx.fillRect(x * cW + offX, y * cH + offY, dotW, dotH);
+      }
+    }
+  }
+
+  // ── 按钮 ──
+  document.getElementById('btn-copy').addEventListener('click', function() {
+    var ta = document.createElement('textarea');
+    ta.value = textOutput.textContent;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    alert('已复制到剪贴板');
+  });
+  document.getElementById('btn-download-txt').addEventListener('click', function() {
+    var blob = new Blob([textOutput.textContent], { type: 'text/plain' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ascii-art.txt'; a.click();
+  });
+  document.getElementById('btn-download-png').addEventListener('click', function() {
+    var a = document.createElement('a'); a.href = asciiCanvas.toDataURL('image/png'); a.download = 'ascii-art.png'; a.click();
+  });
+</script>
+
+<style>
+  #drop-zone { min-height: 80px; }
+  #text-output::-webkit-scrollbar { width: 6px; height: 6px; }
+  #text-output::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  input[type=range] { accent-color: #49B1F5; }
+</style>
