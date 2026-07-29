@@ -13,6 +13,7 @@ const posts = allPosts.map(p => ({
 ---
 
 <BaseLayout title="搜索 - 摸鱼骑士 知识库">
+  <script type="application/json" id="post-data" data-base={import.meta.env.BASE_URL}>{JSON.stringify(posts)}</script>
   <h1 class="text-3xl font-bold mb-8">搜索</h1>
   <div class="max-w-md">
     <input
@@ -27,25 +28,29 @@ const posts = allPosts.map(p => ({
 </BaseLayout>
 
 <script>
-  const postData = JSON.parse('{JSON.stringify(posts)}');
-  const input = document.getElementById('search-input') as HTMLInputElement;
-  const results = document.getElementById('search-results')!;
-  const baseUrl = import.meta.env.BASE_URL;
+  var postData = JSON.parse(document.getElementById('post-data').textContent);
+  var input = document.getElementById('search-input');
+  var results = document.getElementById('search-results');
+  var baseUrl = document.querySelector('#post-data').getAttribute('data-base') || '/astro-blog';
 
-  input?.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
-    if (!q) { results.innerHTML = ''; return; }
-    const filtered = postData.filter((p: any) =>
-      p.title.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      p.tags.some((t: string) => t.toLowerCase().includes(q))
-    );
-    results.innerHTML = filtered.length
-      ? filtered.map((p: any) => `
-        <a href="${baseUrl}posts/${p.slug}" class="card block p-4 hover:shadow-md transition-shadow">
-          <h3 class="font-medium text-gray-800">${p.title}</h3>
-          <p class="text-sm text-gray-400 mt-1">${p.date}</p>
-        </a>`).join('')
-      : '<p class="text-gray-400">未找到相关文章</p>';
+  var timer = null;
+  input && input.addEventListener('input', function() {
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      var q = input.value.trim().toLowerCase();
+      if (!q) { results.innerHTML = ''; return; }
+      var filtered = postData.filter(function(p) {
+        return p.title.toLowerCase().indexOf(q) !== -1 ||
+               p.description.toLowerCase().indexOf(q) !== -1 ||
+               p.tags.some(function(t) { return t.toLowerCase().indexOf(q) !== -1; });
+      });
+      results.innerHTML = filtered.length
+        ? filtered.map(function(p) {
+            return '<a href="' + baseUrl + '/posts/' + p.slug + '" class="card block p-4 hover:shadow-md transition-shadow">' +
+              '<h3 class="font-medium text-gray-800">' + p.title + '</h3>' +
+              '<p class="text-sm text-gray-400 mt-1">' + p.date + '</p></a>';
+          }).join('')
+        : '<p class="text-gray-400">未找到相关文章</p>';
+    }, 300);
   });
 </script>
