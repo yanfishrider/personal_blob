@@ -1,45 +1,129 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ProfileSidebar from '../components/ProfileSidebar.astro';
+import SiteStats from '../components/SiteStats.astro';
+import BlogCalendar from '../components/BlogCalendar.astro';
 import { getCollection } from 'astro:content';
 
 const posts = await getCollection('posts', ({ data }) => !data.draft);
 posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const tagSet = new Set<string>();
+const catSet = new Set<string>();
+posts.forEach(p => {
+  p.data.tags?.forEach(t => tagSet.add(t));
+  if (p.data.category) catSet.add(p.data.category);
+});
+const tagCount = tagSet.size;
+const catCount = catSet.size;
+
+const recentPosts = posts.slice(0, 8).map(p => ({ slug: p.slug, title: p.data.title }));
+
+const postDates = posts.map(p => {
+  const d = p.data.date;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+});
+
+const lastUpdate = posts.length > 0 ? posts[0].data.date : new Date();
 ---
 
-<BaseLayout title="我的博客" description="一个安静的角落，写点东西。">
-  <div class="mb-10">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">文章</h1>
-    <p class="text-gray-500">一个安静的角落，写点东西。</p>
-  </div>
+<BaseLayout title="摸鱼骑士 知识库" description="代码如诗，架构如画。">
+  <ProfileSidebar slot="sidebar" postCount={posts.length} tagCount={tagCount} categoryCount={catCount} recentPosts={recentPosts} />
 
-  {
-    posts.length === 0 ? (
-      <p class="text-gray-400 text-center py-20">还没有文章。</p>
-    ) : (
-      <ul class="space-y-6">
-        {posts.map((post) => (
-          <li>
-            <a href={`${import.meta.env.BASE_URL}posts/${post.slug}`} class="block group">
-              <time class="text-sm text-gray-400">
+  <div id="center-view" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+    <h2 class="section-header text-sm font-medium text-gray-400 uppercase tracking-wider mb-6">最新文章</h2>
+
+    {
+      posts.length === 0 ? (
+        <p class="text-gray-400 text-center py-20">还没有文章。</p>
+      ) : (
+        <div class="post-grid grid gap-5 grid-cols-2">
+          {posts.map((post) => (
+            <a href={`${import.meta.env.BASE_URL}/posts/${post.slug}`}
+               class="post-card group block bg-gray-50 rounded-xl border border-gray-200 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <time class="text-xs text-gray-400">
                 {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
               </time>
-              <h2 class="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors mt-1">
+              <h3 class="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition-colors mt-2 mb-1.5 line-clamp-2">
                 {post.data.title}
-              </h2>
+              </h3>
               {post.data.description && (
-                <p class="text-gray-500 text-sm mt-1.5">{post.data.description}</p>
+                <p class="text-sm text-gray-500 line-clamp-2 mb-3">{post.data.description}</p>
               )}
-              {post.data.tags && post.data.tags.length > 0 && (
-                <div class="flex gap-2 mt-2">
-                  {post.data.tags.map((tag: string) => (
-                    <span class="bg-gray-100 text-gray-400 px-2 py-0.5 rounded text-xs">{tag}</span>
-                  ))}
-                </div>
-              )}
+              <div class="flex items-center gap-2 flex-wrap">
+                {post.data.category && (
+                  <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">{post.data.category}</span>
+                )}
+                {post.data.tags?.map((tag: string) => (
+                  <span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">{tag}</span>
+                ))}
+              </div>
             </a>
-          </li>
-        ))}
-      </ul>
-    )
-  }
+          ))}
+        </div>
+      )
+    }
+  </div>
+
+  <aside slot="rightSidebar" class="w-[14%] min-w-[150px] shrink-0 space-y-4">
+    <SiteStats postCount={posts.length} lastUpdate={lastUpdate} />
+    <BlogCalendar postDates={postDates} />
+  </aside>
 </BaseLayout>
+
+<script>
+  var centerView = document.getElementById('center-view');
+  if (!centerView) throw new Error('missing #center-view');
+
+  var listHTML = centerView.innerHTML;
+
+  // 事件委托：拦截卡片点击
+  centerView.addEventListener('click', function(e) {
+    var card = e.target.closest('a.post-card');
+    if (!card) return;
+    e.preventDefault();
+    loadPost(card.getAttribute('href'));
+  });
+
+  function backBtn() {
+    return '<button id="back-to-list" class="flex items-center gap-1 text-sm text-gray-400 hover:text-[#49B1F5] transition-colors mb-6">' +
+      '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>' +
+      '返回列表</button>';
+  }
+
+  async function loadPost(href) {
+    centerView.innerHTML = '<div class="text-center py-20"><span class="text-gray-400 text-sm">加载中...</span></div>';
+    try {
+      var res = await fetch(href);
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + href);
+      var html = await res.text();
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var article = doc.getElementById('post-article');
+      if (!article) throw new Error('article#post-article not found in ' + href);
+
+      centerView.innerHTML = backBtn() + article.outerHTML;
+
+      var btn = document.getElementById('back-to-list');
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          history.back();
+        });
+      }
+
+      history.pushState({ view: 'post', href: href }, '', href);
+    } catch (err) {
+      console.error('loadPost failed:', err);
+      centerView.innerHTML = '<div class="text-center py-20 text-gray-400 text-sm">加载失败，请刷新重试</div>';
+    }
+  }
+
+  window.addEventListener('popstate', function(e) {
+    if (e.state && e.state.view === 'post') {
+      loadPost(e.state.href);
+    } else {
+      centerView.innerHTML = listHTML;
+    }
+  });
+</script>

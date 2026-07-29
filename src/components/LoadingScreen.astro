@@ -1,8 +1,11 @@
 ---
-// LoadingScreen.astro — NieR 风格页面加载动画（网格点阵徽章 + 代码雨 + 终端打字）
-// 徽章源码: ascii-art.txt（编辑此文件即可改徽章）
+// LoadingScreen.astro — 页面加载动画（NieR 风格 / P3RE 风格 / 无动画）
+// NieR 徽章源码: ascii-art.txt
+// P3RE 素材: public/assset/, public/img/waves/, public/img/P3RE.svg
+const base = import.meta.env.BASE_URL;
 ---
 
+<!-- ===== NieR 风格 ===== -->
 <div id="nier-loading" class="fixed inset-0 z-[9999] overflow-hidden" style="background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px;">
   <canvas id="nier-grid-art" class="absolute inset-0 w-full h-full z-[5] pointer-events-none"></canvas>
 
@@ -15,108 +18,269 @@
   <div id="nier-lines" class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"></div>
 </div>
 
+<!-- ===== P3RE 风格 ===== -->
+<div id="p3re-loading" class="fixed inset-0 z-[9999] overflow-hidden" style="display:none" data-base={import.meta.env.BASE_URL}>
+  <!-- 海浪幕布 -->
+  <div id="p3re-startwaves" class="fixed flex justify-center w-full" style="height:120vh;background-color:#469ce5;transform:translateY(-10vh);z-index:999;">
+    <div id="p3re-waves" class="block absolute w-full" style="bottom:120vh;">
+      <img src={`${base}/img/waves/wave-1.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-2.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-3.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-4.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-5.svg`} id="p3re-shape" alt="" />
+    </div>
+  </div>
+
+  <!-- 视频背景 -->
+  <div id="p3re-videobg" style="width:100%;height:100%;">
+    <video id="p3re-video1" muted playsinline class="p3re-video"></video>
+    <video id="p3re-video2" muted playsinline loop class="p3re-video"></video>
+
+    <div id="p3re-centertext">
+      <h1>Memento Mori</h1>
+      <p>Remember, You Will Die.<br/>Time never waits.<br/>It delivers all equally to the same end.</p>
+    </div>
+
+    <img id="p3re-logo" src={`${base}/img/P3RE.svg`} alt="" />
+
+    <div id="p3re-enter" style="display:none;position:absolute;bottom:3rem;left:50%;transform:translateX(-50%);color:#fff;font-size:0.875rem;opacity:0.6;cursor:pointer;letter-spacing:0.1em;transition:opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+      点击任意位置进入
+    </div>
+  </div>
+</div>
+
 <script>
-  import asciiRaw from '../../ascii-art.txt?raw';
-  const ASCII_EMBLEM = asciiRaw.split('\n').filter(r => r.length > 0);
+  var B = document.getElementById('p3re-loading').dataset.base;
 
-  const GLITCH_CHARS = '!@#$%^&*<>?|/\\{}[]±§※☆★○●◎◇◆□■△▲▽▼→←↑↓↔↕♠♣♥♦♂♀∞≈≠≤≥';
-  function randomGlitch() { return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]; }
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  var anim = localStorage.getItem('loading-animation') || 'nier';
+  var nierEl = document.getElementById('nier-loading');
+  var p3reEl = document.getElementById('p3re-loading');
 
-  const lines = [
-    '连接服务器 - 完成','页面资源 - 完毕','渲染引擎 - 初始化',
-    '全局样式表 - 已解析','字体文件 - 已加载','脚本模块 - 已编译',
-    'WebSocket连接 - 已建立','路由表 - 初始化','资源完整性 - 已验证','页面准备就绪',
-  ];
-
-  if ((localStorage.getItem('loading-animation') || 'nier') !== 'nier') {
-    document.getElementById('nier-loading')?.remove();
-  } else if (sessionStorage.getItem('nier-intro-done')) {
-    document.getElementById('nier-loading')?.remove();
+  if (anim === 'none') {
+    nierEl?.remove();
+    p3reEl?.remove();
+  } else if (anim === 'p3re') {
+    nierEl?.remove();
+    p3reEl.style.display = '';
+    runP3RE();
   } else {
-    sessionStorage.setItem('nier-intro-done', '1');
+    // nier
+    p3reEl?.remove();
+    if (!sessionStorage.getItem('nier-intro-done')) {
+      sessionStorage.setItem('nier-intro-done', '1');
+      runNier();
+    } else {
+      nierEl?.remove();
+    }
+  }
 
-    // 5px 格 → 与 CSS 网格对齐
-    const CELL = 1.5, GAP = 0, STEP = CELL + GAP; // 缩小25%
-    const DOT = 2, OFF = (CELL - DOT) / 2;
-    const STRETCH_Y = 2.75; // 拉长10%
-    const STRETCH_X = 1.5;  // 拉宽10%
-    const DENSITY_MAP = {
-      ' ': 0, '@': 0.50, '#': 0.44, '%': 0.38, '*': 0.32, '=': 0.26,
-      '+': 0.20, '-': 0.14, ':': 0.08, '.': 0.04,
-    };
+  /* ============ P3RE ============ */
+  function runP3RE() {
+    var baseAsset = B + '/assset/';
+    var v1 = document.getElementById('p3re-video1');
+    var v2 = document.getElementById('p3re-video2');
+    var waves = document.getElementById('p3re-startwaves');
 
-    function drawGridArt() {
-      const canvas = document.getElementById('nier-grid-art');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    // 海浪幕布下滑
+    waves.style.animation = 'p3re-down 3s ease-out 1s forwards';
 
-      function drawDots(arr, ox, oy) {
-        for (let r = 0; r < arr.length; r++) {
-          const row = arr[r];
-          for (let c = 0; c < row.length; c++) {
-            const a = DENSITY_MAP[row[c]] || 0;
-            if (a > 0) {
-              ctx.fillStyle = `rgba(200,200,210,${a})`;
-              ctx.fillRect(ox + c * STEP * STRETCH_X + OFF, oy + r * STEP * STRETCH_Y + OFF, DOT * STRETCH_X, DOT * STRETCH_Y);
+    // 用 setTimeout 作主触发器（比 animationend 更可靠）
+    var WAVE_TOTAL = 3600; // 1s delay + 3s duration - 500ms提前
+    var revealed = false;
+
+    function revealVideo() {
+      if (revealed) return;
+      revealed = true;
+      waves.style.display = 'none';
+
+      // 设置视频 src 并在 load 后播放
+      v1.src = baseAsset + 'fv_movie1.mp4';
+      v1.load();
+      var play1 = v1.play();
+      if (play1) play1.catch(function(){});
+
+      v1.addEventListener('ended', function() {
+        v1.style.display = 'none';
+        v2.src = baseAsset + 'fv_movie2.mp4';
+        v2.load();
+        var play2 = v2.play();
+        if (play2) play2.catch(function(){});
+
+        setTimeout(function() {
+          var enter = document.getElementById('p3re-enter');
+          if (enter) enter.style.display = 'block';
+        }, 2000);
+      });
+    }
+
+    setTimeout(revealVideo, WAVE_TOTAL);
+    // animationend 作为兜底，提前触发也不浪费
+    waves.addEventListener('animationend', revealVideo);
+
+    // 点击任意位置关闭
+    p3reEl.addEventListener('click', function() {
+      p3reEl.style.transition = 'opacity 0.6s ease-out';
+      p3reEl.style.opacity = '0';
+      sessionStorage.setItem('nier-intro-done', '1');
+      setTimeout(function() { p3reEl.remove(); }, 600);
+    });
+  }
+
+  /* ============ NieR ============ */
+  function runNier() {
+    // 点击任意位置跳过
+    function dismissNier() {
+      if (!nierEl) return;
+      nierEl.style.transition = 'opacity 0.6s ease-out';
+      nierEl.style.opacity = '0';
+      setTimeout(function() { nierEl.remove(); }, 600);
+    }
+    nierEl.addEventListener('click', dismissNier);
+
+    import('../../ascii-art.txt?raw').then(function(m) {
+      var ASCII_EMBLEM = m.default.split('\n').filter(function(r) { return r.length > 0; });
+
+      var GLITCH_CHARS = '!@#$%^&*<>?|/\\\\{}[]\u00b1\u00a7\u203b\u2606\u2605\u25cb\u25cf\u25c7\u25c6\u25a1\u25a0\u25b3\u25b2\u25bd\u25bc\u2192\u2190\u2191\u2193\u2194\u2195\u2660\u2663\u2665\u2666\u2642\u2640\u221e\u2248\u2260\u2264\u2265';
+      function randomGlitch() { return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]; }
+      function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+      var lines = [
+        '连接服务器 - 完成','页面资源 - 完毕','渲染引擎 - 初始化',
+        '全局样式表 - 已解析','字体文件 - 已加载','脚本模块 - 已编译',
+        'WebSocket连接 - 已建立','路由表 - 初始化','资源完整性 - 已验证','页面准备就绪',
+      ];
+
+      var CELL = 1.5, GAP = 0, STEP = CELL + GAP;
+      var DOT = 2, OFF = (CELL - DOT) / 2;
+      var STRETCH_Y = 2.75, STRETCH_X = 1.5;
+      var DENSITY_MAP = {
+        ' ': 0, '@': 0.50, '#': 0.44, '%': 0.38, '*': 0.32, '=': 0.26,
+        '+': 0.20, '-': 0.14, ':': 0.08, '.': 0.04,
+      };
+
+      function drawGridArt() {
+        var canvas = document.getElementById('nier-grid-art');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        function drawDots(arr, ox, oy) {
+          for (var r = 0; r < arr.length; r++) {
+            var row = arr[r];
+            for (var c = 0; c < row.length; c++) {
+              var a = DENSITY_MAP[row[c]] || 0;
+              if (a > 0) {
+                ctx.fillStyle = 'rgba(200,200,210,' + a + ')';
+                ctx.fillRect(ox + c * STEP * STRETCH_X + OFF, oy + r * STEP * STRETCH_Y + OFF, DOT * STRETCH_X, DOT * STRETCH_Y);
+              }
             }
           }
         }
+
+        var ew = ASCII_EMBLEM[0].length * STEP * STRETCH_X;
+        var eh = ASCII_EMBLEM.length * STEP * STRETCH_Y;
+        var ox = (canvas.width - ew) / 2;
+        var oy = (canvas.height - eh) / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawDots(ASCII_EMBLEM, ox, oy);
       }
 
-      const ew = ASCII_EMBLEM[0].length * STEP * STRETCH_X;
-      const eh = ASCII_EMBLEM.length * STEP * STRETCH_Y;
-      const ox = (canvas.width - ew) / 2; // 居中
-      const oy = (canvas.height - eh) / 2;
+      drawGridArt();
+      window.addEventListener('resize', drawGridArt);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawDots(ASCII_EMBLEM, ox, oy);
-    }
+      var container = document.getElementById('nier-lines');
+      var CHAR_DELAY = 22, GLITCH_DURATION = 28;
+      var glitchChance = Math.random() * 0.08;
+      var dotsEl = document.getElementById('nier-dots');
+      var dotStates = ['_', '.', '..', '...', ''];
+      var dotIdx = 0;
+      var dotTimer = setInterval(function() { if (dotsEl) dotsEl.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
 
-    drawGridArt();
-    window.addEventListener('resize', drawGridArt);
-
-    const container = document.getElementById('nier-lines');
-    if (!container) throw new Error('missing #nier-lines');
-    const CHAR_DELAY = 22, GLITCH_DURATION = 28;
-    const glitchChance = Math.random() * 0.08;
-    const dotsEl = document.getElementById('nier-dots');
-    const dotStates = ['_', '.', '..', '...', ''];
-    let dotIdx = 0;
-    const dotTimer = setInterval(() => { if (dotsEl) dotsEl.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
-
-    async function typeLine(text, isLast) {
-      const el = document.createElement('p');
-      el.className = 'tracking-wider';
-      container.appendChild(el);
-      for (let i = 0; i < text.length; i++) {
-        const span = document.createElement('span');
-        span.className = 'nier-char'; span.style.color = 'rgba(255,255,255,0.2)'; span.textContent = text[i];
-        if (Math.random() < glitchChance) {
-          const gs = document.createElement('span'); gs.textContent = randomGlitch(); gs.style.color = 'rgba(255,255,255,0.5)';
-          el.appendChild(gs); await sleep(GLITCH_DURATION); el.removeChild(gs);
+      async function typeLine(text, isLast) {
+        var el = document.createElement('p');
+        el.className = 'tracking-wider';
+        container.appendChild(el);
+        for (var i = 0; i < text.length; i++) {
+          var span = document.createElement('span');
+          span.className = 'nier-char'; span.style.color = 'rgba(255,255,255,0.2)'; span.textContent = text[i];
+          if (Math.random() < glitchChance) {
+            var gs = document.createElement('span'); gs.textContent = randomGlitch(); gs.style.color = 'rgba(255,255,255,0.5)';
+            el.appendChild(gs); await sleep(GLITCH_DURATION); el.removeChild(gs);
+          }
+          el.appendChild(span);
+          requestAnimationFrame(function() { span.style.transition = 'color 0.25s ease-out'; span.style.color = '#fff'; });
+          await sleep(CHAR_DELAY);
         }
-        el.appendChild(span);
-        requestAnimationFrame(() => { span.style.transition = 'color 0.25s ease-out'; span.style.color = '#fff'; });
-        await sleep(CHAR_DELAY);
+        if (isLast) { var c = document.createElement('span'); c.className = 'nier-char'; c.style.color = '#fff'; c.textContent = '_'; el.appendChild(c); await sleep(300); c.style.opacity = '0'; await sleep(200); c.style.opacity = '1'; await sleep(300); }
+        await sleep(80);
       }
-      if (isLast) { const c = document.createElement('span'); c.className = 'nier-char'; c.style.color = '#fff'; c.textContent = '_'; el.appendChild(c); await sleep(300); c.style.opacity = '0'; await sleep(200); c.style.opacity = '1'; await sleep(300); }
-      await sleep(80);
-    }
 
-    async function run() {
-      for (let i = 0; i < lines.length; i++) await typeLine(lines[i], i === lines.length - 1);
-      clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
-      await sleep(500);
-      const overlay = document.getElementById('nier-loading');
-      if (overlay) { overlay.style.transition = 'opacity 0.6s ease-out'; overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 600); }
-    }
-    run();
+      async function run() {
+        for (var i = 0; i < lines.length; i++) await typeLine(lines[i], i === lines.length - 1);
+        clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
+        await sleep(500);
+        if (nierEl) { nierEl.style.transition = 'opacity 0.6s ease-out'; nierEl.style.opacity = '0'; setTimeout(function() { nierEl.remove(); }, 600); }
+      }
+      run();
+    });
   }
 </script>
 
 <style is:global>
   #nier-loading { font-family: 'Courier New', 'Source Code Pro', 'Consolas', 'Noto Sans SC', monospace; letter-spacing: 0.05em; }
+
+  /* P3RE 海浪动画 */
+  @keyframes p3re-down {
+    0%   { transform: translateY(-10vh); }
+    100% { transform: translateY(110vh); }
+  }
+  /* P3RE 淡出 */
+  @keyframes p3re-out {
+    100% { opacity: 0; display: none; }
+  }
+  @keyframes p3re-in {
+    100% { opacity: 1; }
+  }
+
+  #p3re-shape {
+    position: absolute; left: 0; bottom: -1vw;
+  }
+  #p3re-waves img:not(#p3re-shape) {
+    position: absolute; left: 0;
+  }
+  #p3re-waves img:nth-child(1) { opacity: 0.8; bottom: -0.1vw; animation: p3re-move-1 5s infinite; }
+  #p3re-waves img:nth-child(2) { opacity: 0.7; bottom: 0.5vw;  animation: p3re-move-2 4s infinite; }
+  #p3re-waves img:nth-child(3) { opacity: 0.6; bottom: 0.3vw;  animation: p3re-move-3 3.5s infinite; }
+  #p3re-waves img:nth-child(4) { opacity: 0.5; bottom: 0.1vw;  animation: p3re-move-4 3s infinite; }
+  @keyframes p3re-move-1 { 50% { transform: translateY(35px); } }
+  @keyframes p3re-move-2 { 50% { transform: translateY(25px); } }
+  @keyframes p3re-move-3 { 50% { transform: translateY(20px); } }
+  @keyframes p3re-move-4 { 50% { transform: translateY(20px); } }
+
+  /* P3RE 视频 */
+  .p3re-video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    position: absolute;
+  }
+  #p3re-videobg {
+    width: 100%; height: 100%;
+  }
+  #p3re-centertext {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center; color: #fff;
+    animation: p3re-out 1.5s 3s forwards;
+  }
+  #p3re-centertext h1 { font-size: 3rem; font-weight: bold; margin-bottom: 1rem; letter-spacing: 0.05em; }
+  #p3re-centertext p  { font-size: 1rem; line-height: 1.8; opacity: 0.8; }
+  #p3re-logo {
+    position: absolute; right: 12%; top: 50%;
+    opacity: 0;
+    transform: translateY(-50%);
+    animation: p3re-in 1.5s 5s forwards;
+    max-height: 120px;
+  }
 </style>

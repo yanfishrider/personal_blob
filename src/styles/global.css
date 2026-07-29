@@ -1,10 +1,6 @@
-@import "tailwindcss";
-
-body {
-  font-family: 'Georgia', 'Noto Serif SC', serif;
-  color: #333;
-  background: #faf9f7;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* 文章内容样式 */
 article h1 { font-size: 2rem; font-weight: 700; margin: 2rem 0 1rem; }

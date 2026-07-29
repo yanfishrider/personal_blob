@@ -15,7 +15,7 @@ const categories = [...catMap.entries()].sort((a, b) => b[1] - a[1]);
   <h1 class="text-3xl font-bold mb-8">分类</h1>
   <div class="grid gap-4 sm:grid-cols-2">
     {categories.map(([name, count]) => (
-      <a href={`${import.meta.env.BASE_URL}?category=${encodeURIComponent(name)}`}
+      <a href={`${import.meta.env.BASE_URL}/?category=${encodeURIComponent(name)}`}
          class="card p-5 flex items-center justify-between hover:shadow-md transition-shadow">
         <span class="font-medium text-gray-700">{name}</span>
         <span class="text-sm text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{count} 篇</span>

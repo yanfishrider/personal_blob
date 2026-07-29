@@ -23,7 +23,7 @@ sorted.forEach(p => {
           {posts.map(p => (
             <li class="flex items-baseline gap-4">
               <span class="text-sm text-gray-400 shrink-0 w-16">{p.data.date.toISOString().slice(5, 10)}</span>
-              <a href={`${import.meta.env.BASE_URL}posts/${p.slug}`} class="text-gray-700 hover:text-blue-600 transition-colors">
+              <a href={`${import.meta.env.BASE_URL}/posts/${p.slug}`} class="text-gray-700 hover:text-blue-600 transition-colors">
                 {p.data.title}
               </a>
             </li>
