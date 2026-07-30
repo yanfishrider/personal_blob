@@ -1,0 +1,136 @@
+<div class="bg-[#1e1e1e] rounded-2xl border border-gray-700 shadow-sm overflow-hidden flex flex-col" id="editor-panel">
+  <div class="flex items-center justify-between px-4 py-2 border-b border-gray-700 bg-[#1a1a1a]">
+    <div class="flex gap-0">
+      <button class="editor-tab active text-xs font-medium px-4 py-1.5 rounded-t border-b-2 transition-colors"
+        style="color:#ff7b42;border-color:#ff7b42;background:transparent;" data-tab="html">HTML</button>
+      <button class="editor-tab text-xs font-medium px-4 py-1.5 rounded-t border-b-2 border-transparent transition-colors text-gray-500 hover:text-gray-300" data-tab="css">CSS</button>
+      <button class="editor-tab text-xs font-medium px-4 py-1.5 rounded-t border-b-2 border-transparent transition-colors text-gray-500 hover:text-gray-300" data-tab="js">JavaScript</button>
+    </div>
+    <span class="text-xs text-gray-600">Ctrl+Space 补全</span>
+    <button id="btn-run" class="text-xs font-medium px-3 py-1 rounded-md text-white transition-all active:scale-95 hover:opacity-90" style="background:#ff7b42;">▶ 运行</button>
+  </div>
+  <div class="flex-1 min-h-0 relative">
+    <div id="editor-html" class="absolute inset-0"></div>
+    <div id="editor-css" class="absolute inset-0 hidden"></div>
+    <div id="editor-js" class="absolute inset-0 hidden"></div>
+  </div>
+  <div id="error-msg" class="hidden text-xs text-red-400 bg-red-900/30 border-t border-red-800 px-4 py-2 font-mono"></div>
+</div>
+
+<script>
+  import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+  import { EditorState } from '@codemirror/state';
+  import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+  import { javascript } from '@codemirror/lang-javascript';
+  import { html } from '@codemirror/lang-html';
+  import { css } from '@codemirror/lang-css';
+  import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
+  import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+  import { tags } from '@codemirror/highlight';
+  import { editors, switchTab, updatePreview, debouncedUpdatePreview } from '../../lib/editor-state';
+  import { loadTopic } from '../../lib/editor-state';
+
+  const animeCompletions = [
+    { label: 'anime', type: 'function', detail: '(params)', info: '创建动画' },
+    { label: 'anime.timeline', type: 'function', detail: '(params)', info: '创建时间轴' },
+    { label: 'anime.stagger', type: 'function', detail: '(value, options)', info: '创建逐项延迟' },
+    { label: 'targets', type: 'property', detail: 'string | NodeList', info: '目标元素选择器' },
+    { label: 'duration', type: 'property', detail: 'number', info: '动画时长 (ms)' },
+    { label: 'delay', type: 'property', detail: 'number | function', info: '延迟 (ms)' },
+    { label: 'loop', type: 'property', detail: 'boolean | number', info: '循环次数' },
+    { label: 'direction', type: 'property', detail: "'normal' | 'reverse' | 'alternate'", info: '动画方向' },
+    { label: 'easing', type: 'property', detail: 'string', info: '缓动函数' },
+    { label: 'translateX', type: 'property', detail: 'number', info: '水平位移' },
+    { label: 'translateY', type: 'property', detail: 'number', info: '垂直位移' },
+    { label: 'rotate', type: 'property', detail: 'number | string', info: '旋转' },
+    { label: 'scale', type: 'property', detail: 'number | [from, to]', info: '缩放' },
+    { label: 'opacity', type: 'property', detail: 'number (0~1)', info: '透明度' },
+    { label: 'backgroundColor', type: 'property', detail: 'string | [from, to]', info: '背景颜色' },
+    { label: 'borderRadius', type: 'property', detail: 'string | [from, to]', info: '圆角' },
+    { label: 'width', type: 'property', detail: 'number | string', info: '宽度' },
+    { label: 'height', type: 'property', detail: 'number | string', info: '高度' },
+    { label: 'begin', type: 'property', detail: 'function', info: '开始回调' },
+    { label: 'complete', type: 'property', detail: 'function', info: '完成回调' },
+    { label: 'update', type: 'property', detail: 'function', info: '每帧回调' },
+    { label: 'linear', type: 'keyword', info: '线性' },
+    { label: 'easeInOutQuad', type: 'keyword', info: '二次缓入缓出' },
+    { label: 'easeInOutCubic', type: 'keyword', info: '三次缓入缓出' },
+    { label: 'easeOutElastic', type: 'keyword', info: '弹性缓出' },
+    { label: 'easeInOutBack', type: 'keyword', info: '回退缓入缓出' },
+    { label: 'easeOutBounce', type: 'keyword', info: '弹跳缓出' },
+    { label: 'easeInOutExpo', type: 'keyword', info: '指数缓入缓出' },
+  ];
+
+  function animeAutocomplete(context: CompletionContext) {
+    const word = context.matchBefore(/\w*/);
+    if (!word || (word.from === word.to && !context.explicit)) return null;
+    return {
+      from: word.from,
+      options: animeCompletions
+        .filter(c => c.label.toLowerCase().startsWith(word.text.toLowerCase()))
+        .map(c => ({ label: c.label, type: c.type as any, detail: c.detail, info: c.info })),
+    };
+  }
+
+  const softHighlight = HighlightStyle.define([
+    { tag: tags.keyword, color: '#8b9dc3' },
+    { tag: tags.string, color: '#8f9a7a' },
+    { tag: tags.number, color: '#c49a6c' },
+    { tag: tags.comment, color: '#5a5a5a', fontStyle: 'italic' },
+    { tag: tags.variableName, color: '#c5c5c5' },
+    { tag: tags.function(tags.variableName), color: '#a8b5c8' },
+    { tag: tags.operator, color: '#888' },
+    { tag: tags.tagName, color: '#8b9dc3' },
+    { tag: tags.attributeName, color: '#a8b5c8' },
+    { tag: tags.attributeValue, color: '#8f9a7a' },
+    { tag: tags.bracket, color: '#777' },
+    { tag: tags.typeName, color: '#a8b5c8' },
+    { tag: tags.className, color: '#a8b5c8' },
+    { tag: tags.propertyName, color: '#c5c5c5' },
+    { tag: tags.bool, color: '#c49a6c' },
+    { tag: tags.null, color: '#c49a6c' },
+    { tag: tags.escape, color: '#c49a6c' },
+    { tag: tags.regexp, color: '#c49a6c' },
+  ]);
+
+  function createEditor(parentId: string, lang: 'html' | 'css' | 'js') {
+    const langExt = lang === 'html' ? html() : lang === 'css' ? css() : javascript();
+    const extra = lang === 'js' ? [autocompletion({ override: [animeAutocomplete] })] : [autocompletion()];
+
+    return new EditorView({
+      state: EditorState.create({
+        doc: '',
+        extensions: [
+          lineNumbers(), highlightActiveLine(), history(),
+          keymap.of([...defaultKeymap, ...historyKeymap]),
+          langExt, syntaxHighlighting(softHighlight),
+          EditorView.theme({
+            '&': { backgroundColor: '#1e1e1e', color: '#d4d4d4' },
+            '.cm-gutters': { backgroundColor: '#1a1a1a', color: '#858585', border: 'none' },
+            '.cm-activeLineGutter': { backgroundColor: '#2a2a2a' },
+            '.cm-activeLine': { backgroundColor: '#2a2a2a40' },
+            '.cm-cursor': { borderLeftColor: '#ff7b42' },
+            '.cm-selectionBackground': { backgroundColor: '#264f7840' },
+            '.cm-matchingBracket': { backgroundColor: '#3a3a3a', outline: '1px solid #555' },
+          }),
+          EditorView.updateListener.of(v => { if (v.docChanged) debouncedUpdatePreview(); }),
+          ...extra,
+        ],
+      }),
+      parent: document.getElementById(parentId)!,
+    });
+  }
+
+  editors['editor-html'] = createEditor('editor-html', 'html');
+  editors['editor-css'] = createEditor('editor-css', 'css');
+  editors['editor-js'] = createEditor('editor-js', 'js');
+
+  document.querySelectorAll('.editor-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab as 'html' | 'css' | 'js'));
+  });
+  document.getElementById('btn-run')!.addEventListener('click', updatePreview);
+
+  loadTopic('intro');
+  switchTab('html');
+  updatePreview();
+</script>

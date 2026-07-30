@@ -1,0 +1,84 @@
+<aside class="w-full md:w-[180px] shrink-0">
+  <div class="md:sticky md:top-[10vh] space-y-0.5" id="nav-tree"></div>
+</aside>
+
+<script>
+  import { topics } from '../../data/anime-topics';
+  import { loadTopic, loadSubTopic, loadSubSubTopic } from '../../lib/editor-state';
+
+  function buildNav() {
+    const container = document.getElementById('nav-tree')!;
+    topics.forEach((topic, i) => {
+      const item = document.createElement('div');
+      item.className = `nav-item ${i === 0 ? 'active' : ''}`;
+      item.dataset.topicId = topic.id;
+      item.innerHTML = topic.children
+        ? `<span>${topic.label}</span><span class="nav-arrow">▸</span>`
+        : topic.label;
+      item.addEventListener('click', () => {
+        if (topic.children) {
+          document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+          loadTopic(topic.id);
+          item.classList.toggle('expanded');
+          const sub = item.nextElementSibling as HTMLElement;
+          if (sub?.classList.contains('nav-sub-wrap')) sub.classList.toggle('hidden');
+        } else {
+          document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+          loadTopic(topic.id);
+        }
+      });
+      container.appendChild(item);
+
+      if (topic.children) {
+        const subWrap = document.createElement('div');
+        subWrap.className = 'nav-sub-wrap hidden';
+        topic.children.forEach((sub) => {
+          const subItem = document.createElement('div');
+          subItem.className = `nav-item nav-sub ${sub.children ? 'has-children' : ''}`;
+          subItem.dataset.subId = sub.id;
+          subItem.innerHTML = sub.children
+            ? `<span>${sub.label}</span><span class="nav-arrow">▸</span>` : sub.label;
+          if (!sub.children) {
+            subItem.addEventListener('click', (e) => {
+              e.stopPropagation();
+              document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+              subItem.classList.add('active');
+              loadSubTopic(topic.id, sub.id);
+            });
+          } else {
+            subItem.addEventListener('click', (e) => {
+              e.stopPropagation();
+              subItem.classList.toggle('expanded');
+              const ss = subItem.nextElementSibling as HTMLElement;
+              if (ss?.classList.contains('nav-sub-wrap')) ss.classList.toggle('hidden');
+            });
+          }
+          subWrap.appendChild(subItem);
+
+          if (sub.children) {
+            const ssWrap = document.createElement('div');
+            ssWrap.className = 'nav-sub-wrap hidden';
+            sub.children.forEach((ss) => {
+              const ssItem = document.createElement('div');
+              ssItem.className = 'nav-item nav-sub nav-sub2';
+              ssItem.textContent = ss.label;
+              ssItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+                ssItem.classList.add('active');
+                loadSubSubTopic(topic.id, sub.id, ss.id);
+              });
+              ssWrap.appendChild(ssItem);
+            });
+            subWrap.appendChild(ssWrap);
+          }
+        });
+        container.appendChild(subWrap);
+      }
+    });
+  }
+
+  buildNav();
+</script>

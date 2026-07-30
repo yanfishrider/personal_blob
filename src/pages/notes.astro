@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SideNav from '../components/notes/SideNav.astro';
+import CodeEditor from '../components/notes/CodeEditor.astro';
+import PreviewPanel from '../components/notes/PreviewPanel.astro';
+---
+
+<BaseLayout title="学习笔记 · anime.js" description="anime.js 交互式学习">
+  <SideNav slot="sidebar" />
+  <CodeEditor />
+  <PreviewPanel slot="rightSidebar" />
+</BaseLayout>
+
+<style is:global>
+  html, body { overflow: hidden !important; height: 100vh !important; }
+  body { background: #252423 !important; }
+  footer, #side-toolbar { display: none !important; }
+  #site-header { transform: translateY(0) !important; background: #1a1a1a !important; position: fixed !important; }
+  #site-header #brand { color: #ffffff !important; }
+  #site-header #nav-links a { color: rgba(255,255,255,0.7) !important; }
+  #site-header #nav-links a:hover { color: #ff7b42 !important; }
+  header ~ .max-w-6xl {
+    max-width: 1600px !important; height: calc(100vh - 56px);
+    margin-top: 56px !important; padding-bottom: 0 !important; overflow: hidden;
+  }
+  aside[slot="sidebar"] { position: sticky !important; top: 0 !important; max-height: 100%; overflow-y: auto; align-self: flex-start; }
+  aside[slot="rightSidebar"] { align-self: flex-start; height: 100%; }
+  main { position: sticky !important; top: 0 !important; align-self: stretch !important; flex: 1 1 auto !important; min-width: 400px; }
+  #editor-panel { height: 100%; }
+  #nav-tree .nav-item {
+    display: flex; align-items: center; padding: 5px 10px; border-radius: 6px;
+    font-size: 13px; color: #bbb; cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  #nav-tree .nav-item:hover { background: rgba(255,255,255,0.05); color: #eee; }
+  #nav-tree .nav-item.active { background: rgba(255,123,66,0.12); color: #ff7b42; font-weight: 600; }
+  .nav-arrow { margin-left: auto; font-size: 10px; opacity: 0.4; transition: transform 0.2s; display: inline-block; }
+  .nav-item.expanded .nav-arrow { transform: rotate(90deg); }
+  .nav-sub-wrap { border-left: 1px solid #3a3a3a; margin-left: 12px; }
+  .nav-sub { position: relative; padding-left: 20px !important; font-size: 12px !important; }
+  .nav-sub::before { content: ''; position: absolute; left: 0; top: 50%; width: 10px; height: 1px; background: #3a3a3a; }
+  .nav-sub2 { padding-left: 30px !important; font-size: 11px !important; }
+  .cm-editor { height: 100%; font-size: 14px; }
+  .cm-editor .cm-scroller { overflow: auto; }
+  .cm-editor.cm-focused { outline: none; }
+</style>
