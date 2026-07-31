@@ -755,7 +755,7 @@ animate('circle.progress-1', {
 });
 // 圆点同步旋转
 animate('.dot-wrap', {
-  rotate: { from: '-2turn', delay: 0 },
+  rotate: [0, 360],
   duration: 2000,
   easing: 'easeInOutQuad',
   loop: true,
