@@ -1,4 +1,4 @@
-import { topics, type Topic } from '../data/anime-topics';
+import { topics, type Topic, type SubItem } from '../data/anime-topics';
 import { renderMarkdown } from './markdown';
 
 // ==================== CodeMirror 编辑器实例 ====================
@@ -95,4 +95,30 @@ export function switchTab(tab: 'html' | 'css' | 'js') {
   });
 
   editors[`editor-${tab}`]?.requestMeasure();
+}
+
+// ==================== 递归查找（支持任意深度） ====================
+function collectAll(items: (Topic | SubItem)[]): (Topic | SubItem)[] {
+  const result: (Topic | SubItem)[] = [];
+  for (const item of items) {
+    result.push(item);
+    if ('children' in item && item.children) {
+      result.push(...collectAll(item.children));
+    }
+  }
+  return result;
+}
+
+export function findItemById(id: string): Topic | SubItem | undefined {
+  return collectAll(topics).find(t => t.id === id);
+}
+
+export function loadItemById(id: string) {
+  const item = findItemById(id);
+  if (!item) return;
+  setEditorValue('editor-html', item.html);
+  setEditorValue('editor-css', item.css);
+  setEditorValue('editor-js', item.js);
+  showInfo(item.desc || '');
+  updatePreview();
 }

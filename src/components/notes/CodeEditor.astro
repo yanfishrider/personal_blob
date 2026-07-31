@@ -31,9 +31,10 @@
   import { loadTopic } from '../../lib/editor-state';
 
   const animeCompletions = [
-    { label: 'anime', type: 'function', detail: '(params)', info: '创建动画' },
-    { label: 'anime.timeline', type: 'function', detail: '(params)', info: '创建时间轴' },
-    { label: 'anime.stagger', type: 'function', detail: '(value, options)', info: '创建逐项延迟' },
+    { label: 'animate', type: 'function', detail: '(targets, params)', info: '创建动画' },
+    { label: 'createTimer', type: 'function', detail: '(params)', info: '创建计时器' },
+    { label: 'createTimeline', type: 'function', detail: '(params)', info: '创建时间轴' },
+    { label: 'stagger', type: 'function', detail: '(value, options)', info: '创建逐项延迟' },
     { label: 'targets', type: 'property', detail: 'string | NodeList', info: '目标元素选择器' },
     { label: 'duration', type: 'property', detail: 'number', info: '动画时长 (ms)' },
     { label: 'delay', type: 'property', detail: 'number | function', info: '延迟 (ms)' },
@@ -130,7 +131,7 @@
   });
   document.getElementById('btn-run')!.addEventListener('click', updatePreview);
 
-  loadTopic('intro');
+  loadTopic('animejs');
   switchTab('html');
   updatePreview();
 </script>

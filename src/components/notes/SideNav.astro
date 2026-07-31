@@ -4,7 +4,7 @@
 
 <script>
   import { topics } from '../../data/anime-topics';
-  import { loadTopic, loadSubTopic, loadSubSubTopic } from '../../lib/editor-state';
+  import { loadTopic, loadSubTopic, loadItemById } from '../../lib/editor-state';
 
   function buildNav() {
     const container = document.getElementById('nav-tree')!;
@@ -62,15 +62,44 @@
             ssWrap.className = 'nav-sub-wrap hidden';
             sub.children.forEach((ss) => {
               const ssItem = document.createElement('div');
-              ssItem.className = 'nav-item nav-sub nav-sub2';
-              ssItem.textContent = ss.label;
-              ssItem.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
-                ssItem.classList.add('active');
-                loadSubSubTopic(topic.id, sub.id, ss.id);
-              });
+              ssItem.className = `nav-item nav-sub nav-sub2 ${ss.children ? 'has-children' : ''}`;
+              ssItem.innerHTML = ss.children
+                ? `<span>${ss.label}</span><span class="nav-arrow">▸</span>`
+                : ss.label;
+              if (!ss.children) {
+                ssItem.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+                  ssItem.classList.add('active');
+                  loadItemById(ss.id);
+                });
+              } else {
+                ssItem.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  ssItem.classList.toggle('expanded');
+                  const sss = ssItem.nextElementSibling as HTMLElement;
+                  if (sss?.classList.contains('nav-sub-wrap')) sss.classList.toggle('hidden');
+                });
+              }
               ssWrap.appendChild(ssItem);
+
+              if (ss.children) {
+                const sssWrap = document.createElement('div');
+                sssWrap.className = 'nav-sub-wrap hidden';
+                ss.children.forEach((sss) => {
+                  const sssItem = document.createElement('div');
+                  sssItem.className = 'nav-item nav-sub nav-sub2 nav-sub3';
+                  sssItem.textContent = sss.label;
+                  sssItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('#nav-tree .nav-item').forEach(el => el.classList.remove('active'));
+                    sssItem.classList.add('active');
+                    loadItemById(sss.id);
+                  });
+                  sssWrap.appendChild(sssItem);
+                });
+                ssWrap.appendChild(sssWrap);
+              }
             });
             subWrap.appendChild(ssWrap);
           }
@@ -81,4 +110,12 @@
   }
 
   buildNav();
+
+  // 首项自动展开，显示子导航
+  const firstItem = document.querySelector('#nav-tree .nav-item') as HTMLElement;
+  if (firstItem) {
+    firstItem.classList.add('expanded');
+    const firstSub = firstItem.nextElementSibling as HTMLElement;
+    if (firstSub?.classList.contains('nav-sub-wrap')) firstSub.classList.remove('hidden');
+  }
 </script>
