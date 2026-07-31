@@ -54,7 +54,7 @@ JS 编辑器中按 **Ctrl+Space** 可获取 API 补全提示。修改代码后�
 修改左侧代码，预览区会实时更新。JS 编辑器里按 **Ctrl+Space** 获取补全提示。`,
         html: `<div class="box"></div>\n<div class="box"></div>\n<div class="box"></div>\n<div class="box"></div>\n<div class="box"></div>`,
         css: `.box {\n  width: 40px; height: 40px; border-radius: 8px;\n  display: inline-block; margin: 8px;\n  background: #5b6cff;\n}`,
-        js: `import { animate, stagger } from 'https://esm.sh/animejs';
+        js: `import { animate, stagger } from 'https://esm.sh/animejs@4.4.1';
 
 // anime.js 基础 — Ctrl+Space 触发补全
 animate('.box', {
@@ -104,7 +104,7 @@ const timer = createTimer(parameters);
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-        js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+        js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const fmt = t => (t / 1000).toFixed(3) + 's';
 const [ $time, $count ] = $('.value');
@@ -141,7 +141,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const fmt = t => (t / 1000).toFixed(3) + 's';
 const [ $time ] = $('.time');
@@ -169,7 +169,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const fmt = t => (t / 1000).toFixed(3) + 's';
 const [ $time ] = $('.time');
@@ -202,7 +202,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const fmt = t => (t / 1000).toFixed(3) + 's';
 const [ $loops ] = $('.loops');
@@ -240,7 +240,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const fmt = t => (t / 1000).toFixed(3) + 's';
 const [ $loops ] = $('.loops');
@@ -279,7 +279,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $loops ] = $('.loops');
 const [ $time ] = $('.time');
@@ -317,7 +317,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $loops ] = $('.loops');
 const [ $time ] = $('.time');
@@ -361,7 +361,7 @@ createTimer({
 .col { flex: 1 1 0; min-width: 0; }
 .controls { border: none; padding: 0; margin: 0; width: 100%; }
 .range { width: 100%; accent-color: #ff7b42; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $range ] = $('.range');
 const [ $fps ] = $('.fps');
@@ -410,7 +410,7 @@ $range.addEventListener('input', updateFps);`,
 .col { flex: 1 1 0; min-width: 0; }
 .controls { border: none; padding: 0; margin: 0; width: 100%; }
 .range { width: 100%; accent-color: #ff7b42; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $range ] = $('.range');
 const [ $speed ] = $('.speed');
@@ -461,7 +461,7 @@ $range.addEventListener('input', updateSpeed);`,
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $status ] = $('.status');
 const [ $time ] = $('.time');
@@ -500,7 +500,7 @@ const logTimer = createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $status ] = $('.status');
 const [ $time ] = $('.time');
@@ -539,7 +539,7 @@ const logTimer = createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $updates ] = $('.updates');
 const [ $time ] = $('.time');
@@ -576,7 +576,7 @@ createTimer({
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $loops ] = $('.loops');
 const [ $time ] = $('.time');
@@ -622,7 +622,7 @@ createTimer({
 .controls { border: none; padding: 0; margin: 0; width: 100%; }
 .button { margin-right: 8px; padding: 4px 14px; border: 1px solid #ff7b42; background: transparent; color: #ff7b42; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .button:hover { background: #ff7b4220; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $resumeButton, $pauseButton ] = $('.button');
 const [ $paused ] = $('.paused');
@@ -664,7 +664,7 @@ $pauseButton.addEventListener('click', pauseTimer);`,
 .log { background: rgba(0,0,0,0.3); padding: 12px 20px; border-radius: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center; height: 65px; }
 .row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
 .col { flex: 1 1 0; min-width: 0; }`,
-                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs';
+                js: `import { createTimer, utils, $ } from 'https://esm.sh/animejs@4.4.1';
 
 const [ $status ] = $('.status');
 const [ $time ] = $('.time');
@@ -684,14 +684,14 @@ createTimer({
         desc: `**自由发挥** — 在这里试验任意 anime.js 代码。\n\n按 **Ctrl+Space** 获取 API 补全提示。修改 HTML/CSS/JS 后预览区自动刷新。`,
         html: `<div class="box"></div>`,
         css: `.box { width: 60px; height: 60px; border-radius: 12px; background: #ff7b42; }`,
-        js: `import { animate, stagger } from 'https://esm.sh/animejs';
+        js: `import { animate, stagger } from 'https://esm.sh/animejs@4.4.1';
 
 // Ctrl+Space 获取补全提示
 animate('.box', { translateX: 200, duration: 1000 });`,
         children: [
           {
             id: 'ring-animation', label: '圆环动画',
-            desc: `**圆环进度动画** — strokeDashoffset + 旋转圆点。\n\n**原理**\n- SVG stroke-dasharray 设为圆周长，虚线恰好覆盖一整圈\n- stroke-dashoffset 从周长渐变到 0，实现从无到有的描边\n- createDrawable 自动处理 stroke-dashoffset，省去手算\n- 圆点通过独立旋转同步跟随描边头部\n\n两条 anime 动画并行：描边 + 旋转，交替循环。`,
+            desc: `**圆环进度动画** — strokeDashoffset + 旋转圆点。\n\n**原理**\n- SVG pathLength=100 归一化周长，dasharray 恒为 100\n- stroke-dashoffset 从 100 渐变到 0，实现从无到有的描边\n- 圆点通过独立旋转同步跟随描边头部\n\n两条 anime 动画并行：描边 + 旋转，交替循环。`,
             html: `<div class="ring-container">
   <svg id="1" viewBox="0 0 200 200">
     <circle class="track" cx="100" cy="100" r="70"
@@ -699,12 +699,12 @@ animate('.box', { translateX: 200, duration: 1000 });`,
     <circle class="progress" cx="100" cy="100" r="70"
       fill="none" stroke="#ff7b42" stroke-width="6"
       stroke-linecap="round"
-      stroke-dasharray="439.8" stroke-dashoffset="439.8" />
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
   </svg>
   <svg id="2" viewBox="0 0 200 200">
     <circle class="progress-1" cx="100" cy="100" r="80"
       fill="none" stroke="#AAAAAA" stroke-width="10"
-      stroke-dasharray="502.7" stroke-dashoffset="502.7" />
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
   </svg>
   <div class="dot-wrap">
     <div class="dot"></div>
@@ -735,7 +735,7 @@ animate('.box', { translateX: 200, duration: 1000 });`,
   position: absolute;
   top: -6px; left: calc(50% - 6px);
 }`,
-            js: `import { animate } from 'https://esm.sh/animejs';
+            js: `import { animate } from 'https://esm.sh/animejs@4.4.1';
 
 // 内环描边
 animate('circle.progress', {
@@ -772,32 +772,22 @@ animate('.dot-wrap', {
     <circle class="progress" cx="100" cy="100" r="30"
       fill="none" stroke="#ff7b42" stroke-width="6"
       stroke-linecap="round"
-      stroke-dasharray="188.5" stroke-dashoffset="188.5" />
-  </svg>
-  <svg viewBox="0 0 200 200">
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
     <circle class="progress-1" cx="100" cy="100" r="40"
       fill="none" stroke="#AAAAAA" stroke-width="10"
-      stroke-dasharray="251.3" stroke-dashoffset="251.3" />
-  </svg>
-  <svg viewBox="0 0 200 200">
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
     <circle class="progress-2" cx="100" cy="100" r="50"
       fill="none" stroke="#C5FCE7" stroke-width="10"
-      stroke-dasharray="314.2" stroke-dashoffset="314.2" />
-  </svg>
-  <svg viewBox="0 0 200 200">
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
     <circle class="progress-3" cx="100" cy="100" r="60"
       fill="none" stroke="#B7D8FE" stroke-width="10"
-      stroke-dasharray="377.0" stroke-dashoffset="377.0" />
-  </svg>
-  <svg viewBox="0 0 200 200">
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
     <circle class="progress-4" cx="100" cy="100" r="70"
       fill="none" stroke="#92C41E" stroke-width="10"
-      stroke-dasharray="439.8" stroke-dashoffset="439.8" />
-  </svg>
-  <svg viewBox="0 0 200 200">
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
     <circle class="progress-5" cx="100" cy="100" r="90"
       fill="none" stroke="#E9E9E9" stroke-width="10"
-      stroke-dasharray="565.5" stroke-dashoffset="565.5" />
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
   </svg>
 </div>`,
             css: `body { background: #1a1a1a !important; }
@@ -829,7 +819,105 @@ animate('.dot-wrap', {
   transform: rotate(160deg);
   transform-origin: 100px 100px;
 }`,
-            js: `import { animate } from 'https://esm.sh/animejs';
+            js: `import { animate, stagger } from 'https://esm.sh/animejs@4.4.1';
+
+// 定义每个圆环的动画参数
+const configs = [
+  { selector: 'circle.progress',   start: 0, end: 100, isReverse: false },  // 正向填充
+  { selector: 'circle.progress-1', start: 100, end: 0 },
+  { selector: 'circle.progress-2', start: 100, end: 0 },
+  { selector: 'circle.progress-3', start: 100, end: 0 },
+  { selector: 'circle.progress-4', start: 100, end: 0 },
+  { selector: 'circle.progress-5', start: 0, end: 100, isReverse: true }   // 反向（擦除）
+];
+
+configs.forEach(({ selector, start, end }) => {
+  animate(selector, {
+    strokeDashoffset: [start, end],   // 明确起始和结束
+    duration: 2000,
+    easing: 'easeInOutQuad',
+    loop: true,
+    direction: 'alternate'
+  });
+});`,
+          },
+          {
+            id: 'ring-text', label: '圆环文字组合',
+            desc: `**圆环 + 文字组合** — 多圆环描边动画 + splitText 逐字动画。\n\n**splitText** 将文本拆分为独立字符元素，配合 stagger 实现逐字弹跳。\n- \`splitText(el, { words: false, chars: true })\` 拆成字符\n- 每个字符独立动画：y 弹跳 + rotate 旋转 + 颜色渐变\n- stagger(50) 让字符依次延迟，形成波浪效果`,
+            html: `<div class="ring-container">
+  <svg viewBox="0 0 200 200">
+    <circle class="track" cx="100" cy="100" r="70"
+      fill="none" stroke="#3a3a3a" stroke-width="6" />
+    <circle class="progress" cx="100" cy="100" r="30"
+      fill="none" stroke="#ff7b42" stroke-width="6"
+      stroke-linecap="round"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+    <circle class="progress-1" cx="100" cy="100" r="40"
+      fill="none" stroke="#AAAAAA" stroke-width="10"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+    <circle class="progress-2" cx="100" cy="100" r="50"
+      fill="none" stroke="#C5FCE7" stroke-width="10"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+    <circle class="progress-3" cx="100" cy="100" r="60"
+      fill="none" stroke="#B7D8FE" stroke-width="10"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+    <circle class="progress-4" cx="100" cy="100" r="70"
+      fill="none" stroke="#92C41E" stroke-width="10"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+    <circle class="progress-5" cx="100" cy="100" r="90"
+      fill="none" stroke="#E9E9E9" stroke-width="10"
+      pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+  </svg>
+
+  <div class="text-container">
+    <a class="text-xl" id='1'>摸鱼</a>
+    <a class="text-xl" id='2'>骑士</a>
+  </div>
+
+</div>`,
+            css: `body { background: #1a1a1a !important; }
+.ring-container {
+  position: relative; width: 250px; height: 250px;
+  margin: 0 auto;
+}
+.ring-container svg {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+.progress-1 {
+  transform: rotate(130deg);
+  transform-origin: 100px 100px;
+}
+.progress-2 {
+  transform: rotate(270deg);
+  transform-origin: 100px 100px;
+}
+.progress-3 {
+  transform: rotate(20deg);
+  transform-origin: 100px 100px;
+}
+.progress-4 {
+  transform: rotate(-50deg);
+  transform-origin: 100px 100px;
+}
+.progress-5 {
+  transform: rotate(160deg);
+  transform-origin: 100px 100px;
+}
+.text-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+}
+.text-xl {
+  font-size: 1.1rem;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+}`,
+            js: `import { animate, stagger, splitText } from 'https://esm.sh/animejs@4.4.1';
 
 // 6 层描边
 animate('circle.progress', {
@@ -855,6 +943,48 @@ animate('circle.progress-4', {
 animate('circle.progress-5', {
   strokeDashoffset: 0,
   duration: 2000, easing: 'easeInOutQuad', loop: true, direction: 'alternate',
+});
+
+// 获取两个元素
+const el1 = document.getElementById('1');
+const el2 = document.getElementById('2');
+const { chars } = splitText(el1, { words: false, chars: true });
+animate(chars, {
+  // Property keyframes
+  y: [
+    { to: '1.5rem', ease: 'outExpo', duration: 600 },
+    { to: 0, ease: 'outBounce', duration: 800, delay: 100 }
+  ],
+  // Property specific parameters
+  rotate: {
+    from: '-1turn',
+    delay: 0
+  },
+  backgroundColor: ['#5b6cff', '#ff6b6b', '#263C47'],
+  color: ['#FF6B6B', '#4D96FF'],
+  delay: stagger(50),
+  ease: 'inOutCirc',
+  loopDelay: 1000,
+  loop: true
+});
+const { chars: chars2 } = splitText(el2, { words: false, chars: true });
+animate(chars2, {
+  // Property keyframes
+  y: [
+    { to: '-1.5rem', ease: 'outExpo', duration: 600 },
+    { to: 0, ease: 'outBounce', duration: 800, delay: 100 }
+  ],
+  // Property specific parameters
+  rotate: {
+    from: '-1turn',
+    delay: 0
+  },
+  backgroundColor: ['#5b6cff', '#51cf66', '#cc5de8'],
+  color: ['#FF6B6B', '#57F695'],
+  delay: stagger(50),
+  ease: 'inOutCirc',
+  loopDelay: 1000,
+  loop: true
 });`,
           },
         ],

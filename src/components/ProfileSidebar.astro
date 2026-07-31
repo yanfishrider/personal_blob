@@ -15,8 +15,30 @@ const base = import.meta.env.BASE_URL;
     <!-- 个人信息卡片 -->
     <div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm space-y-5">
       <div class="text-center">
-        <div class="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg mb-3">
-          摸
+        <div class="avatar-ring mx-auto relative w-24 h-24 rounded-full bg-[#252423] shadow-lg mb-3 overflow-hidden">
+          <svg viewBox="0 0 200 200" class="absolute inset-0 w-full h-full">
+            <circle class="track" cx="100" cy="100" r="70"
+              fill="none" stroke="#3a3a3a" stroke-width="8" />
+            <circle class="progress" cx="100" cy="100" r="30"
+              fill="none" stroke="#ff7b42" stroke-width="8"
+              stroke-linecap="round"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+            <circle class="progress-1" cx="100" cy="100" r="40"
+              fill="none" stroke="#AAAAAA" stroke-width="10"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+            <circle class="progress-2" cx="100" cy="100" r="50"
+              fill="none" stroke="#C5FCE7" stroke-width="10"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+            <circle class="progress-3" cx="100" cy="100" r="60"
+              fill="none" stroke="#B7D8FE" stroke-width="10"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+            <circle class="progress-4" cx="100" cy="100" r="70"
+              fill="none" stroke="#92C41E" stroke-width="10"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+            <circle class="progress-5" cx="100" cy="100" r="90"
+              fill="none" stroke="#E9E9E9" stroke-width="10"
+              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+          </svg>
         </div>
         <h2 class="text-lg font-bold text-gray-800">摸鱼骑士</h2>
         <p class="text-xs text-gray-500 mt-1">闲来垂钓碧溪上,忽复乘舟梦日边</p>
@@ -66,3 +88,29 @@ const base = import.meta.env.BASE_URL;
     </a>
   </div>
 </aside>
+
+<style is:global>
+  .avatar-ring .progress-1 { transform: rotate(130deg); transform-origin: 100px 100px; }
+  .avatar-ring .progress-2 { transform: rotate(270deg); transform-origin: 100px 100px; }
+  .avatar-ring .progress-3 { transform: rotate(20deg); transform-origin: 100px 100px; }
+  .avatar-ring .progress-4 { transform: rotate(-50deg); transform-origin: 100px 100px; }
+  .avatar-ring .progress-5 { transform: rotate(160deg); transform-origin: 100px 100px; }
+</style>
+
+<script>
+  import { animate } from 'https://esm.sh/animejs@4.4.1';
+
+  const avatars = document.querySelectorAll('.avatar-ring');
+  if (avatars.length) {
+    // 6 层描边动画
+    ['progress', 'progress-1', 'progress-2', 'progress-3', 'progress-4', 'progress-5'].forEach(cls => {
+      animate(`circle.${cls}`, {
+        strokeDashoffset: 0,
+        duration: 2000,
+        easing: 'easeInOutQuad',
+        loop: true,
+        direction: 'alternate',
+      });
+    });
+  }
+</script>
