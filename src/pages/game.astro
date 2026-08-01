@@ -47,7 +47,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     #game-cursor {
       position: fixed; top: 0; left: 0; z-index: 99999;
-      width: 32px; height: 46px;
+      width: 24px; height: 24px;
       pointer-events: none;
       transform: translate(-100px, -100px);
       will-change: transform;
@@ -387,15 +387,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       });
       window.addEventListener('resize', resize);
 
-      // ===== 自定义光标跟随（完整徽章，热点=中心圆）+ 转向 =====
+      // ===== 自定义光标跟随（完整徽章，热点=SVG顶部）+ 转向 =====
       var cursor = document.getElementById('game-cursor');
-      var HOT_X = 149.5, HOT_Y = 216.4;   // 中心圆相对裁剪 viewBox 原点
-      var SCALE = 32 / 299;               // 显示 32px / viewBox 宽 299
+      var HOT_X = 12, HOT_Y = 0;          // 24×24 容器：meet 缩放后图形顶部贴容器顶边
       var shown = false;
       var curAngle = 0;                   // 光标当前朝向（弧度，0 = 顶部朝上）
       if (cursor) {
-        // 旋转轴心 = 热点（中心圆位置），保证转向时热点仍对准鼠标
-        cursor.style.transformOrigin = (HOT_X * SCALE) + 'px ' + (HOT_Y * SCALE) + 'px';
+        // 旋转轴心 = 热点（SVG 顶部），保证转向时热点仍对准鼠标
+        cursor.style.transformOrigin = HOT_X + 'px ' + HOT_Y + 'px';
         document.addEventListener('mousemove', function (e) {
           mx = e.clientX; my = e.clientY;
           if (!shown) { cursor.style.opacity = 1; shown = true; }
@@ -423,7 +422,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           curAngle += diff * 0.15;
         }
         cursor.style.transform =
-          'translate(' + (mx - HOT_X * SCALE) + 'px,' + (my - HOT_Y * SCALE) + 'px) rotate(' + (curAngle * 180 / Math.PI) + 'deg)';
+          'translate(' + (mx - HOT_X) + 'px,' + (my - HOT_Y) + 'px) rotate(' + (curAngle * 180 / Math.PI) + 'deg)';
       }
 
       // ===== 启动 =====

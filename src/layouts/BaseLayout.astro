@@ -75,7 +75,7 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
       html, body, body * { cursor: none !important; }
       #custom-cursor {
         position: fixed; top: 0; left: 0; z-index: 99999;
-        width: 32px; height: 32px;
+        width: 24px; height: 24px;
         pointer-events: none;
         transform: translate(-100px, -100px);
         will-change: transform;
@@ -105,18 +105,18 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
     </div>
 
     <script>
-      // 全局自定义光标：32×32 徽章，无光晕，顶部朝向左 30°
-      // 热点 = 容器中心 (16,16)：SVG meet 缩放后图形中心恰好居中
+      // 全局自定义光标：24×24 徽章，无光晕，顶部朝向左 30°
+      // 热点 = SVG 顶部中心 (12,0)：meet 缩放后图形顶部贴容器顶边，水平居中
       (function () {
         var cursor = document.getElementById('custom-cursor');
         if (!cursor) return;
-        var HOT = 16;
-        cursor.style.transformOrigin = HOT + 'px ' + HOT + 'px';
+        var HOT_X = 12, HOT_Y = 0;
+        cursor.style.transformOrigin = HOT_X + 'px ' + HOT_Y + 'px';
         var shown = false;
         document.addEventListener('mousemove', function (e) {
           if (!shown) { cursor.style.opacity = 1; shown = true; }
           cursor.style.transform =
-            'translate(' + (e.clientX - HOT) + 'px,' + (e.clientY - HOT) + 'px) rotate(-30deg)';
+            'translate(' + (e.clientX - HOT_X) + 'px,' + (e.clientY - HOT_Y) + 'px) rotate(-30deg)';
         });
         document.addEventListener('mouseleave', function () {
           cursor.style.opacity = 0; shown = false;
