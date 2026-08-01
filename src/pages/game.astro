@@ -43,6 +43,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     /* 隐藏 BaseLayout 的 16×16 静态光标，本页使用转向版 */
     #custom-cursor { display: none !important; }
 
+    #game-canvas { position: fixed; top: 0; left: 0; display: block; }
+
     #game-cursor {
       position: fixed; top: 0; left: 0; z-index: 99999;
       width: 32px; height: 46px;
