@@ -75,7 +75,7 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
       html, body, body * { cursor: none !important; }
       #custom-cursor {
         position: fixed; top: 0; left: 0; z-index: 99999;
-        width: 16px; height: 16px;
+        width: 32px; height: 32px;
         pointer-events: none;
         transform: translate(-100px, -100px);
         will-change: transform;
@@ -105,12 +105,12 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
     </div>
 
     <script>
-      // 全局自定义光标：16×16 徽章，无光晕，顶部朝向左 30°
-      // 热点 = 容器中心 (8,8)：SVG meet 缩放后图形中心恰好居中
+      // 全局自定义光标：32×32 徽章，无光晕，顶部朝向左 30°
+      // 热点 = 容器中心 (16,16)：SVG meet 缩放后图形中心恰好居中
       (function () {
         var cursor = document.getElementById('custom-cursor');
         if (!cursor) return;
-        var HOT = 8;
+        var HOT = 16;
         cursor.style.transformOrigin = HOT + 'px ' + HOT + 'px';
         var shown = false;
         document.addEventListener('mousemove', function (e) {
