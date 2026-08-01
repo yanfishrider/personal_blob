@@ -1,0 +1,433 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="打靶游戏 · 摸鱼骑士">
+  <div id="app" data-base={import.meta.env.BASE_URL}></div>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div>命中 <span id="hud-hits">0</span></div>
+    <div>柱子 <span id="hud-pillars">0</span></div>
+    <div class="key">空格 射击 · 光标自动转向最近柱子</div>
+  </div>
+
+  <!-- 转向版徽章光标（32×46，顶部朝最近柱子）。BaseLayout 的 16×16 静态光标在本页隐藏 -->
+  <div id="game-cursor" aria-hidden="true">
+    <div class="cursor-svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+        <g transform="translate(0,448) scale(0.1,-0.1)" fill="#000000" stroke="none">
+        <path d="M2191 4363 c-10 -21 -152 -324 -316 -673 -164 -349 -315 -673 -337 -720 -22 -47 -123 -263 -225 -480 -102 -217 -222 -471 -267 -565 l-81 -170 -3 -244 -3 -245 598 -598 c329 -329 600 -598 603 -598 30 1 31 21 36 516 4 274 7 500 8 501 0 0 12 3 26 5 l25 3 3 -499 c2 -496 4 -526 36 -526 6 0 277 267 603 592 l593 593 0 248 0 248 -402 857 c-220 471 -434 927 -473 1012 -233 499 -354 751 -365 765 -20 24 -38 18 -59 -22z m141 -291 c54 -114 188 -400 298 -637 111 -236 280 -597 376 -800 96 -204 174 -376 174 -383 0 -10 -488 -264 -597 -310 -32 -14 -34 -13 -79 27 -63 55 -139 83 -245 89 -130 7 -220 -24 -311 -106 l-38 -34 -317 162 c-175 89 -319 164 -321 165 -2 2 34 81 79 176 45 96 115 245 155 332 279 596 567 1210 639 1362 31 66 61 130 66 143 5 12 12 22 16 22 5 0 52 -93 105 -208z m-811 -2141 l314 -159 6 -74 c7 -84 17 -113 61 -175 36 -50 130 -117 189 -134 l39 -12 0 -359 c0 -197 -3 -358 -7 -358 -13 0 -1083 1074 -1083 1087 0 16 153 343 160 343 4 0 148 -72 321 -159z m1822 -16 l79 -168 -546 -546 -546 -546 0 363 c0 338 1 362 18 362 34 0 142 60 185 102 65 66 99 142 99 226 l1 68 306 157 c168 86 310 155 316 153 5 -1 44 -78 88 -171z m-1223 -1535 l0 -175 -539 540 -540 540 -3 177 -3 178 543 -542 542 -543 0 -175z m756 361 l-544 -544 -1 177 -2 176 543 543 543 543 3 -175 2 -175 -544 -545z" />
+        <path d="M740 781 c-16 -30 -14 -612 3 -634 11 -16 36 -17 272 -15 l260 3 3 319 c2 227 -1 323 -9 332 -9 11 -63 14 -265 14 -240 0 -254 -1 -264 -19z m476 -188 l-1 -138 -207 -3 -208 -2 0 140 0 140 209 0 208 0 -1 -137z m-6 -308 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+        <path d="M3192 792 c-9 -7 -12 -80 -10 -333 l3 -324 265 0 265 0 3 319 c2 227 -1 323 -9 332 -9 11 -61 14 -258 14 -135 0 -252 -4 -259 -8z m468 -202 l0 -140 -210 0 -210 0 0 140 0 140 210 0 210 0 0 -140z m-10 -305 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+        </g>
+        <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 108.10634,559.58773 v -10.99386 h 26.38528 26.38527 v 10.99386 10.99387 h -26.38527 -26.38528 z" transform="scale(0.75)" />
+        <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 433.52474,559.58773 v -10.99386 h 26.38528 26.38528 v 10.99386 10.99387 h -26.38528 -26.38528 z" transform="scale(0.75)" />
+        <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 311.12638,547.12522 v -23.08713 l 71.71206,-71.70925 71.71206,-71.70926 0.48099,6.77622 c 0.26454,3.72692 0.48098,13.89968 0.48098,22.60612 v 15.82991 l -72.19304,72.19026 -72.19305,72.19025 z" transform="scale(0.75)" />
+        <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 210.71575,497.18285 -71.46013,-71.96266 -0.43543,-22.41623 c -0.23949,-12.32893 -0.39034,-22.48526 -0.33523,-22.56962 0.0551,-0.0844 32.49545,32.2431 72.08963,71.83881 l 71.98942,71.99221 -0.19407,22.54007 -0.19407,22.54009 z" transform="scale(0.75)" />
+        <path style="fill:#ffffff;stroke-width:1.46585" d="m 211.81513,318.65389 c -22.17096,-11.35106 -40.52555,-20.84394 -40.78797,-21.09527 -0.26243,-0.25135 17.08686,-37.95124 38.55396,-83.77755 21.46711,-45.82629 49.71617,-106.22862 62.77571,-134.227396 13.05953,-27.998772 24.13311,-50.920981 24.60796,-50.938242 0.47484,-0.01726 23.84488,48.946286 51.93343,108.807878 74.38772,158.53321 74.28128,158.29661 72.15042,160.39132 -2.8505,2.80216 -76.57576,40.06349 -79.26962,40.06349 -1.32532,0 -5.35023,-2.24457 -8.94424,-4.98793 -9.74341,-7.43732 -19.63475,-10.26317 -36.00042,-10.28494 -11.88646,-0.0158 -15.1159,0.53247 -22.05462,3.74431 -4.47098,2.06955 -10.49475,5.83994 -13.38615,8.37861 -2.89141,2.53869 -6.15947,4.60414 -7.26236,4.58991 -1.10289,-0.0142 -20.14514,-9.31312 -42.3161,-20.66419 z" transform="scale(0.75)" />
+        <path style="fill:#ffffff;stroke-width:1.46585" d="m 311.49284,461.38485 v -45.78756 l 9.39619,-4.26044 c 10.97764,-4.9775 21.81963,-14.42833 26.18031,-22.82106 1.91753,-3.69056 3.3929,-10.00674 3.90753,-16.72847 l 0.82681,-10.79918 40.31084,-20.28876 c 22.17096,-11.15882 40.66092,-20.31637 41.08879,-20.35011 0.83376,-0.0657 9.08432,16.09118 16.88432,33.06424 l 4.78159,10.40493 -71.68819,71.67699 -71.68819,71.677 z" transform="scale(0.75)" />
+        <path style="fill:#ffffff;stroke-width:1.46585" d="m 210.60351,436.24753 c -38.83823,-39.01486 -70.61496,-71.55399 -70.61496,-72.30918 0,-2.79956 19.4622,-43.65042 20.79597,-43.65042 0.76152,0 19.73478,9.24171 42.1628,20.53712 l 40.77821,20.53712 1.02938,9.87924 c 0.56616,5.43359 2.20739,12.57674 3.64719,15.87367 4.45947,10.21158 17.57304,21.41484 29.74269,25.40996 l 5.49693,1.80457 -0.17343,42.02947 c -0.0954,23.11621 -0.64062,44.00836 -1.21163,46.42701 -1.01931,4.31759 -2.3223,3.10759 -71.65315,-66.53856 z" transform="scale(0.75)" />
+        <path style="fill:#ffffff;stroke-width:1.46585" d="m 433.15828,518.91043 v -18.32311 h 27.1182 27.1182 v 18.32311 18.32311 h -27.1182 -27.1182 z" transform="scale(0.75)" />
+        <path style="fill:#ffffff;stroke-width:1.46585" d="m 107.73988,519.1224 v -18.53508 h 27.1182 27.1182 v 17.59019 17.59018 l -17.22372,0.0104 c -9.47305,0.006 -21.67624,0.43093 -27.1182,0.94489 l -9.89448,0.93448 z" transform="scale(0.75)" />
+        </svg></div>
+  </div>
+
+  <style is:global>
+    html, body { overflow: hidden !important; height: 100vh !important; }
+    body { background: #252423 !important; }
+    footer, #side-toolbar { display: none !important; }
+    #site-header { transform: translateY(0) !important; background: #1a1a1a !important; position: fixed !important; }
+    #site-header #brand { color: #ffffff !important; }
+    #site-header #nav-links a { color: rgba(255,255,255,0.7) !important; }
+    #site-header #nav-links a:hover { color: #ff7b42 !important; }
+    /* 隐藏 BaseLayout 的 16×16 静态光标，本页使用转向版 */
+    #custom-cursor { display: none !important; }
+
+    #game-cursor {
+      position: fixed; top: 0; left: 0; z-index: 99999;
+      width: 32px; height: 46px;
+      pointer-events: none;
+      transform: translate(-100px, -100px);
+      will-change: transform;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #game-cursor .cursor-svg { width: 100%; height: 100%; }
+    #game-cursor .cursor-svg svg { display: block; width: 100%; height: 100%; }
+
+    #hud {
+      position: fixed; top: 64px; left: 16px; z-index: 10;
+      font-family: 'Courier New', monospace; font-size: 13px; color: rgba(255,255,255,0.65);
+      line-height: 1.7; pointer-events: none; user-select: none;
+      text-shadow: 0 0 4px rgba(0,0,0,0.6);
+    }
+    #hud .key { color: rgba(255,255,255,0.35); font-size: 11px; }
+  </style>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ===== DOM =====
+      var app = document.getElementById('app');
+      var BASE = app ? app.dataset.base : '';
+      var canvas = document.getElementById('game-canvas');
+      var ctx = canvas.getContext('2d');
+      var hudHits = document.getElementById('hud-hits');
+      var hudPillars = document.getElementById('hud-pillars');
+
+      // ===== 画布尺寸 =====
+      var W = 0, H = 0, DPR = window.devicePixelRatio || 1;
+      function resize() {
+        W = window.innerWidth; H = window.innerHeight;
+        canvas.width = W * DPR; canvas.height = H * DPR;
+        canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+
+      // ===== 参数 =====
+      var BALL_COUNT = 18;
+      var PILLAR_COUNT = 6;
+      var PILLAR_HP = 4;
+      var AIM_RANGE = 300;        // 自动瞄准范围 px
+      var BULLET_SPEED = 16;      // px/帧(60fps基准)
+      var BULLET_W = 18, BULLET_LEN = 5;  // 矩形弹幕：宽 > 长（长宽对调）
+      var BULLET_LIFE = 90;       // 帧数，超时消失
+      var FIRE_COOLDOWN = 110;    // 连射间隔 ms
+
+      // ===== 状态 =====
+      var hits = 0;
+      var mx = -100, my = -100;   // 鼠标（= 光标热点）
+      var balls = [];
+      var pillars = [];
+      var bullets = [];
+      var particles = [];
+      var target = null;          // { type:'ball'|'pillar', obj, cx, cy }
+      var lastShot = 0;
+
+      // ===== 工具 =====
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function dist(x1, y1, x2, y2) { var dx = x2 - x1, dy = y2 - y1; return Math.sqrt(dx * dx + dy * dy); }
+
+      // ===== 对象生成 =====
+      function makeBall() {
+        var r = rand(7, 16);
+        return {
+          x: rand(r + 20, W - r - 20), y: rand(r + 60, H - r - 20),
+          vx: rand(-1.6, 1.6), vy: rand(-1.6, 1.6),
+          r: r, hue: Math.floor(rand(0, 360)), phase: rand(0, Math.PI * 2)
+        };
+      }
+      function makePillar() {
+        var w = rand(46, 72), h = rand(64, 120), d = w * 0.42;
+        return {
+          cx: rand(w, W - w), cy: rand(h + d, H - 16),
+          w: w, h: h, d: d,
+          hp: PILLAR_HP, maxHp: PILLAR_HP, flash: 0
+        };
+      }
+      function spawn() {
+        balls = []; pillars = [];
+        for (var i = 0; i < BALL_COUNT; i++) balls.push(makeBall());
+        for (var i = 0; i < PILLAR_COUNT; i++) pillars.push(makePillar());
+      }
+
+      // ===== 粒子特效 =====
+      function burst(x, y, n, color, speed) {
+        for (var i = 0; i < n; i++) {
+          var a = rand(0, Math.PI * 2), s = rand(speed * 0.3, speed);
+          particles.push({
+            x: x, y: y,
+            vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1,
+            life: Math.floor(rand(20, 40)), maxLife: 40,
+            size: rand(1.5, 3.5), color: color
+          });
+        }
+      }
+
+      // ===== 自动瞄准：找光标热点附近最近目标 =====
+      function findTarget() {
+        var best = null, bestD = AIM_RANGE;
+        for (var i = 0; i < balls.length; i++) {
+          var b = balls[i];
+          var d = dist(mx, my, b.x, b.y);
+          if (d < bestD) { bestD = d; best = { type: 'ball', obj: b, cx: b.x, cy: b.y }; }
+        }
+        for (var j = 0; j < pillars.length; j++) {
+          var p = pillars[j];
+          var pcx = p.cx + p.d * 0.5, pcy = p.cy - p.d * 0.5;
+          var pd = dist(mx, my, pcx, pcy);
+          if (pd < bestD) { bestD = pd; best = { type: 'pillar', obj: p, cx: pcx, cy: pcy }; }
+        }
+        return best;
+      }
+
+      // ===== 射击（空格） =====
+      function shoot() {
+        var now = Date.now();
+        if (now - lastShot < FIRE_COOLDOWN) return;
+        lastShot = now;
+        target = findTarget();
+        var tx = mx, ty = my;
+        if (target) { tx = target.cx; ty = target.cy; }
+        var ang = Math.atan2(ty - my, tx - mx);
+        bullets.push({
+          x: mx, y: my,
+          vx: Math.cos(ang) * BULLET_SPEED, vy: Math.sin(ang) * BULLET_SPEED,
+          life: BULLET_LIFE
+        });
+      }
+
+      // ===== 更新 =====
+      function update(dt) {
+        var i, j, k;
+
+        // 小球漂移 + 反弹
+        for (i = 0; i < balls.length; i++) {
+          var b = balls[i];
+          b.x += b.vx * dt; b.y += b.vy * dt;
+          if (b.x < b.r || b.x > W - b.r) b.vx *= -1;
+          if (b.y < b.r + 50 || b.y > H - b.r) b.vy *= -1;
+          b.x = Math.max(b.r, Math.min(W - b.r, b.x));
+          b.y = Math.max(b.r + 50, Math.min(H - b.r, b.y));
+        }
+
+        // 柱子闪光衰减
+        for (i = 0; i < pillars.length; i++) {
+          if (pillars[i].flash > 0) pillars[i].flash = Math.max(0, pillars[i].flash - 0.06 * dt);
+        }
+
+        // 子弹飞行 + 碰撞
+        for (i = bullets.length - 1; i >= 0; i--) {
+          var bu = bullets[i];
+          bu.x += bu.vx * dt; bu.y += bu.vy * dt;
+          bu.life -= dt;
+          if (bu.life <= 0 || bu.x < -30 || bu.x > W + 30 || bu.y < -30 || bu.y > H + 30) {
+            bullets.splice(i, 1); continue;
+          }
+
+          // 打小球：1 发消失
+          var hitBall = false;
+          for (j = balls.length - 1; j >= 0; j--) {
+            var b2 = balls[j];
+            if (dist(bu.x, bu.y, b2.x, b2.y) < b2.r + 4) {
+              burst(b2.x, b2.y, 12, 'hsl(' + b2.hue + ',100%,70%)', 5);
+              burst(b2.x, b2.y, 6, '#ffffff', 4);
+              balls.splice(j, 1);
+              hits++;
+              hitBall = true;
+              break;
+            }
+          }
+          if (hitBall) { bullets.splice(i, 1); continue; }
+
+          // 打柱子：N 发碎裂
+          for (k = pillars.length - 1; k >= 0; k--) {
+            var p = pillars[k];
+            var left = p.cx - p.w / 2, right = p.cx + p.w / 2 + p.d;
+            var top = p.cy - p.h - p.d, bottom = p.cy;
+            if (bu.x >= left && bu.x <= right && bu.y >= top && bu.y <= bottom) {
+              p.hp--; p.flash = 1;
+              burst(bu.x, bu.y, 8, 'rgba(255,255,255,0.9)', 4);
+              if (p.hp <= 0) {
+                burst(p.cx, p.cy - p.h / 2, 30, 'rgba(200,200,200,0.9)', 7);
+                burst(p.cx, p.cy - p.h / 2, 12, '#ffffff', 5);
+                pillars.splice(k, 1);
+                pillars.push(makePillar()); // 保持场上数量恒定
+                hits++;
+              }
+              bullets.splice(i, 1);
+              break;
+            }
+          }
+        }
+
+        // 粒子
+        for (i = particles.length - 1; i >= 0; i--) {
+          var pt = particles[i];
+          pt.x += pt.vx * dt; pt.y += pt.vy * dt;
+          pt.vx *= 0.92; pt.vy *= 0.92;
+          pt.life -= dt;
+          if (pt.life <= 0) particles.splice(i, 1);
+        }
+
+        // HUD
+        hudHits.textContent = hits;
+        hudPillars.textContent = pillars.length;
+      }
+
+      // ===== 渲染 =====
+      function drawPillar(p) {
+        var cx = p.cx, cy = p.cy, w = p.w, h = p.h, d = p.d;
+        var A = [cx - w / 2, cy], B = [cx + w / 2, cy];
+        var C = [cx + w / 2 + d, cy - d], D = [cx - w / 2 + d, cy - d];
+        var At = [A[0], A[1] - h], Bt = [B[0], B[1] - h];
+        var Ct = [C[0], C[1] - h], Dt = [D[0], D[1] - h];
+
+        // 右侧面（最深）
+        ctx.beginPath();
+        ctx.moveTo(B[0], B[1]); ctx.lineTo(C[0], C[1]); ctx.lineTo(Ct[0], Ct[1]); ctx.lineTo(Bt[0], Bt[1]);
+        ctx.closePath();
+        ctx.fillStyle = '#161616'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.stroke();
+
+        // 正面
+        ctx.beginPath();
+        ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]);
+        ctx.closePath();
+        ctx.fillStyle = '#242424'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.stroke();
+
+        // 顶面（最亮）
+        ctx.beginPath();
+        ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(Ct[0], Ct[1]); ctx.lineTo(Dt[0], Dt[1]);
+        ctx.closePath();
+        ctx.fillStyle = '#343434'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.stroke();
+
+        // 命中闪白
+        if (p.flash > 0) {
+          ctx.globalAlpha = p.flash * 0.35;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(cx - w / 2, cy - h - d, w + d, h + d);
+          ctx.globalAlpha = 1;
+        }
+
+        // 高亮（被瞄准）
+        if (target && target.type === 'pillar' && target.obj === p) {
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+          ctx.strokeRect(cx - w / 2 - 3, cy - h - d - 3, w + d + 6, h + d + 6);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, W, H);
+
+        // 弹幕小球
+        for (var i = 0; i < balls.length; i++) {
+          var b = balls[i];
+          ctx.save();
+          ctx.shadowColor = 'hsl(' + b.hue + ',100%,60%)';
+          ctx.shadowBlur = 14;
+          var g = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.2, b.x, b.y, b.r);
+          g.addColorStop(0, 'hsla(' + b.hue + ',100%,78%,0.95)');
+          g.addColorStop(1, 'hsla(' + b.hue + ',100%,55%,0.65)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          // 高亮（被瞄准）
+          if (target && target.type === 'ball' && target.obj === b) {
+            ctx.globalAlpha = 0.6;
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 5, 0, Math.PI * 2); ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        // 柱子（先画远的？测试阶段直接画）
+        for (var j = 0; j < pillars.length; j++) drawPillar(pillars[j]);
+
+        // 瞄准线
+        if (target) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 5]);
+          ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(target.cx, target.cy); ctx.stroke();
+          ctx.restore();
+        }
+
+        // 子弹（发光白矩形，沿速度方向）
+        for (var k = 0; k < bullets.length; k++) {
+          var bu = bullets[k];
+          var ang = Math.atan2(bu.vy, bu.vx);
+          ctx.save();
+          ctx.translate(bu.x, bu.y);
+          ctx.rotate(ang);
+          ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 12;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(-BULLET_W / 2, -BULLET_LEN / 2, BULLET_W, BULLET_LEN);
+          ctx.restore();
+        }
+
+        // 粒子
+        for (var m = 0; m < particles.length; m++) {
+          var pt = particles[m];
+          ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+          ctx.fillStyle = pt.color;
+          ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // ===== 主循环 =====
+      var last = performance.now();
+      function loop(now) {
+        var dt = Math.min((now - last) / 16.666, 3);
+        last = now;
+        update(dt);
+        render();
+        updateCursor();
+        requestAnimationFrame(loop);
+      }
+
+      // ===== 输入 =====
+      document.addEventListener('mousemove', function (e) {
+        mx = e.clientX; my = e.clientY;
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          shoot();
+        }
+      });
+      window.addEventListener('resize', resize);
+
+      // ===== 自定义光标跟随（完整徽章，热点=中心圆）+ 转向 =====
+      var cursor = document.getElementById('game-cursor');
+      var HOT_X = 149.5, HOT_Y = 216.4;   // 中心圆相对裁剪 viewBox 原点
+      var SCALE = 32 / 299;               // 显示 32px / viewBox 宽 299
+      var shown = false;
+      var curAngle = 0;                   // 光标当前朝向（弧度，0 = 顶部朝上）
+      if (cursor) {
+        // 旋转轴心 = 热点（中心圆位置），保证转向时热点仍对准鼠标
+        cursor.style.transformOrigin = (HOT_X * SCALE) + 'px ' + (HOT_Y * SCALE) + 'px';
+        document.addEventListener('mousemove', function (e) {
+          mx = e.clientX; my = e.clientY;
+          if (!shown) { cursor.style.opacity = 1; shown = true; }
+        });
+        document.addEventListener('mouseleave', function () {
+          cursor.style.opacity = 0; shown = false;
+        });
+      }
+      // 光标转向：顶部朝向最近的黑色柱体，rAF 每帧平滑插值
+      function updateCursor() {
+        if (!cursor) return;
+        var bestP = null, bestD = Infinity;
+        for (var i = 0; i < pillars.length; i++) {
+          var p = pillars[i];
+          var pcx = p.cx + p.d * 0.5, pcy = p.cy - p.d * 0.5;
+          var dd = dist(mx, my, pcx, pcy);
+          if (dd < bestD) { bestD = dd; bestP = { cx: pcx, cy: pcy }; }
+        }
+        if (bestP) {
+          // 顶部（-y 方向）指向柱子：目标角度 = 柱子方位角 + 90°
+          var targetAngle = Math.atan2(bestP.cy - my, bestP.cx - mx) + Math.PI / 2;
+          var diff = targetAngle - curAngle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          curAngle += diff * 0.15;
+        }
+        cursor.style.transform =
+          'translate(' + (mx - HOT_X * SCALE) + 'px,' + (my - HOT_Y * SCALE) + 'px) rotate(' + (curAngle * 180 / Math.PI) + 'deg)';
+      }
+
+      // ===== 启动 =====
+      resize();
+      spawn();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</BaseLayout>

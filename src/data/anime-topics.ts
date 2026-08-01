@@ -987,6 +987,126 @@ animate(chars2, {
   loop: true
 });`,
           },
+          {
+            id: 'animatable', label: '可动画',
+            desc: `**可动画对象（createAnimatable）** — 创建一个可反复"调用"触发动画的对象。
+
+**与 animate() 的区别**
+- \`animate()\`：一次性播放，播完即止
+- \`createAnimatable()\`：返回 Animatable 实例，每个可动画属性变成同名方法，随时调用即可让元素动画到新目标值
+
+**用法**
+\`\`\`
+import { createAnimatable, utils } from 'animejs';
+const animatable = createAnimatable('.square', {
+  x: 500,   // x 动画时长 500ms
+  y: 500,   // y 动画时长 500ms
+  ease: 'out(3)',
+});
+animatable.x(200);  // 触发：500ms 内动画到 x=200
+\`\`\`
+
+**本例**：监听 mousemove，鼠标移动时计算相对容器中心的偏移，反复调用 .x()/.y() 让方块平滑跟随光标，超出容器范围用 utils.clamp 夹取。
+
+**ease: 'out(3)'** — 幂次缓动：out + 指数 3（即 easeOutCubic）。`,
+            html: `<div class="large centered row">
+  <div class="col">
+    <div class="square"></div>
+  </div>
+</div>
+<div class="small centered row">
+  <span class="label">Move cursor around</span>
+</div>`,
+            css: `body { background: #2d2117 !important; color: #ff7b42; }
+.row { display: flex; gap: 16px; align-items: stretch; margin: 8px 0; }
+.col { flex: 1 1 0; min-width: 0; }
+.large.centered.row { min-height: 200px; align-items: center; }
+.centered { justify-content: center; }
+.small.centered.row { justify-content: center; }
+.square {
+  width: 60px; height: 60px; border-radius: 8px;
+  background: #ff7b42;
+  box-shadow: 0 0 24px rgba(255,123,66,0.45);
+}
+.label { font-size: 11px; color: #8b7355; text-transform: uppercase; letter-spacing: 1px; display: block; text-align: center; }`,
+            js: `import { createAnimatable, utils } from 'https://esm.sh/animejs@4.4.1';
+
+const $demo = document.querySelector('.large.centered.row');
+
+let bounds = $demo.getBoundingClientRect();
+const refreshBounds = () => bounds = $demo.getBoundingClientRect();
+
+// 创建可动画对象：x/y 动画时长 500ms，out(3) 缓动
+const animatableSquare = createAnimatable('.square', {
+  x: 500,
+  y: 500,
+  ease: 'out(3)',
+});
+
+const onMouseMove = e => {
+  const { width, height, left, top } = bounds;
+  const hw = width / 2;
+  const hh = height / 2;
+  // 光标相对容器中心的偏移，夹取在容器范围内
+  const x = utils.clamp(e.clientX - left - hw, -hw, hw);
+  const y = utils.clamp(e.clientY - top - hh, -hh, hh);
+  animatableSquare.x(x);  // 500ms 内动画到 x
+  animatableSquare.y(y);  // 500ms 内动画到 y
+};
+
+window.addEventListener('mousemove', onMouseMove);
+window.addEventListener('resize', refreshBounds);`,
+          },
+          {
+            id: 'svg-cursor', label: 'SVG 光标',
+            desc: `**SVG 光标矢量图** — Inkscape 染色版（黑色剪影 + 灰色部件）。
+
+**结构**
+- 黑色菱形徽章剪影（中心圆、辐条、底部凹槽镂空）
+- 底部两侧灰色方块（#898d7f，Inkscape 添加的染色部件）
+
+**说明**：在纯黑剪影基础上用 Inkscape 添加了灰色染色层，浅色背景衬托。
+
+**动画**：整体缓慢上下浮动（translateY 交替）。`,
+            html: `<div class="cursor-wrap">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 448" width="100%" height="100%">
+    <g transform="translate(0,448) scale(0.1,-0.1)" fill="#000000" stroke="none">
+      <path d="M2191 4363 c-10 -21 -152 -324 -316 -673 -164 -349 -315 -673 -337 -720 -22 -47 -123 -263 -225 -480 -102 -217 -222 -471 -267 -565 l-81 -170 -3 -244 -3 -245 598 -598 c329 -329 600 -598 603 -598 30 1 31 21 36 516 4 274 7 500 8 501 0 0 12 3 26 5 l25 3 3 -499 c2 -496 4 -526 36 -526 6 0 277 267 603 592 l593 593 0 248 0 248 -402 857 c-220 471 -434 927 -473 1012 -233 499 -354 751 -365 765 -20 24 -38 18 -59 -22z m141 -291 c54 -114 188 -400 298 -637 111 -236 280 -597 376 -800 96 -204 174 -376 174 -383 0 -10 -488 -264 -597 -310 -32 -14 -34 -13 -79 27 -63 55 -139 83 -245 89 -130 7 -220 -24 -311 -106 l-38 -34 -317 162 c-175 89 -319 164 -321 165 -2 2 34 81 79 176 45 96 115 245 155 332 279 596 567 1210 639 1362 31 66 61 130 66 143 5 12 12 22 16 22 5 0 52 -93 105 -208z m-811 -2141 l314 -159 6 -74 c7 -84 17 -113 61 -175 36 -50 130 -117 189 -134 l39 -12 0 -359 c0 -197 -3 -358 -7 -358 -13 0 -1083 1074 -1083 1087 0 16 153 343 160 343 4 0 148 -72 321 -159z m1822 -16 l79 -168 -546 -546 -546 -546 0 363 c0 338 1 362 18 362 34 0 142 60 185 102 65 66 99 142 99 226 l1 68 306 157 c168 86 310 155 316 153 5 -1 44 -78 88 -171z m-1223 -1535 l0 -175 -539 540 -540 540 -3 177 -3 178 543 -542 542 -543 0 -175z m756 361 l-544 -544 -1 177 -2 176 543 543 543 543 3 -175 2 -175 -544 -545z" />
+      <path d="M740 781 c-16 -30 -14 -612 3 -634 11 -16 36 -17 272 -15 l260 3 3 319 c2 227 -1 323 -9 332 -9 11 -63 14 -265 14 -240 0 -254 -1 -264 -19z m476 -188 l-1 -138 -207 -3 -208 -2 0 140 0 140 209 0 208 0 -1 -137z m-6 -308 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+      <path d="M3192 792 c-9 -7 -12 -80 -10 -333 l3 -324 265 0 265 0 3 319 c2 227 -1 323 -9 332 -9 11 -61 14 -258 14 -135 0 -252 -4 -259 -8z m468 -202 l0 -140 -210 0 -210 0 0 140 0 140 210 0 210 0 0 -140z m-10 -305 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+    </g>
+    <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 108.10634,559.58773 v -10.99386 h 26.38528 26.38527 v 10.99386 10.99387 h -26.38527 -26.38528 z" transform="scale(0.75)" />
+    <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 433.52474,559.58773 v -10.99386 h 26.38528 26.38528 v 10.99386 10.99387 h -26.38528 -26.38528 z" transform="scale(0.75)" />
+    <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 311.12638,547.12522 v -23.08713 l 71.71206,-71.70925 71.71206,-71.70926 0.48099,6.77622 c 0.26454,3.72692 0.48098,13.89968 0.48098,22.60612 v 15.82991 l -72.19304,72.19026 -72.19305,72.19025 z" transform="scale(0.75)" />
+    <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 210.71575,497.18285 -71.46013,-71.96266 -0.43543,-22.41623 c -0.23949,-12.32893 -0.39034,-22.48526 -0.33523,-22.56962 0.0551,-0.0844 32.49545,32.2431 72.08963,71.83881 l 71.98942,71.99221 -0.19407,22.54007 -0.19407,22.54009 z" transform="scale(0.75)" />
+  </svg>
+</div>`,
+            css: `body { background: #1a1a1a !important; }
+.cursor-wrap {
+  width: 240px;
+  margin: 40px auto;
+}
+body { background: #e6e8eb !important; }
+.cursor-wrap {
+  width: 240px;
+  margin: 40px auto;
+}
+.cursor-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}`,
+            js: `import { animate } from 'https://esm.sh/animejs@4.4.1';
+
+// SVG 元素同样支持 CSS transform 动画：缓慢上下浮动
+animate('.cursor-wrap svg', {
+  translateY: [-8, 8],
+  easing: 'easeInOutSine',
+  duration: 1600,
+  direction: 'alternate',
+  loop: true,
+});`,
+          },
         ],
       },
     ],
