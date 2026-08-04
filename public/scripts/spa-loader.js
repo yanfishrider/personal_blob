@@ -11,7 +11,13 @@
       '返回列表</button>';
   }
 
+  var MIN_LOADING_MS = 400; // 加载圆环最小展示时长，避免加载太快像闪烁
+  var loadSeq = 0; // 请求序号，防止快速连点时旧请求的 setTimeout 误复位光标
+
   async function loadPost(href) {
+    var seq = ++loadSeq;
+    if (window.setCursorState) window.setCursorState('loading');
+    var loadStart = Date.now();
     centerView.innerHTML = '<div class="text-center py-20"><span class="text-gray-400 text-sm">加载中...</span></div>';
     try {
       var res = await fetch(href);
@@ -37,6 +43,16 @@
       console.error('loadPost failed:', err);
       centerView.innerHTML = '<div class="text-center py-20 text-gray-400 text-sm">加载失败，请刷新重试</div>';
     }
+    // 保证圆环至少展示 MIN_LOADING_MS，不足则补齐；仅当仍是最新请求时才复位
+    var elapsed = Date.now() - loadStart;
+    var remain = MIN_LOADING_MS - elapsed;
+    if (remain > 0) {
+      setTimeout(function() {
+        if (seq === loadSeq && window.setCursorState) window.setCursorState('default');
+      }, remain);
+    } else {
+      if (seq === loadSeq && window.setCursorState) window.setCursorState('default');
+    }
   }
 
   centerView.addEventListener('click', function(e) {
@@ -51,6 +67,7 @@
       loadPost(e.state.href);
     } else {
       centerView.innerHTML = listHTML;
+      if (window.setCursorState) window.setCursorState('default');
     }
   });
 })();

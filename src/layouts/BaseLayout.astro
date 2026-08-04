@@ -86,6 +86,18 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
       }
       #custom-cursor .cursor-svg { width: 100%; height: 100%; }
       #custom-cursor .cursor-svg svg { display: block; width: 100%; height: 100%; }
+
+      /* ── 加载中状态：徽章隐藏，圆环轨迹旋转 + 填充呼吸 ── */
+      #custom-cursor.loading .cursor-svg { display: none; }
+      #custom-cursor .cursor-loading { display: none; width: 100%; height: 100%; }
+      #custom-cursor.loading .cursor-loading { display: block; }
+      #custom-cursor .cursor-loading svg { display: block; width: 100%; height: 100%; }
+      #custom-cursor.loading .cursor-ring {
+        animation: cursor-spin 1s linear infinite;
+        transform-origin: 12px 12px;
+        transform-box: view-box;
+      }
+      @keyframes cursor-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
     <div id="custom-cursor" aria-hidden="true">
       <div class="cursor-svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
@@ -104,21 +116,51 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
           <path style="fill:#ffffff;stroke-width:1.46585" d="m 433.15828,518.91043 v -18.32311 h 27.1182 27.1182 v 18.32311 18.32311 h -27.1182 -27.1182 z" transform="scale(0.75)" />
           <path style="fill:#ffffff;stroke-width:1.46585" d="m 107.73988,519.1224 v -18.53508 h 27.1182 27.1182 v 17.59019 17.59018 l -17.22372,0.0104 c -9.47305,0.006 -21.67624,0.43093 -27.1182,0.94489 l -9.89448,0.93448 z" transform="scale(0.75)" />
           </svg></div>
+      <!-- 加载中圆环：外环旋转轨迹 + 内环静止（默认隐藏，由 .loading 类控制显示） -->
+      <div class="cursor-loading">
+        <svg viewBox="0 0 24 24" width="100%" height="100%">
+          <circle class="cursor-ring" cx="12" cy="12" r="9.5" fill="none" stroke="#646155" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="36 23.7" />
+          <circle class="cursor-ring-outer" cx="12" cy="12" r="4" fill="none" stroke="#CCC7AF" stroke-width="2" />
+        </svg>
+      </div>
     </div>
 
     <script>
       // 全局自定义光标：24×24 徽章，无光晕，顶部朝向左 30°
       // 热点 = SVG 顶部中心 (12,0)：meet 缩放后图形顶部贴容器顶边，水平居中
+      // 支持状态切换：window.setCursorState('default' | 'loading')
       (function () {
         var cursor = document.getElementById('custom-cursor');
         if (!cursor) return;
         var HOT_X = 12, HOT_Y = 0;
         cursor.style.transformOrigin = HOT_X + 'px ' + HOT_Y + 'px';
         var shown = false;
+        var loading = false;
+
+        function applyState() {
+          if (loading) {
+            cursor.classList.add('loading');
+            // 徽章默认 -30°，loading 时让圆环自身旋转，容器不旋转
+            cursor.style.transform =
+              'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px)';
+          } else {
+            cursor.classList.remove('loading');
+            cursor.style.transform =
+              'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px) rotate(-30deg)';
+          }
+        }
+
+        window.setCursorState = function (state) {
+          loading = (state === 'loading');
+          cursor.classList.toggle('loading', loading);
+          if (cursor._x !== undefined) applyState();
+        };
+
         document.addEventListener('mousemove', function (e) {
           if (!shown) { cursor.style.opacity = 1; shown = true; }
-          cursor.style.transform =
-            'translate(' + (e.clientX - HOT_X) + 'px,' + (e.clientY - HOT_Y) + 'px) rotate(-30deg)';
+          cursor._x = e.clientX;
+          cursor._y = e.clientY;
+          applyState();
         });
         document.addEventListener('mouseleave', function () {
           cursor.style.opacity = 0; shown = false;
