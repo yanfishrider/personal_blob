@@ -21,6 +21,8 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
     <meta name="description" content={description || title} />
     <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}/favicon.svg`} />
     <title>{title}</title>
+    <!-- 不蒜子站点统计 -->
+    <script is:inline async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
   </head>
   <body class="min-h-screen" style="background: #e0e0e0; font-family: 'Georgia', 'Noto Serif SC', serif; color: #333;">
     <LoadingScreen />
