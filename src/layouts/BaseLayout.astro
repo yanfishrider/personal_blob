@@ -30,18 +30,18 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
     <header id="site-header" class="fixed top-0 left-0 right-0 z-50" style="background:transparent;transform:translateY(-8px);transition:all .6s cubic-bezier(.34,1.56,.64,1);">
       <nav class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
         <a href={import.meta.env.BASE_URL} id="brand" class="font-bold text-lg transition-colors duration-500" style="color:rgba(80,120,125,0.8);">
-          摸鱼骑士 知识库
+          <span id="logo-text-3d" class="logo-text-3d">摸鱼骑士 知识库</span>
         </a>
         <div class="flex gap-4 text-sm" id="nav-links">
-          <a href={`${import.meta.env.BASE_URL}/ascii-converter`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">转换</a>
-          <a href={`${import.meta.env.BASE_URL}/search`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">搜索</a>
-          <a href={import.meta.env.BASE_URL} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">首页</a>
-          <a href={`${import.meta.env.BASE_URL}/archive`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">归档</a>
-          <a href={`${import.meta.env.BASE_URL}/categories`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">分类</a>
-          <a href={`${import.meta.env.BASE_URL}/tags`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">标签</a>
-          <a href={`${import.meta.env.BASE_URL}/notes`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">笔记</a>
-          <a href={`${import.meta.env.BASE_URL}/game`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">游戏</a>
-          <a href={`${import.meta.env.BASE_URL}/about`} class="transition-colors hover:text-white" style="color:rgba(80,120,125,0.6);">关于</a>
+          <a href={`${import.meta.env.BASE_URL}/ascii-converter`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">转换</a>
+          <a href={`${import.meta.env.BASE_URL}/search`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">搜索</a>
+          <a href={import.meta.env.BASE_URL} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">首页</a>
+          <a href={`${import.meta.env.BASE_URL}/archive`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">归档</a>
+          <a href={`${import.meta.env.BASE_URL}/categories`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">分类</a>
+          <a href={`${import.meta.env.BASE_URL}/tags`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">标签</a>
+          <a href={`${import.meta.env.BASE_URL}/notes`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">笔记</a>
+          <a href={`${import.meta.env.BASE_URL}/game`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">游戏</a>
+          <a href={`${import.meta.env.BASE_URL}/about`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">关于</a>
         </div>
       </nav>
     </header>
@@ -72,7 +72,89 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
 
     <SideToolbar />
 
-    <!-- 全局自定义光标：16×16 徽章，无光晕，顶部朝向左 30°（game 页独立实现转向版） -->
+    <!-- 导航栏 Logo 3D 翻转文字（splitText） -->
+    <style is:global>
+      #logo-text-3d {
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .char-3d {
+        position: relative;
+        transform-style: preserve-3d;
+        transform-origin: 50% 50% 1.1rem;
+      }
+      .face {
+        position: absolute;
+        left: 0;
+        font-style: normal;
+        opacity: 0.5;
+      }
+      #logo-text-3d .face-bottom {
+        top: 100%;
+        transform-origin: 50% 0%;
+        transform: rotateX(90deg);
+      }
+      #logo-text-3d .face-top {
+        bottom: 100%;
+        transform-origin: 50% 100%;
+        transform: rotateX(-90deg);
+      }
+    </style>
+    <script is:inline>
+      // 导航栏 Logo 3D 翻转：splitText 拆字 + 平滑往返（0 → -90 → 0，终点=起点，loop 无跳变）
+      (async function () {
+        const el = document.getElementById('logo-text-3d');
+        if (!el) return;
+        try {
+          const { animate, stagger, splitText } = await import('https://esm.sh/animejs@4.4.1');
+          splitText(el, {
+            chars: `<span class="char-3d word-{i}">
+  <em class="face face-top">{value}</em>
+  <em class="face-front">{value}</em>
+  <em class="face face-bottom">{value}</em>
+</span>`,
+          });
+          const charsStagger = stagger(100, { start: 0 });
+          // 每个关键帧 750ms，出 + 回 = 一个循环；4 组动画同步，终点=起点
+          animate('.char-3d', {
+            rotateX: [
+              { to: -90, duration: 750, ease: 'out(3)' },
+              { to: 0, duration: 750, ease: 'in(3)' },
+            ],
+            delay: charsStagger,
+            loop: true,
+          });
+          animate('.char-3d .face-top', {
+            opacity: [
+              { to: 0, duration: 750, ease: 'out(3)' },
+              { to: 0.5, duration: 750, ease: 'in(3)' },
+            ],
+            delay: charsStagger,
+            loop: true,
+          });
+          animate('.char-3d .face-front', {
+            opacity: [
+              { to: 0.5, duration: 750, ease: 'out(3)' },
+              { to: 1, duration: 750, ease: 'in(3)' },
+            ],
+            delay: charsStagger,
+            loop: true,
+          });
+          animate('.char-3d .face-bottom', {
+            opacity: [
+              { to: 1, duration: 750, ease: 'out(3)' },
+              { to: 0.5, duration: 750, ease: 'in(3)' },
+            ],
+            delay: charsStagger,
+            loop: true,
+          });
+        } catch (err) {
+          console.error('logo 3D init failed:', err);
+        }
+      })();
+    </script>
+
+    <!-- 全局自定义光标：24×24 上下双环+黑线，垂直无旋转，白色轮廓（game 页独立实现转向版） -->
     <style is:global>
       html, body, body * { cursor: none !important; }
       #custom-cursor {
@@ -126,9 +208,9 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
     </div>
 
     <script>
-      // 全局自定义光标：24×24 徽章，无光晕，顶部朝向左 30°
-      // 热点 = SVG 顶部中心 (12,0)：meet 缩放后图形顶部贴容器顶边，水平居中
+      // 全局自定义光标：默认菱形徽章 -30°，loading 时切换双环动画
       // 支持状态切换：window.setCursorState('default' | 'loading')
+      // 热点 = SVG 顶部中心 (12,0)：meet 缩放后图形顶部贴容器顶边，水平居中
       (function () {
         var cursor = document.getElementById('custom-cursor');
         if (!cursor) return;
@@ -138,16 +220,11 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
         var loading = false;
 
         function applyState() {
-          if (loading) {
-            cursor.classList.add('loading');
-            // 徽章默认 -30°，loading 时让圆环自身旋转，容器不旋转
-            cursor.style.transform =
-              'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px)';
-          } else {
-            cursor.classList.remove('loading');
-            cursor.style.transform =
-              'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px) rotate(-30deg)';
-          }
+          cursor.classList.toggle('loading', loading);
+          // 仅默认徽章旋转 -30°（顶部朝左）；loading 圆环自身旋转
+          var rotate = loading ? '' : ' rotate(-30deg)';
+          cursor.style.transform =
+            'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px)' + rotate;
         }
 
         window.setCursorState = function (state) {

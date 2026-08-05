@@ -11,21 +11,24 @@ import PreviewPanel from '../components/notes/PreviewPanel.astro';
   <PreviewPanel slot="rightSidebar" />
 </BaseLayout>
 
-<!-- 光标状态测试按钮 -->
+<!-- 光标状态测试按钮（默认 ↔ 加载中） -->
 <div id="cursor-test-btn" style="position:fixed;bottom:20px;right:20px;z-index:9999;">
   <button id="btn-toggle-cursor"
-    style="background:#ff7b42;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);"
-    data-loading="0">光标状态：默认</button>
+    style="background:#ff7b42;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);">光标状态：默认</button>
 </div>
 
 <script>
   const btn = document.getElementById('btn-toggle-cursor');
+  const STATES = [
+    { key: 'default', label: '光标状态：默认' },
+    { key: 'loading', label: '光标状态：加载中' },
+  ];
+  let idx = 0;
   btn.addEventListener('click', function () {
-    const isLoading = btn.dataset.loading === '1';
-    const next = isLoading ? 'default' : 'loading';
-    if (window.setCursorState) window.setCursorState(next);
-    btn.dataset.loading = isLoading ? '0' : '1';
-    btn.textContent = next === 'loading' ? '光标状态：加载中' : '光标状态：默认';
+    idx = (idx + 1) % STATES.length;
+    const s = STATES[idx];
+    if (window.setCursorState) window.setCursorState(s.key);
+    btn.textContent = s.label;
   });
 </script>
 

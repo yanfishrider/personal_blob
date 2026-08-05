@@ -32,9 +32,10 @@
       header.style.transform = 'translateY(-8px)';
       brand.style.color = 'rgba(80,120,125,0.8)';
       links.forEach(function(a) {
-        a.style.color = 'rgba(80,120,125,0.6)';
-        a.onmouseenter = function() { a.style.color = '#fff'; };
-        a.onmouseleave = function() { a.style.color = 'rgba(80,120,125,0.6)'; };
+        // 移除内联样式，颜色/悬停交回 CSS class 控制（text-[#50787d]/60 + hover:text-[#49B1F5]）
+        a.style.color = '';
+        a.onmouseenter = null;
+        a.onmouseleave = null;
       });
     }
   });

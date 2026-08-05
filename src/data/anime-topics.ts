@@ -1105,7 +1105,112 @@ animate('.cursor-wrap svg', {
   duration: 1600,
   direction: 'alternate',
   loop: true,
+  });`,
+          },
+          {
+            id: 'svg-line-draw', label: 'SVG 变化',
+            desc: `**SVG 线条绘制动画** — svg.createDrawable() 把 SVG 路径包装成可动画对象，draw 属性逐笔绘制粗线条字。
+
+**原理**
+- \`svg.createDrawable('.line')\` 收集所有 .line 路径（path / polyline 均可）
+- **draw** 属性接受 [起点, 终点] 关键帧，数值为路径长度比例（0~1）：
+- \`'0 0'\` — 未绘制
+- \`'0 1'\` — 从起点画到终点
+- \`'1 1'\` — 整条线完成
+- \`stagger(100)\` 让每条线依次延迟 100ms，形成逐笔书写效果
+
+这正是**图形方式**的粗线条字：每个字母是独立的 SVG 路径，可以逐笔画动画。`,
+            html: `<svg viewBox="0 0 304 112">
+<g stroke="currentColor" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+<path class="line" d="M59 90V56.136C58.66 46.48 51.225 39 42 39c-9.389 0-17 7.611-17 17s7.611 17 17 17h8.5v17H42C23.222 90 8 74.778 8 56s15.222-34 34-34c18.61 0 33.433 14.994 34 33.875V90H59z"/>
+<polyline class="line" points="59 22.035 59 90 76 90 76 22 59 22"/>
+<path class="line" d="M59 90V55.74C59.567 36.993 74.39 22 93 22c18.778 0 34 15.222 34 34v34h-17V56c0-9.389-7.611-17-17-17-9.225 0-16.66 7.48-17 17.136V90H59z"/>
+<polyline class="line" points="127 22.055 127 90 144 90 144 22 127 22"/>
+<path class="line" d="M127 90V55.74C127.567 36.993 142.39 22 161 22c18.778 0 34 15.222 34 34v34h-17V56c0-9.389-7.611-17-17-17-9.225 0-16.66 7.48-17 17.136V90h-17z"/>
+<path class="line" d="M118.5 22a8.5 8.5 0 1 1-8.477 9.067v-1.134c.283-4.42 3.966-7.933 8.477-7.933z"/>
+<path class="line" d="M144 73c-9.389 0-17-7.611-17-17v-8.5h-17V56c0 18.778 15.222 34 34 34V73z"/>
+<path class="line" d="M178 90V55.74C178.567 36.993 193.39 22 212 22c18.778 0 34 15.222 34 34v34h-17V56c0-9.389-7.611-17-17-17-9.225 0-16.66 7.48-17 17.136V90h-17z"/>
+<path class="line" d="M263 73c-9.389 0-17-7.611-17-17s7.611-17 17-17c9.18 0 16.58 7.4 17 17h-17v17h34V55.875C296.433 36.994 281.61 22 263 22c-18.778 0-34 15.222-34 34s15.222 34 34 34V73z"/>
+<path class="line" d="M288.477 73A8.5 8.5 0 1 1 280 82.067v-1.134c.295-4.42 3.967-7.933 8.477-7.933z"/>
+</g>
+</svg>`,
+            css: `body { background: #1a1a1a !important; }
+svg {
+display: block; margin: 32px auto;
+color: #ff7b42; width: 100%; max-width: 300px;
+}`,
+            js: `import { animate, svg, stagger } from 'https://esm.sh/animejs@4.4.1';
+
+// 逐笔绘制粗线条字：每条 .line 依次画出，然后整体消失循环
+animate(svg.createDrawable('.line'), {
+draw: ['0 0', '0 1', '1 1'],
+ease: 'inOutQuad',
+duration: 2000,
+delay: stagger(100),
+loop: true
 });`,
+          },
+          {
+            id: 'text-custom-template', label: '文本自定义模板',
+            desc: `**splitText 自定义 HTML 模板** — splitText 的 chars 参数支持模板字符串，每个字符用自定义 HTML 包裹，实现 3D 翻转文字。
+
+**原理**
+- \`chars\` 模板：\`{value}\` 是字符内容、\`{i}\` 是索引占位符，会被逐个替换
+- 每个字符生成 3 个 \`<em>\` 面：face-top / face-front / face-bottom，构成 3D 立方体字
+- **createTimeline** 按顺序添加动画：先旋转整字（rotateX: -90），再依次切换三个面的透明度，形成翻转循环
+- 3D 效果依赖 \`transform-style: preserve-3d\` + 各面 rotateX 定位`,
+            html: `<div class="large centered row">
+<p class="text-xl">Custom HTML template.</p>
+</div>`,
+            css: `body { background: #1a1a1a !important; }
+.text-xl {
+font-size: 1.5rem;
+color: #ffffff;
+letter-spacing: 0.06em;
+font-family: sans-serif;
+}
+.char-3d {
+position: relative;
+transform-style: preserve-3d;
+transform-origin: 50% 50% 1rem;
+}
+.face {
+position: absolute;
+left: 0;
+}
+.face-bottom {
+top: 100%;
+transform-origin: 50% 0%;
+transform: rotateX(90deg);
+}
+.face-top {
+bottom: 100%;
+transform-origin: 50% 100%;
+transform: rotateX(-90deg);
+}
+.large.centered.row {
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 60vh;
+}`,
+            js: `import { createTimeline, stagger, splitText } from 'https://esm.sh/animejs@4.4.1';
+
+splitText('p', {
+chars: \`<span class="char-3d word-{i}">
+<em class="face face-top">{value}</em>
+<em class="face-front">{value}</em>
+<em class="face face-bottom">{value}</em>
+</span>\`,
+});
+
+const charsStagger = stagger(100, { start: 0 });
+
+createTimeline({ defaults: { ease: 'linear', loop: true, duration: 750 }})
+.add('.char-3d', { rotateX: -90 }, charsStagger)
+.add('.char-3d .face-top', { opacity: [.5, 0] }, charsStagger)
+.add('.char-3d .face-front', { opacity: [1, .5] }, charsStagger)
+.add('.char-3d .face-bottom', { opacity: [.5, 1] }, charsStagger);`,
           },
         ],
       },
