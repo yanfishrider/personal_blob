@@ -1212,6 +1212,99 @@ createTimeline({ defaults: { ease: 'linear', loop: true, duration: 750 }})
 .add('.char-3d .face-front', { opacity: [1, .5] }, charsStagger)
 .add('.char-3d .face-bottom', { opacity: [.5, 1] }, charsStagger);`,
           },
+          {
+            id: 'nav-logo-3d', label: '导航栏 3D 翻转',
+            desc: `**导航栏 Logo 3D 翻转（平滑往返版）** — 模拟本博客导航栏当前效果。
+
+**实现要点**
+- \`splitText\` 拆字：每字生成 face-top / face-front / face-bottom 三个面，构成 3D 硬币
+- **平滑往返**：rotateX 0 → -90° → 0（有去有回），终点=起点，loop 重置无跳变
+- 4 组动画同步：翻转 + 三个面透明度同步往返
+- 关键坑：timeline 顺序版（转完再换面）loop 会从 -90° 跳回 0° 产生抖动；perspective 透视投影在小空间放大变形感，导航栏已去掉
+
+**参数**：每段 750ms，stagger(100) 逐字错开，transform-origin Z=1.1rem（位移大但往返闭环后无跳变）`,
+            html: `<div class="large centered row">
+<p class="text-xl">摸鱼骑士知识库</p>
+</div>`,
+            css: `body { background: #1a1a1a !important; }
+.text-xl {
+font-size: 1.5rem;
+color: #ffffff;
+letter-spacing: 0.06em;
+font-family: sans-serif;
+}
+.char-3d {
+position: relative;
+transform-style: preserve-3d;
+transform-origin: 50% 50% 1.1rem;
+}
+.face {
+position: absolute;
+left: 0;
+opacity: 0.5;
+}
+.face-bottom {
+top: 100%;
+transform-origin: 50% 0%;
+transform: rotateX(90deg);
+}
+.face-top {
+bottom: 100%;
+transform-origin: 50% 100%;
+transform: rotateX(-90deg);
+}
+.large.centered.row {
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 60vh;
+}`,
+            js: `import { animate, stagger, splitText } from 'https://esm.sh/animejs@4.4.1';
+
+splitText('p', {
+chars: \`<span class="char-3d word-{i}">
+<em class="face face-top">{value}</em>
+<em class="face-front">{value}</em>
+<em class="face face-bottom">{value}</em>
+</span>\`,
+});
+
+const charsStagger = stagger(100, { start: 0 });
+
+// 平滑往返：终点=起点，loop 无跳变
+animate('.char-3d', {
+rotateX: [
+{ to: -90, duration: 750, ease: 'out(3)' },
+{ to: 0, duration: 750, ease: 'in(3)' },
+],
+delay: charsStagger,
+loop: true,
+});
+animate('.char-3d .face-top', {
+opacity: [
+{ to: 0, duration: 750, ease: 'out(3)' },
+{ to: 0.5, duration: 750, ease: 'in(3)' },
+],
+delay: charsStagger,
+loop: true,
+});
+animate('.char-3d .face-front', {
+opacity: [
+{ to: 0.5, duration: 750, ease: 'out(3)' },
+{ to: 1, duration: 750, ease: 'in(3)' },
+],
+delay: charsStagger,
+loop: true,
+});
+animate('.char-3d .face-bottom', {
+opacity: [
+{ to: 1, duration: 750, ease: 'out(3)' },
+{ to: 0.5, duration: 750, ease: 'in(3)' },
+],
+delay: charsStagger,
+loop: true,
+});`,
+          },
         ],
       },
     ],
