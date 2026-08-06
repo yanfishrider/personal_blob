@@ -1613,6 +1613,137 @@ split.words.forEach((w, i) => colors[i] = utils.get(w, 'color'));
   run();
 })();`,
             },
+            {
+              id: 'modal-layout', label: '模块对话框动画',
+              desc: 'anime.js v4 createLayout API（AutoLayout）：把 dialog 设为布局根，元素在普通布局与对话框之间移动时，位置/尺寸/透明度自动 FLIP 过渡。核心：createLayout(root, { children, properties }) 声明需要动画的子元素与 CSS 变量；modalLayout.update(cb, { duration }) 在 DOM 变化前后捕获元素快照自动补间——点按钮克隆元素 append 进 dialog，showModal() 打开，源元素加 is-open 隐藏；close/cancel 时反向。properties: [--overlay-alpha] 让遮罩透明度也参与动画。每个按钮 data-duration 控制时长（500/1000/2000ms）。需要 dialog.showModal() 支持（预览 iframe sandbox=allow-scripts 可用）。',
+              html: `<div class="layout-container grid-layout row">
+  <button data-layout-id="A" data-duration="500" class="button item col">
+    <h2 data-layout-id="A-title">Item A</h2>
+    <h3 data-layout-id="A-duration">(500ms)</h3>
+    <p>This p tag is hidden by default and only visible when appended inside the dialog element. Its position and opacity are automatically animated.</p>
+  </button>
+  <button data-layout-id="B" data-duration="1000" class="button item col">
+    <h2 data-layout-id="B-title">Item B</h2>
+    <h3 data-layout-id="B-duration">(1000ms)</h3>
+    <p>This p tag is hidden by default and only visible when appended inside the dialog element. Its position and opacity are automatically animated.</p>
+  </button>
+  <button data-layout-id="C" data-duration="2000" class="button item col">
+    <h2 data-layout-id="C-title">Item C</h2>
+    <h3 data-layout-id="C-duration">(2000ms)</h3>
+    <p>This p tag is hidden by default and only visible when appended inside the dialog element. Its position and opacity are automatically animated.</p>
+  </button>
+</div>`,
+              css: `/* 官方 demo 依赖的 CSS 变量（预览环境补定义） */
+:root {
+  --hex-black-1: #0e1013;
+  --hex-green-1: #e6f0e6;
+  --hex-green-6: #2f6f4f;
+  --hex-green-1: #eef7ee;
+  --hex-green-6: #2e7d5b;
+}
+body { background: var(--hex-black-1); }
+
+/* 按钮网格 */
+.layout-container { width: 100%; }
+.grid-layout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+.button.item {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+  text-align: left; width: 100%; height: 14.5rem; padding: 2rem;
+  border-radius: 1rem; border: 1px solid var(--hex-green-6);
+  font-size: 1rem; color: var(--hex-green-6); background-color: var(--hex-green-1);
+  cursor: pointer;
+}
+.button.item h2 { font-size: 1.8rem; margin-bottom: 0.6rem; }
+.button.item h3 { font-size: 0.9rem; margin: 0; font-weight: normal; opacity: 0.7; }
+.button.item p { display: none; }
+.layout-container .item.is-open { visibility: hidden; }
+.layout-container .item p { display: none; }
+
+/* 对话框 */
+#layout-dialog {
+  --overlay-alpha: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100%;
+  max-height: 100%;
+  border: none;
+  background: transparent;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--hex-black-1), transparent var(--overlay-alpha));
+}
+#layout-dialog[open] {
+  --overlay-alpha: 40%;
+  pointer-events: auto;
+}
+#layout-dialog::backdrop { background: transparent; }
+#layout-dialog .item {
+  position: relative;
+  visibility: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+  text-align: left; width: 22rem; height: 14.5rem; padding: 2rem;
+  border-radius: 1rem; border: 1px solid var(--hex-green-6);
+  font-size: 1rem; color: var(--hex-green-6); background-color: var(--hex-green-1);
+}
+#layout-dialog[open] .item { visibility: visible; }
+#layout-dialog .item h2 { font-size: 2rem; margin-bottom: 1rem; will-change: font-size; text-wrap: nowrap; }
+#layout-dialog .item h3 { position: absolute; top: 2.9rem; right: 2rem; }
+#layout-dialog .item p { padding-top: 1rem; border-top: 1px solid currentColor; }
+#layout-dialog[open] .item p { display: block; }`,
+              js: `import { createLayout, utils } from 'https://esm.sh/animejs@4.4.1';
+
+const buttons = utils.$('button');
+
+// Create demo dialog and append it to the body
+const $dialog = document.createElement('dialog');
+$dialog.id = 'layout-dialog';
+document.body.appendChild($dialog);
+
+// Create the modal layout by setting the dialog as the root
+// Since the elements are not yet part of the modal root, it's necessary to specify all animated children
+// to tell the layout what to look for during an update
+const modalLayout = createLayout($dialog, {
+  children: ['.item', 'h2', 'h3', 'p'],
+  properties: ['--overlay-alpha'],
+});
+
+const closeModal = (e) => {
+  let $item;
+  modalLayout.update(({ root }) => {
+    $dialog.close();
+    $item = buttons.find(item => item.classList.contains('is-open'));
+    $item.classList.remove('is-open'); // Makes the clicked element visible again
+    $item.focus(); // Focus to the closed element to preserve the keyboard navigation flow
+  });
+};
+
+const openModal = e => {
+  const $target = e.target;
+  const $item = $target.closest('.item');
+  const $clone = $item.cloneNode(true);
+  $dialog.innerHTML = ''; // Make sure old clones are removed from the modal before adding a new one
+  $dialog.appendChild($clone); // Append the clicked element clone to the modal
+  modalLayout.update(() => {
+    $dialog.showModal(); // Open the modal
+    $item.classList.add('is-open'); // Hide the clicked element
+  }, {
+    duration: $item.dataset.duration // Custom duration depending of the button clicked
+  });
+}
+
+buttons.forEach($button => $button.addEventListener('click', openModal));
+$dialog.addEventListener('cancel', closeModal);
+$dialog.addEventListener('click', closeModal);`,
+            },
+
         ],
       },
     ],
