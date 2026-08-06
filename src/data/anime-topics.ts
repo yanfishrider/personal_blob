@@ -1305,8 +1305,129 @@ delay: charsStagger,
 loop: true,
 });`,
           },
+          {
+            id: 'text-clone', label: '文本克隆',
+            desc: `**splitText 文本克隆** — 无缝向上滚动的文字流。
+
+**原理**
+- wrap: 'clip'：每个字符外包裁切容器（overflow hidden），滚动时上下溢出被裁掉
+- clone: 'bottom'：每个原字符底部复制一份，原字滚出、克隆滚入，视觉上无限衔接
+- 动画作用于全部字符 y: -100%：滚过一个字高正好与克隆对齐，loop 重置无跳变
+- stagger(150, { from: 'center' })：从中间向两侧逐字延迟，形成波纹扩散`,
+            html: `<div class="large centered row">
+<p class="text-xl">Split and clone text.</p>
+</div>
+<div class="small row"></div>`,
+            css: `body { background: #1a1a1a !important; }
+.text-xl {
+font-size: 1.5rem;
+color: #ffffff;
+letter-spacing: 0.06em;
+font-family: sans-serif;
+white-space: nowrap;
+}
+.large.centered.row {
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 60vh;
+}
+.small.row {
+height: 0;
+}`,
+            js: `import { createTimeline, stagger, splitText } from 'https://esm.sh/animejs@4.4.1';
+
+const { chars } = splitText('p', {
+chars: {
+wrap: 'clip',
+clone: 'bottom'
+},
+});
+
+createTimeline()
+.add(chars, {
+y: '-100%',
+loop: true,
+loopDelay: 350,
+duration: 750,
+ease: 'inOut(2)',
+}, stagger(150, { from: 'center' }));`
+          },
+          {
+            id: 'text-hover-color', label: '颜色调整',
+            desc: `**splitText hover 变色 + resize 重排** — hover 单词随机变色，行上下浮动，容器宽度变化自动重新分行。
+
+**原理**
+- splitText('p', { lines: true }) 按行拆分，lines 数组是每一行
+- **addEffect** 注册效果：第一个动画 lines 上下浮动（loop alternate + stagger(400) 逐行错开）；第二个给每个单词绑 pointerenter 随机变色
+- **addEffect 返回值 = cleanup**：每次 re-split（resize 时）先执行，保存当前各单词颜色，重拆后恢复
+- splitText 内置 **ResizeObserver**：容器宽度变化 150ms 防抖后自动 re-split；CSS resize: both 可拖右下角改宽度演示`,
+            html: `<div class="iframe-content resizable">
+<div class="medium centered row">
+<p class="text-l">Hover the words to animate their color, then resize the text.</p>
+</div>
+</div>`,
+            css: `body { background: #1a1a1a !important; }
+.iframe-content.resizable {
+width: 100%;
+min-height: 55vh;
+display: flex;
+justify-content: center;
+align-items: center;
+resize: both;
+overflow: hidden;
+}
+.medium.centered.row {
+display: flex;
+justify-content: center;
+align-items: center;
+padding: 1rem;
+text-align: center;
+}
+.text-l {
+font-size: 1.8rem;
+color: #ffffff;
+letter-spacing: 0.05em;
+line-height: 1.7;
+font-family: sans-serif;
+margin: 0;
+}`,
+            js: `import { animate, utils, stagger, splitText } from 'https://esm.sh/animejs@4.4.1';
+
+const colors = [];
+
+splitText('p', {
+lines: true,
+})
+/* Registering an animation to the split */
+.addEffect(({ lines }) => animate(lines, {
+y: ['50%', '-50%'],
+loop: true,
+alternate: true,
+delay: stagger(400),
+ease: 'inOutQuad',
+}))
+/* Registering a callback to the split */
+.addEffect(split => {
+split.words.forEach(($el, i) => {
+const color = colors[i];
+if (color) utils.set($el, { color });
+$el.addEventListener('pointerenter', () => {
+animate($el, {
+color: utils.randomPick(['#FF4B4B', '#FFCC2A', '#B7FF54', '#57F695']),
+duration: 250,
+})
+});
+});
+return () => {
+/* Called between each split */
+split.words.forEach((w, i) => colors[i] = utils.get(w, 'color'));
+};
+});`
+          },
         ],
       },
     ],
   },
 ];
+

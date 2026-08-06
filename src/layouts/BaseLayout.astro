@@ -233,12 +233,59 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
           if (cursor._x !== undefined) applyState();
         };
 
+        // —— 状态切换：进入 iframe（预览区）时延迟关闭父光标 ——
+        // iframe 是独立文档，父页面 mousemove 不会进入；用 100ms 定时器延迟关闭，
+        // 给 iframe 内光标（mouseenter 立即启动）接管留出时间，避免瞬间切换闪烁/盲区
+        var iframeHideTimer = null;
+
+        // 判断鼠标坐标是否落在任一 iframe 区域内（跨边界时父文档仍会收到零星 mousemove，
+        // 必须用坐标判定，否则 mousemove 会无条件取消隐藏定时器导致父光标不隐藏）
+        function isInsideIframe(e) {
+          var frames = document.querySelectorAll('iframe');
+          for (var i = 0; i < frames.length; i++) {
+            var r = frames[i].getBoundingClientRect();
+            if (e.clientX >= r.left && e.clientX <= r.right &&
+                e.clientY >= r.top && e.clientY <= r.bottom) {
+              return true;
+            }
+          }
+          return false;
+        }
+
         document.addEventListener('mousemove', function (e) {
+          if (isInsideIframe(e)) {
+            // 鼠标在 iframe 区域内：保持父光标隐藏（由 iframe 内光标接管）
+            clearTimeout(iframeHideTimer);
+            cursor.style.transition = 'none';
+            cursor.style.opacity = 0; shown = false;
+            return;
+          }
+          // 在 iframe 外：取消隐藏定时器 + 正常跟随显示
+          if (iframeHideTimer) { console.log('[cursor] mousemove 取消 iframe 隐藏'); }
+          clearTimeout(iframeHideTimer);
+          // 恢复过渡（iframe 隐藏时被置 none）
+          cursor.style.transition = '';
           if (!shown) { cursor.style.opacity = 1; shown = true; }
           cursor._x = e.clientX;
           cursor._y = e.clientY;
           applyState();
         });
+        document.addEventListener('mouseover', function (e) {
+          var t = e.target;
+          while (t && t !== document) {
+            if (t.tagName === 'IFRAME') {
+              console.log('[cursor] mouseover 进入 iframe，100ms 后隐藏父光标');
+              clearTimeout(iframeHideTimer);
+              iframeHideTimer = setTimeout(function () {
+                console.log('[cursor] 父光标已隐藏');
+                cursor.style.transition = 'none';
+                cursor.style.opacity = 0; shown = false;
+              }, 100);
+              return;
+            }
+            t = t.parentNode;
+          }
+        }, true);
         document.addEventListener('mouseleave', function () {
           cursor.style.opacity = 0; shown = false;
         });
