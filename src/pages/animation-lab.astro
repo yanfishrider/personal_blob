@@ -1,0 +1,719 @@
+---
+// animation-lab.astro — 复杂页面动画测试页（加载动画 + 滚动指示器同源设计的迭代画布）
+// 逐步实现：每一轮迭代在此页面累积效果，验证后迁移回 LoadingScreen / 正式页面
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="动画实验室" description="复杂页面动画测试画布">
+  <main id="anim-lab" class="anim-lab">
+    <!-- 测试内容：750 主动画区域 + 700 内圆 + 725 圆弧分段 + 665/660 圆环 + 667 刻度线 -->
+    <!-- 圆弧区：页面固定 100vh 聚焦圆环，wheel 滚轮驱动进度 -->
+    <div class="lab-stage">
+      <div id="lab-circle" class="lab-circle">
+        <svg id="lab-dots" class="lab-arc" viewBox="0 0 750 750"></svg>
+        <div id="lab-circle-inner" class="lab-circle-inner"></div>
+        <div id="lab-ring-665" class="lab-ring lab-ring-665"></div>
+        <div id="lab-ring-660" class="lab-ring lab-ring-660"></div>
+        <svg id="lab-arc" class="lab-arc" viewBox="0 0 750 750"></svg>
+        <svg id="lab-ticks" class="lab-arc" viewBox="0 0 750 750"></svg>
+        <svg id="lab-rings" class="lab-arc" viewBox="0 0 750 750"></svg>
+      </div>
+    </div>
+
+    <!-- 圆形容器外的横向刻度尺容器：fixed 右下角（right:20% bottom:10%），350×40 圆角 -->
+    <div id="lab-ruler" class="lab-ruler">
+      <svg id="lab-ruler-svg" width="350" height="40" viewBox="0 0 350 40"></svg>
+    </div>
+
+    <!-- 刻度尺上方浮动代码卡片：显示当前段 SCENES[idx].code -->
+    <div id="lab-code-card" class="lab-code-card"></div>
+
+    <!-- 圆外左侧介绍长条：8 张卡片随进度上移 -->
+    <div id="lab-left" class="lab-left">
+      <div id="lab-left-list" class="lab-left-list"></div>
+    </div>
+
+    <!-- 中心场景容器：点阵上方，8 个占位场景 -->
+    <div id="lab-center" class="lab-center"></div>
+  </main>
+</BaseLayout>
+
+<script>
+  // ===== 场景数据（8 段占位，改数组长度即可调整段数） =====
+  // 每段：title 中心艺术字 / desc 左侧介绍 / code 刻度尺上方代码卡片 / anim 占位动画类名（后续替换真实 JS 动画）
+  var SCENES = [
+    { title: '粒子聚合', desc: '第一段 · 粒子从四周聚合到中心，形成稳定结构，颜色跟随弧段。', code: '// 段1 代码片段\nanimate(dots, { x: 0, y: 0, stagger: 20 });', anim: 'anim-breathe' },
+    { title: '波纹扩散', desc: '第二段 · 同心波纹从圆心向外扩散，逐层衰减消失。', code: '// 段2 代码片段\ncreateTimeline()\n  .add(rings, { scale: 4, opacity: 0, stagger: 80 });', anim: 'anim-ripple' },
+    { title: '旋转光环', desc: '第三段 · 两道光环反向旋转，速度随段内进度变化。', code: '// 段3 代码片段\nanimate(halo, { rotate: 360, duration: 3000, loop: true });', anim: 'anim-spin' },
+    { title: '脉冲心跳', desc: '第四段 · 中心圆点脉冲放大缩小，模拟心跳节奏。', code: '// 段4 代码片段\nanimate(pulse, { scale: [1, 1.3, 1], duration: 800, loop: true });', anim: 'anim-pulse' },
+    { title: '流光扫过', desc: '第五段 · 一道高光沿圆环扫过，配合荧光辉光。', code: '// 段5 代码片段\nanimate(glow, { strokeDashoffset: [C, 0], duration: 2000, loop: true });', anim: 'anim-sweep' },
+    { title: '数字滚动', desc: '第六段 · 大数字随进度滚动递增，像计时器。', code: '// 段6 代码片段\ncreateTimer({ duration: 2000, onUpdate: t => render(Math.round(t)) });', anim: 'anim-count' },
+    { title: '星点闪烁', desc: '第七段 · 点阵随机闪烁，明暗交替如星空。', code: '// 段7 代码片段\nanimate(stars, { opacity: [0.2, 1], delay: stagger(100), loop: true });', anim: 'anim-twinkle' },
+    { title: '旋涡收敛', desc: '第八段 · 点阵向中心旋涡式收敛，完成整轮循环。', code: '// 段8 代码片段\nanimate(swirl, { r: [2, 0], rotate: 360, stagger: 30, loop: true });', anim: 'anim-swirl' },
+  ];
+  var SEG_NUM = SCENES.length;   // 段数由场景数组驱动（当前 8）
+
+  // ===== 725 圆弧分段参数（可调） =====
+  var ARC = {
+    cx: 375, cy: 375,   // 圆心（viewBox 0 0 750 750）
+    r: 357.5,           // 715 直径 → 半径
+    width: 5,           // 向内弧线宽度
+    segments: SEG_NUM,  // 分段数（= SCENES.length，动态）
+    gapDeg: 1,          // 段间空白角度（可调）
+    colors: [           // 每段颜色（可自定义，已调暗 ~35%）
+      '#16899B', '#539EA6', '#228963', '#6A9622',
+      '#A37C17', '#9F4A76', '#6D5AA3', '#AAAAAA',
+    ],
+  };
+
+  // ===== 667 刻度线参数（可调） =====
+  var TICKS = {
+    r: 333.5,           // 667 直径 → 半径
+    len: 15,            // 刻度线长度（向圆心延伸）
+    count: 180,         // 刻度线数量（可调，240 → 180 减少 25%）
+    width: 2,           // 刻度线宽度
+    startDeg: -90,      // 起点角度：12 点方向
+  };
+
+  // ===== 手抖圆环参数（可调） =====
+  var RINGS = {
+    radii: [310, 305, 290, 295, 275, 270],  // 6 个圆环半径（由外到内）
+    width: 2,           // 线条宽度
+    jitter: 0.8,        // 随机抖动幅度（px，减小后更接近圆）
+    step: 2,            // 每多少度取一个点（越小越精细）
+    colors: [           // 每环颜色（可自定义）
+      '#000000', '#000000', '#000000',
+      '#000000', '#000000', '#000000',
+    ],
+  };
+
+  // ===== 点阵背景参数（可调） =====
+  var DOTS = {
+    gap: 30,            // 点阵间隔（方形网格）
+    radius: 270,        // 点阵覆盖半径（最小圆环处消失）
+    dotR: 2.5,          // 小圆点半径
+    minOpacity: 0.06,   // 低于此透明度直接消失（不渲染）
+  };
+
+  // ===== 横向刻度尺参数（圆外右下角容器，350×40，分段与圆弧对应） =====
+  var RULER = {
+    w: 350, h: 40,      // 容器尺寸
+    segments: SEG_NUM,  // 分段数（与 ARC.segments 同步，动态）
+    ticksPerSeg: 10,    // 每段内竖线条数（5 → 10 密集度翻倍）
+    tickH: 10,          // 刻度线高度（容器中间）
+    tickW: 2,           // 刻度线宽度
+    color: '#393837',   // 非高亮部分颜色
+    slider: true,       // 是否显示定位滑块
+    sliderMult: 2,      // 滑块宽度 = 刻度线宽度 × 倍数
+    sliderH: 12,        // 滑块高度
+    sliderBright: 1.26, // 滑块亮度（弧色高亮 1.2 再调亮 5% = 1.2 × 1.05）
+  };
+
+  (function () {
+    var NS = 'http://www.w3.org/2000/svg';
+    var a = ARC;
+    var ru = RULER;
+
+    // 颜色工具：hex 变暗（factor < 1 调暗）
+    function darken(hex, factor) {
+      var r = parseInt(hex.slice(1, 3), 16);
+      var g = parseInt(hex.slice(3, 5), 16);
+      var b = parseInt(hex.slice(5, 7), 16);
+      r = Math.round(r * factor);
+      g = Math.round(g * factor);
+      b = Math.round(b * factor);
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    // ============ 三区域初始化：左侧卡片列表 / 中心场景 / 代码卡片 ============
+    var leftList = document.getElementById('lab-left-list');
+    var centerEl = document.getElementById('lab-center');
+    var codeCard = document.getElementById('lab-code-card');
+    var sceneEls = [];      // 中心场景元素
+    var leftCards = [];     // 左侧卡片元素
+    var cardStep = window.innerHeight;  // 左侧卡片步进 = 整屏高度（每张卡片占满一屏）
+
+    // 左侧卡片 + 中心场景 + 代码卡片（内容取 SCENES）
+    for (var sc = 0; sc < SCENES.length; sc++) {
+      var sdata = SCENES[sc];
+      // 左侧卡片
+      var card = document.createElement('div');
+      card.className = 'lab-left-card';
+      card.innerHTML = '<div class="lc-title">' + sdata.title + '</div>' + sdata.desc;
+      leftList.appendChild(card);
+      leftCards.push(card);
+      // 中心场景
+      var scene = document.createElement('div');
+      scene.className = 'lab-scene ' + sdata.anim;
+      scene.innerHTML = '<span class="scene-anim">' + sdata.title + '</span>';
+      centerEl.appendChild(scene);
+      sceneEls.push(scene);
+    }
+    // 初始显示第一段场景 + 代码卡片
+    if (sceneEls[0]) sceneEls[0].classList.add('active');
+    codeCard.textContent = SCENES[0].code;
+    codeCard.classList.add('show');
+
+    // ============ 点阵背景（方形网格小圆点，中心亮边缘暗） ============
+    var dotEls = [];   // 已渲染的点（含基准 opacity）
+    var svgDots = document.getElementById('lab-dots');
+    if (svgDots) {
+      var dg = DOTS;
+      var cx0 = a.cx, cy0 = a.cy;
+      // 从圆心向四周铺方形网格（间隔 gap），点在圆内且 opacity 达标才渲染
+      for (var gx = -dg.radius; gx <= dg.radius; gx += dg.gap) {
+        for (var gy = -dg.radius; gy <= dg.radius; gy += dg.gap) {
+          var dist = Math.sqrt(gx * gx + gy * gy);
+          if (dist > dg.radius) continue;                 // 圆外不渲染
+          // 亮度随距离衰减：中心最接近弧色，边缘变暗，最暗直接消失
+          var t2 = dist / dg.radius;                     // 0 中心 → 1 边缘
+          var op = 1 - t2 * t2;                          // 平方衰减
+          if (op < dg.minOpacity) continue;              // 最暗直接消失
+          var dot = document.createElementNS(NS, 'circle');
+          dot.setAttribute('cx', cx0 + gx);
+          dot.setAttribute('cy', cy0 + gy);
+          dot.setAttribute('r', dg.dotR);
+          dot.setAttribute('fill', a.colors[0]);
+          dot.setAttribute('opacity', op.toFixed(3));
+          svgDots.appendChild(dot);
+          dotEls.push(dot);
+        }
+      }
+    }
+
+    // ============ 圆弧分段（每段两层：底层段色 + 顶层高亮进度条） ============
+    var arcBases = [];   // 底层：整段（暗/亮弧色，随状态切换）
+    var arcTops = [];    // 顶层：高亮进度条（dasharray 按段内进度）
+    var C = 0, seg = 0, stepDeg = 0;
+    var svgArc = document.getElementById('lab-arc');
+    if (svgArc) {
+      C = 2 * Math.PI * a.r;              // 周长
+      var gap = C * a.gapDeg / 360;       // 空白弧长
+      seg = C / a.segments - gap;         // 每段弧长
+      stepDeg = 360 / a.segments;
+      for (var i = 0; i < a.segments; i++) {
+        var rot = 'rotate(' + (i * stepDeg - 90) + ' ' + a.cx + ' ' + a.cy + ')';
+        // 底层：整段（初始暗版弧色，细）
+        var base = document.createElementNS(NS, 'circle');
+        base.setAttribute('cx', a.cx);
+        base.setAttribute('cy', a.cy);
+        base.setAttribute('r', a.r);
+        base.setAttribute('fill', 'none');
+        base.setAttribute('stroke', darken(a.colors[i % a.colors.length], 0.35));
+        base.setAttribute('stroke-width', 5);
+        base.setAttribute('stroke-dasharray', seg + ' ' + C);
+        base.setAttribute('transform', rot);
+        base.style.transition = 'stroke-width .4s ease';  // 宽度平滑过渡
+        svgArc.appendChild(base);
+        arcBases.push(base);
+        // 顶层：高亮进度条（初始隐藏，dasharray 0；brightness 提亮与段底色区分 + 荧光辉光）
+        var top = document.createElementNS(NS, 'circle');
+        top.setAttribute('cx', a.cx);
+        top.setAttribute('cy', a.cy);
+        top.setAttribute('r', a.r);
+        top.setAttribute('fill', 'none');
+        top.setAttribute('stroke', a.colors[i % a.colors.length]);
+        top.setAttribute('stroke-width', 10);
+        top.setAttribute('stroke-dasharray', '0 ' + C);
+        top.setAttribute('transform', rot);
+        top.style.transition = 'stroke-width .4s ease';  // 宽度平滑过渡
+        top.style.filter = 'brightness(1.42) drop-shadow(0 0 8px ' + a.colors[i % a.colors.length] + ')';  // 亮度 +5% + 荧光
+        svgArc.appendChild(top);
+        arcTops.push(top);
+      }
+    }
+
+    // ============ 667 刻度线（保存引用供圆弧颜色联动） ============
+    var svgTicks = document.getElementById('lab-ticks');
+    var tickLines = [];   // {el, segIdx} 每条刻度线所属段
+    if (svgTicks) {
+      var t = TICKS;
+      var ticksPerSeg = t.count / a.segments;   // 每段对应的刻度线条数（180/8=22.5）
+      var tickColor = darken(a.colors[0], 0.35);  // 初始暗版弧色，后续 updateProgress 联动
+      for (var i = 0; i < t.count; i++) {
+        var ang = (i * (360 / t.count) + t.startDeg) * Math.PI / 180;
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', a.cx + t.r * Math.cos(ang));
+        line.setAttribute('y1', a.cy + t.r * Math.sin(ang));
+        line.setAttribute('x2', a.cx + (t.r - t.len) * Math.cos(ang));
+        line.setAttribute('y2', a.cy + (t.r - t.len) * Math.sin(ang));
+        line.setAttribute('stroke', tickColor);
+        line.setAttribute('stroke-width', t.width);
+        line.setAttribute('stroke-linecap', 'round');
+        // 记录所属段号（起始 -90° 与圆弧同向：第 i 条属于 floor(i / 每段条数) 段）
+        tickLines.push({ el: line, segIdx: Math.floor(i / ticksPerSeg) });
+        svgTicks.appendChild(line);
+      }
+      // 12 点起始刻度线保持高亮标记
+      if (tickLines[0]) tickLines[0].el.style.filter = 'brightness(1.2)';
+    }
+
+    // ============ 手抖圆环 ============
+    var svgRings = document.getElementById('lab-rings');
+    if (svgRings) {
+      var rg = RINGS;
+      for (var rIdx = 0; rIdx < rg.radii.length; rIdx++) {
+        var baseR = rg.radii[rIdx];
+        var d = '';
+        var points = Math.round(360 / rg.step);
+        for (var p = 0; p <= points; p++) {
+          var ang = p * rg.step * Math.PI / 180;
+          var jit = (Math.random() * 2 - 1) * rg.jitter;
+          var rr = baseR + jit;
+          var x = (a.cx + rr * Math.cos(ang)).toFixed(2);
+          var y = (a.cy + rr * Math.sin(ang)).toFixed(2);
+          d += (p === 0 ? 'M' : 'L') + x + ' ' + y;
+        }
+        d += 'Z';
+        var ring = document.createElementNS(NS, 'path');
+        ring.setAttribute('d', d);
+        ring.setAttribute('fill', 'none');
+        ring.setAttribute('stroke', rg.colors[rIdx % rg.colors.length]);
+        ring.setAttribute('stroke-width', rg.width);
+        ring.setAttribute('stroke-linejoin', 'round');
+        svgRings.appendChild(ring);
+      }
+    }
+
+    // ============ 横向刻度尺 + 滑块 + hover 预览 ============
+    var svgRuler = document.getElementById('lab-ruler-svg');
+    var sliderEl = null;   // 定位滑块（跟随进度）
+    var previewEl = null;  // hover 预览滑块
+    var rulerEl = document.getElementById('lab-ruler');
+    var sliderX0 = 0;      // 滑块初始 x
+    var sw = 0, sy1 = 0;
+
+    if (svgRuler) {
+      var segW = ru.w / ru.segments;
+      var y1 = (ru.h - ru.tickH) / 2;
+      var y2 = y1 + ru.tickH;
+      var first = true;
+      for (var s = 0; s < ru.segments; s++) {
+        for (var t2 = 0; t2 < ru.ticksPerSeg; t2++) {
+          var x = s * segW + 6 + t2 * ((segW - 12) / (ru.ticksPerSeg - 1));
+          var line = document.createElementNS(NS, 'line');
+          line.setAttribute('x1', x); line.setAttribute('y1', y1);
+          line.setAttribute('x2', x); line.setAttribute('y2', y2);
+          line.setAttribute('stroke-width', ru.tickW);
+          line.setAttribute('stroke-linecap', 'round');
+          if (t2 === 0) {
+            line.setAttribute('stroke', a.colors[s % a.colors.length]);
+            if (first) {
+              line.style.filter = 'brightness(1.2)';
+              first = false;
+              sliderX0 = x;
+            }
+          } else {
+            line.setAttribute('stroke', ru.color);
+          }
+          svgRuler.appendChild(line);
+        }
+      }
+      // 定位滑块（进度）
+      if (ru.slider) {
+        sliderEl = document.createElementNS(NS, 'rect');
+        sw = ru.tickW * ru.sliderMult;
+        sy1 = (ru.h - ru.sliderH) / 2;
+        sliderEl.setAttribute('x', sliderX0 - sw / 2);
+        sliderEl.setAttribute('y', sy1);
+        sliderEl.setAttribute('width', sw);
+        sliderEl.setAttribute('height', ru.sliderH);
+        sliderEl.setAttribute('rx', sw / 2);
+        sliderEl.setAttribute('fill', a.colors[0]);
+        sliderEl.style.filter = 'brightness(' + ru.sliderBright + ')';
+        svgRuler.appendChild(sliderEl);
+      }
+      // hover 预览滑块（初始隐藏：位于当前滑块位置、尺寸 60%，mousemove 过渡到目标并放大）
+      previewEl = document.createElementNS(NS, 'rect');
+      previewEl.setAttribute('x', sliderX0 - sw / 2);
+      previewEl.setAttribute('y', sy1);
+      previewEl.setAttribute('width', sw * 0.6);
+      previewEl.setAttribute('height', ru.sliderH * 0.6);
+      previewEl.setAttribute('rx', sw / 2);
+      previewEl.setAttribute('fill', a.colors[0]);
+      previewEl.style.filter = 'brightness(0.95)';  // 变暗 5%
+      previewEl.style.opacity = '0';
+      previewEl.style.transition = 'opacity .2s ease, x .25s ease-out, width .25s ease-out, height .25s ease-out';
+      svgRuler.appendChild(previewEl);
+    }
+
+    // ============ 进度驱动（wheel 滚轮，页面固定 100vh；rAF 插值平滑） ============
+    var target = 0;     // 目标进度（wheel/点击直接改）
+    var current = 0;    // 当前渲染进度（rAF 每帧逼近 target）
+    var rafId = null;   // 动画帧句柄
+    var lastIdx = -1;   // 上次渲染的段号（场景/代码卡片切换检测）
+    var BASE_W = 5;     // 基础宽度（未到段 / 已过段）
+    var GROW_W = 10;    // 当前段整段宽度（基础 + 5）
+
+    function updateProgress() {
+      var progress = current;  // 用当前渲染进度
+      var total = a.segments;
+      var idx = Math.min(Math.floor(progress * total), total - 1);  // 当前段
+      var inSeg = progress * total - idx;                           // 段内 0~1
+
+      for (var i = 0; i < total; i++) {
+        var base = arcBases[i];
+        var top = arcTops[i];
+        var col = a.colors[i % a.colors.length];
+        if (i < idx) {
+          // 已过段：弧色保持高亮 + 荧光（顶层整段显示），宽度恢复基础宽
+          base.setAttribute('stroke', col);
+          base.setAttribute('stroke-width', BASE_W);
+          base.setAttribute('stroke-dasharray', seg + ' ' + C);
+          top.setAttribute('stroke-width', BASE_W);
+          top.setAttribute('stroke-dasharray', seg + ' ' + C);  // 顶层整段 → 荧光保留
+        } else if (i === idx) {
+          // 当前段：整段宽度 +5，高亮进度条按 inSeg 移动填充
+          base.setAttribute('stroke', col);
+          base.setAttribute('stroke-width', GROW_W);
+          base.setAttribute('stroke-dasharray', seg + ' ' + C);
+          var fillLen = seg * inSeg;   // 段内进度条长度（0 → seg）
+          top.setAttribute('stroke-width', GROW_W);
+          top.setAttribute('stroke-dasharray', fillLen + ' ' + (C - fillLen));
+        } else {
+          // 未到段：暗版弧色，基础宽，无进度条（初始可见不消失）
+          base.setAttribute('stroke', darken(col, 0.35));
+          base.setAttribute('stroke-width', BASE_W);
+          base.setAttribute('stroke-dasharray', seg + ' ' + C);
+          top.setAttribute('stroke-dasharray', '0 ' + C);
+        }
+      }
+
+      // 定位滑块：x = progress × 容器宽，颜色 = 当前段弧色高亮版
+      if (sliderEl) {
+        var sx = progress * ru.w;
+        sliderEl.setAttribute('x', sx - sw / 2);
+        sliderEl.setAttribute('fill', a.colors[idx % a.colors.length]);
+      }
+
+      // 667 刻度线整体同色变化：全部一起变为当前圆弧（当前段）的颜色
+      var curColor = a.colors[idx % a.colors.length];
+      for (var j = 0; j < tickLines.length; j++) {
+        tickLines[j].el.setAttribute('stroke', curColor);
+      }
+
+      // 点阵背景：整体变为当前弧色（各点 opacity 基准不变，随位置固定）
+      for (var k = 0; k < dotEls.length; k++) {
+        dotEls[k].setAttribute('fill', curColor);
+      }
+
+      // 左侧介绍列表：随进度连续上移（滚到段 N 第 N 张对齐，上移消失、下一个浮现）
+      if (leftList) {
+        leftList.style.transform = 'translateY(' + (-progress * (SCENES.length - 1) * cardStep) + 'px)';
+      }
+      // 中心场景 + 代码卡片：idx 变化时切换
+      if (lastIdx !== idx) {
+        lastIdx = idx;
+        for (var m = 0; m < sceneEls.length; m++) {
+          sceneEls[m].classList.toggle('active', m === idx);
+        }
+        if (codeCard && SCENES[idx]) {
+          codeCard.textContent = SCENES[idx].code;
+          codeCard.classList.remove('show');
+          // 触发重排后重新显示（浮入动画）
+          void codeCard.offsetWidth;
+          codeCard.classList.add('show');
+        }
+        // 左侧当前卡片高亮
+        for (var n = 0; n < leftCards.length; n++) {
+          leftCards[n].style.borderLeftColor = (n === idx) ? curColor : '#22D3EE';
+          leftCards[n].style.opacity = (n === idx) ? '1' : '0.55';
+        }
+      }
+    }
+
+    // rAF 插值：每帧让 current 平滑逼近 target（滚动停止后自然减速滑行）
+    function tick() {
+      var diff = target - current;
+      if (Math.abs(diff) < 0.0008) {
+        current = target;
+        updateProgress();
+        rafId = null;
+        return;
+      }
+      current += diff * 0.08;   // 插值系数：越小越慢越平滑（0.18 → 0.08）
+      updateProgress();
+      rafId = requestAnimationFrame(tick);
+    }
+    function setProgress(p) {
+      target = Math.min(Math.max(p, 0), 1);
+      if (rafId === null) rafId = requestAnimationFrame(tick);
+    }
+
+    updateProgress();
+
+    // wheel 滚轮驱动（页面固定，直接改目标进度；向下滚 deltaY>0 → 进度增加）
+    window.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var step = e.deltaY > 0 ? 0.02 : -0.02;   // 灵敏度可调
+      setProgress(target + step);
+    }, { passive: false });
+
+    // ============ hover 预览滑块 ============
+    if (rulerEl && previewEl && sliderEl) {
+      rulerEl.addEventListener('mousemove', function (e) {
+        var rect = rulerEl.getBoundingClientRect();
+        var px = Math.min(Math.max(e.clientX - rect.left, 0), ru.w);
+        var p2 = px / ru.w;
+        var idx = Math.min(Math.floor(p2 * a.segments), a.segments - 1);
+        // 预览滑块：从当前滑块位置移向鼠标并放大，颜色 = 当前弧段色变暗 5%
+        previewEl.setAttribute('x', px - sw / 2);
+        previewEl.setAttribute('width', sw);
+        previewEl.setAttribute('height', ru.sliderH);
+        previewEl.setAttribute('fill', a.colors[idx % a.colors.length]);
+        previewEl.style.opacity = '1';
+      });
+      rulerEl.addEventListener('mouseleave', function () {
+        previewEl.style.opacity = '0';
+      });
+      // 点击：跳转进度到对应位置（平滑插值）
+      rulerEl.addEventListener('click', function (e) {
+        var rect = rulerEl.getBoundingClientRect();
+        var px = Math.min(Math.max(e.clientX - rect.left, 0), ru.w);
+        setProgress(px / ru.w);
+      });
+    }
+  })();
+</script>
+
+<style is:global>
+  /* 自定义滚动条：轨道 #2C2C2C、滑块 #D1D1D1、宽 10px、滑块两端半圆 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #2C2C2C;
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D1D1D1;
+    border-radius: 5px; /* 宽 10px 的一半 → 上下半圆 */
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #E8E8E8;
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: #D1D1D1 #2C2C2C;
+  }
+
+  /* 深色画布：背景 #252423 衬托动画效果 */
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  /* 内容容器全宽：覆盖 BaseLayout 无侧边栏时的 max-w-2xl 限宽（测试画布需要整页空间） */
+  header ~ main.max-w-2xl {
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .anim-lab {
+    height: 100vh;
+    overflow: hidden;
+    background: #252423;
+    color: #22D3EE;
+    font-family: 'Courier New', 'Consolas', monospace;
+    position: relative;
+  }
+  .lab-stage {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    box-sizing: border-box;
+  }
+  /* 主动画区域：750×750 大圆，黑色边框；小视口自动缩小保证完整显示 */
+  .lab-circle {
+    position: relative;
+    width: min(750px, 92vw, 92vh);
+    height: min(750px, 92vw, 92vh);
+    border-radius: 50%;
+    border: 2px solid #000;
+    flex-shrink: 0;
+  }
+  /* 内部同心圆：700×700（外圆减 50px），仅黑色线条，随外圆自适应缩放 */
+  .lab-circle-inner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: calc(100% - 50px);
+    height: calc(100% - 50px);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid #000;
+  }
+  /* 665/660 圆环：黑色线条，同心 */
+  .lab-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid #000;
+  }
+  .lab-ring-665 {
+    width: calc(100% - 85px);   /* 750 - 85 = 665 */
+    height: calc(100% - 85px);
+  }
+  .lab-ring-660 {
+    width: calc(100% - 100px);  /* 750 - 100 = 650 */
+    height: calc(100% - 100px);
+  }
+  /* 725 圆弧层：铺满整个圆区域，弧段由 JS 生成 */
+  .lab-arc {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  /* 横向刻度尺容器：圆形容器外，fixed 右下角（右 12%、底 10%），350×40 圆角背景 #2F2E2D */
+  .lab-ruler {
+    position: fixed;
+    right: 12%;
+    bottom: 10%;
+    z-index: 10;
+    width: 350px;
+    height: 40px;
+    background: #2F2E2D;
+    border-radius: 10px;
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+  .lab-ruler svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 刻度尺上方浮动代码卡片：进入浮起 + 持续上下浮动 */
+  .lab-code-card {
+    position: fixed;
+    right: 12%;
+    bottom: calc(10% + 52px);
+    z-index: 10;
+    max-width: 360px;
+    background: rgba(47, 46, 45, 0.92);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #7FF3FF;
+    font-family: 'Courier New', 'Consolas', monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  }
+  .lab-code-card.show {
+    opacity: 1;
+    animation: lab-code-enter .9s cubic-bezier(.22, 1, .36, 1);
+  }
+  /* 进入：从下方浮起（缓慢平滑） */
+  @keyframes lab-code-enter {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* 圆外左侧介绍长条：每张卡片占满整屏高度，随进度整屏上移；无色块融入背景 */
+  .lab-left {
+    position: fixed;
+    left: 12.5%;
+    top: 0;
+    width: 15%;
+    height: 100vh;
+    z-index: 10;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .lab-left-list {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+  }
+  .lab-left-card {
+    width: 100%;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: transparent;   /* 融入页面背景 */
+    border: none;              /* 去除边框 */
+    padding: 24px 20px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: rgba(201, 232, 239, 0.85);
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .lab-left-card .lc-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #7FF3FF;
+    letter-spacing: 0.2em;
+    /* 艺术字效果：细描边 + 微光 */
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.55), 0 0 20px rgba(34, 211, 238, 0.25);
+  }
+
+  /* 中心场景容器 */
+  .lab-center {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .lab-scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 0.2em;
+    color: #7FF3FF;
+    text-shadow: 0 0 12px rgba(34, 211, 238, 0.7), 0 0 30px rgba(34, 211, 238, 0.35);
+    opacity: 0;
+    transition: opacity .4s ease;
+  }
+  .lab-scene.active {
+    opacity: 1;
+  }
+
+  /* 占位动画（后续替换为真实 JS 动画） */
+  @keyframes anim-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  @keyframes anim-ripple { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+  @keyframes anim-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes anim-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+  @keyframes anim-sweep { 0% { transform: translateX(-30%); } 100% { transform: translateX(30%); } }
+  @keyframes anim-count { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes anim-twinkle { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+  @keyframes anim-swirl { from { transform: rotate(0deg) scale(1); } to { transform: rotate(90deg) scale(.85); } }
+  .lab-scene .scene-anim {
+    animation-duration: 1.6s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+  }
+  .anim-breathe .scene-anim { animation-name: anim-breathe; }
+  .anim-ripple .scene-anim { animation-name: anim-ripple; }
+  .anim-spin .scene-anim { animation-name: anim-spin; animation-timing-function: linear; }
+  .anim-pulse .scene-anim { animation-name: anim-pulse; }
+  .anim-sweep .scene-anim { animation-name: anim-sweep; }
+  .anim-count .scene-anim { animation-name: anim-count; }
+  .anim-twinkle .scene-anim { animation-name: anim-twinkle; }
+  .anim-swirl .scene-anim { animation-name: anim-swirl; }
+</style>
