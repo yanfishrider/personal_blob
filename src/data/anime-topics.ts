@@ -1743,6 +1743,210 @@ buttons.forEach($button => $button.addEventListener('click', openModal));
 $dialog.addEventListener('cancel', closeModal);
 $dialog.addEventListener('click', closeModal);`,
             },
+            {
+              id: 'scroll-hero', label: '滚动首屏进入',
+              desc: '加载动画改造：播放完停留为首屏，滚轮向下时整屏 rotateX 实时翻转隐藏（无 perspective 平滑、可逆：向上滚翻回），右下角 fixed 横向刻度尺随整页滚动进度 0→100% 移动。技术：文档流 100vh 容器 + sticky top-0 首屏（滚过让位给内容）；window scroll 驱动 transform = rotateX(-90 × scrollY/vh)；刻度尺双层 repeating-linear-gradient 密集装饰刻度（主 16px + 次 4px 间隔，不代表页面数）；已滚区域高亮填充层（width 随进度 + mask 渐变收尾）；竖线滑块 2px×19.5px 亮青 #7FF3FF（1.5 倍主刻度高，底部与刻度线齐平）；点击首屏平滑回顶。不依赖 anime.js，纯 scroll 监听。',
+              html: `<div id="sh-hero-wrap">
+  <div id="sh-hero">
+    <div class="sh-lines">
+      <p>LOADING_系统启动中</p>
+      <p>连接服务器 - 完成</p>
+      <p>页面资源 - 完毕</p>
+      <p>渲染引擎 - 初始化</p>
+      <p>页面准备就绪</p>
+    </div>
+  </div>
+</div>
+<div id="sh-content">
+  <div class="sh-card">内容区块 1：滚动触发首屏翻转</div>
+  <div class="sh-card">内容区块 2：刻度尺整页进度</div>
+  <div class="sh-card">内容区块 3：向上滚可翻回首屏</div>
+</div>
+<div id="sh-ruler">
+  <div class="sh-label">向下滚动</div>
+  <div class="sh-track">
+    <div id="sh-fill"></div>
+    <div id="sh-knob"></div>
+  </div>
+  <div class="sh-hint">SCROLL</div>
+</div>`,
+              css: `html, body { margin: 0; padding: 0; }
+body { height: 400vh; background: #e8e8e8; font-family: 'Courier New', 'Consolas', monospace; }
+#sh-hero-wrap { height: 100vh; }
+#sh-hero {
+  position: sticky; top: 0; height: 100vh;
+  background: #1C1814;
+  background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px);
+  background-size: 5px 5px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  display: flex; align-items: center; justify-content: center;
+}
+.sh-lines { color: #fff; font-size: 13px; line-height: 1.9; letter-spacing: 0.05em; text-align: left; }
+.sh-lines p { margin: 0; white-space: nowrap; }
+#sh-content { padding: 2rem 1.5rem; }
+.sh-card {
+  background: #fff; border: 1px solid #ddd; border-radius: 12px;
+  padding: 2rem; margin-bottom: 1.5rem; color: #444; font-size: 14px;
+}
+#sh-ruler {
+  position: fixed; right: 10%; bottom: 10%; z-index: 70;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none; user-select: none;
+}
+.sh-label { color: #22D3EE; font-size: 12px; letter-spacing: 0.25em; margin-bottom: 6px; }
+.sh-track {
+  position: relative; width: 200px; height: 18px;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(34,211,238,.4) 0 1.5px, transparent 1.5px 16px),
+    repeating-linear-gradient(90deg, rgba(34,211,238,.22) 0 1px, transparent 1px 4px);
+  background-size: 100% 13px, 100% 7px;
+  background-position: 0 1px, 0 6px;
+  background-repeat: no-repeat;
+}
+#sh-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  background-image:
+    repeating-linear-gradient(90deg, #22D3EE 0 1.5px, transparent 1.5px 16px),
+    repeating-linear-gradient(90deg, rgba(34,211,238,.9) 0 1px, transparent 1px 4px);
+  background-size: 100% 13px, 100% 7px;
+  background-position: 0 1px, 0 6px;
+  background-repeat: no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%);
+  mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%);
+}
+#sh-knob {
+  position: absolute; left: 0; top: -5.5px;
+  width: 2px; height: 19.5px;
+  transform: translateX(-50%);
+  background: #7FF3FF;
+  box-shadow: 0 0 8px rgba(34,211,238,.9), 0 0 2px rgba(255,255,255,.8);
+}
+.sh-hint { color: rgba(34,211,238,.55); font-size: 10px; letter-spacing: 0.15em; margin-top: 5px; }`,
+              js: `(function () {
+  var hero = document.getElementById('sh-hero');
+  var knob = document.getElementById('sh-knob');
+  var fill = document.getElementById('sh-fill');
+  var label = document.querySelector('.sh-label');
+  if (!hero) return;
+  function onScroll() {
+    var vh = window.innerHeight;
+    // 首屏翻转：前 100vh 内完成 0 → -90°（可逆，向上滚翻回）
+    var flip = Math.min(window.scrollY / vh, 1);
+    hero.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
+    // 刻度尺：整页滚动进度 0 → 100%
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - vh;
+    var page = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+    knob.style.left = (page * 100) + '%';
+    fill.style.width = (page * 100) + '%';
+    if (label) label.style.opacity = String(Math.max(0, 1 - flip * 3));
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+  // 点击首屏平滑回顶
+  hero.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();`,
+            },
+            {
+              id: 'clock-indicator', label: '圆形表盘时针',
+              desc: '滚动指示器圆形版：右下角固定圆形表盘，JS 动态生成 SVG（createElementNS）——60 条刻度线（12 主 + 48 次，从 12 点方向 -90° 偏移）、底环、时针一根 line 从圆心指向 12 点。window scroll 驱动时针 rotate(0→360°) 转满一圈（transform-origin 必须显式设圆心 px，否则绕左上角转）；扫过的刻度由暗淡变亮青（passed = round(page×60) 换算成第几根刻度线）；中心轴 6px 亮青圆点；「向下滚动」提示随进度淡出。表盘 72px、刻度半径 30px、主刻度 1.6px、时针 2.5px #7FF3FF。不依赖 anime.js，纯 scroll 监听 + SVG。',
+              html: `<div id="ci-content">
+  <div class="ci-card">内容区块 1：滚动驱动时针旋转</div>
+  <div class="ci-card">内容区块 2：扫过的刻度高亮</div>
+  <div class="ci-card">内容区块 3：向上滚指针回转</div>
+</div>
+<div id="ci-clock">
+  <div class="ci-label">向下滚动</div>
+  <svg id="ci-clock-svg" width="72" height="72" viewBox="0 0 72 72"></svg>
+  <div id="ci-center" class="ci-center-dot"></div>
+  <div class="ci-hint">SCROLL</div>
+</div>`,
+              css: `html, body { margin: 0; padding: 0; }
+body { height: 400vh; background: #e8e8e8; font-family: 'Courier New', 'Consolas', monospace; }
+.ci-card {
+  background: #fff; border: 1px solid #ddd; border-radius: 12px;
+  padding: 2rem; margin: 1.5rem; color: #444; font-size: 14px;
+}
+.ci-card:first-child { margin-top: 2rem; }
+#ci-clock {
+  position: fixed; right: 10%; bottom: 10%; z-index: 70;
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none; user-select: none;
+}
+.ci-label { color: #22D3EE; font-size: 12px; letter-spacing: 0.25em; margin-bottom: 6px; }
+#ci-clock-svg { display: block; }
+.ci-center-dot {
+  position: absolute; top: 50%; left: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #7FF3FF;
+  box-shadow: 0 0 8px rgba(34,211,238,.9);
+}
+.ci-hint { color: rgba(34,211,238,.55); font-size: 10px; letter-spacing: 0.15em; margin-top: 6px; }`,
+              js: `(function () {
+  var svg = document.getElementById('ci-clock-svg');
+  var label = document.querySelector('.ci-label');
+  if (!svg) return;
+  var NS = 'http://www.w3.org/2000/svg';
+  var cx = 36, cy = 36, R = 30;
+  var ticks = [];
+  // 60 条刻度线：12 主 + 48 次，从 12 点方向开始
+  for (var i = 0; i < 60; i++) {
+    var a = (i * 6 - 90) * Math.PI / 180;
+    var isMajor = (i % 5 === 0);
+    var r1 = isMajor ? R - 9 : R - 5;
+    var line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', cx + r1 * Math.cos(a));
+    line.setAttribute('y1', cy + r1 * Math.sin(a));
+    line.setAttribute('x2', cx + R * Math.cos(a));
+    line.setAttribute('y2', cy + R * Math.sin(a));
+    line.setAttribute('stroke', isMajor ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)');
+    line.setAttribute('stroke-width', isMajor ? '1.6' : '1');
+    line.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(line);
+    ticks.push(line);
+  }
+  // 底环
+  var ring = document.createElementNS(NS, 'circle');
+  ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
+  ring.setAttribute('fill', 'none');
+  ring.setAttribute('stroke', 'rgba(34,211,238,.25)');
+  ring.setAttribute('stroke-width', '1.5');
+  svg.appendChild(ring);
+  // 时针：从圆心指向 12 点
+  var hand = document.createElementNS(NS, 'line');
+  hand.setAttribute('x1', cx); hand.setAttribute('y1', cy);
+  hand.setAttribute('x2', cx); hand.setAttribute('y2', cy - 20);
+  hand.setAttribute('stroke', '#7FF3FF');
+  hand.setAttribute('stroke-width', '2.5');
+  hand.setAttribute('stroke-linecap', 'round');
+  hand.style.transformOrigin = cx + 'px ' + cy + 'px';
+  hand.style.transition = 'transform .08s linear';
+  svg.appendChild(hand);
+
+  function onScroll() {
+    var vh = window.innerHeight;
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - vh;
+    var page = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+    // 时针 0 → 360°，扫过的刻度高亮
+    hand.style.transform = 'rotate(' + (page * 360) + 'deg)';
+    var passed = Math.round(page * 60);
+    for (var i = 0; i < 60; i++) {
+      var isMajorT = (i % 5 === 0);
+      ticks[i].setAttribute('stroke', i <= passed
+        ? (isMajorT ? '#22D3EE' : 'rgba(34,211,238,.8)')
+        : (isMajorT ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)'));
+    }
+    if (label) label.style.opacity = String(Math.max(0, 1 - page * 5));
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();`,
+            },
 
         ],
       },

@@ -33,6 +33,30 @@ const ANIMATIONS = [
     </div>
   </div>
 
+  <!-- 指示器样式 -->
+  <div class="relative">
+    <button
+      id="btn-indicator"
+      title="切换滚动指示器样式"
+      class="w-10 h-10 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-gray-800 hover:shadow-lg transition-all text-sm"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l3-2"/><path d="M12 7V5"/></svg>
+    </button>
+
+    <!-- 下拉菜单 -->
+    <div id="indicator-menu" class="hidden absolute right-0 bottom-12 mb-2 bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-[140px]">
+      <div class="px-3 py-1.5 text-[11px] text-gray-400 tracking-wider uppercase">指示器样式</div>
+      <button data-indicator="ruler" class="w-full text-left px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2">
+        <span class="w-4 text-center text-[10px] indicator-dot" data-indicator="ruler"></span>
+        横条刻度尺
+      </button>
+      <button data-indicator="clock" class="w-full text-left px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2">
+        <span class="w-4 text-center text-[10px] indicator-dot" data-indicator="clock"></span>
+        圆形表盘时针
+      </button>
+    </div>
+  </div>
+
   <!-- 重播加载动画 -->
   <button
     id="btn-replay"
@@ -82,6 +106,7 @@ const ANIMATIONS = [
 
   document.addEventListener('click', () => {
     menu?.classList.add('hidden');
+    indMenu?.classList.add('hidden');
   });
 
   // 选择动画
@@ -96,10 +121,38 @@ const ANIMATIONS = [
     });
   });
 
-  // 重播加载动画
+  // 重播加载动画：快速定位到页面顶部动画位置（首屏常驻，无需 reload）
   document.getElementById('btn-replay')?.addEventListener('click', () => {
-    sessionStorage.removeItem('nier-intro-done');
-    sessionStorage.removeItem('p3re-intro-done');
-    location.reload();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // 指示器样式菜单
+  function currentIndicator() {
+    return localStorage.getItem('scroll-indicator-style') || 'ruler';
+  }
+
+  function updateIndicatorDots() {
+    const cur = currentIndicator();
+    document.querySelectorAll('.indicator-dot').forEach((el) => {
+      el.textContent = el.dataset.indicator === cur ? '●' : '○';
+    });
+  }
+
+  const indBtn = document.getElementById('btn-indicator');
+  const indMenu = document.getElementById('indicator-menu');
+
+  indBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateIndicatorDots();
+    indMenu?.classList.toggle('hidden');
+  });
+
+  // 选择指示器样式：存 localStorage 后刷新（LoadingScreen 读取生效）
+  indMenu?.querySelectorAll('button[data-indicator]').forEach((b) => {
+    b.addEventListener('click', () => {
+      localStorage.setItem('scroll-indicator-style', b.dataset.indicator);
+      indMenu.classList.add('hidden');
+      location.reload();
+    });
   });
 </script>

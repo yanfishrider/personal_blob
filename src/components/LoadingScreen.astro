@@ -5,17 +5,47 @@
 const base = import.meta.env.BASE_URL;
 ---
 
-<!-- ===== NieR 风格 ===== -->
-<div id="nier-loading" class="fixed inset-0 z-[9999] overflow-hidden" style="background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px;">
-  <canvas id="nier-grid-art" class="absolute inset-0 w-full h-full z-[5] pointer-events-none"></canvas>
+<!-- ===== NieR 风格（首屏模式） ===== -->
+<!-- #nier-loading 占 100vh 文档流、永驻页面顶部（刷新不销毁，向上滚可看回加载动画）；
+     #nier-stage sticky 钉在视口顶部，滚动时实时 rotateX 翻转（可逆：向下滚翻走、向上滚翻回） -->
+<div id="nier-loading" class="relative z-[60]" style="height:100vh;">
+  <div id="nier-stage" class="sticky top-0 overflow-hidden" style="height:100vh; background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px; transform-origin: 50% 50%; will-change: transform;">
+    <canvas id="nier-grid-art" class="absolute inset-0 w-full h-full z-[5] pointer-events-none"></canvas>
 
-  <div class="absolute top-8 left-8 sm:top-12 sm:left-12 z-10">
-    <p class="text-white tracking-[0.15em]">
-      <span class="text-3xl sm:text-4xl">LOADING</span><span class="text-lg sm:text-xl">_系统启动中</span><span id="nier-dots" class="text-lg sm:text-xl"></span>
-    </p>
+    <div class="absolute top-8 left-8 sm:top-12 sm:left-12 z-10">
+      <p class="text-white tracking-[0.15em]">
+        <span class="text-3xl sm:text-4xl">LOADING</span><span class="text-lg sm:text-xl">_系统启动中</span><span id="nier-dots" class="text-lg sm:text-xl"></span>
+      </p>
+    </div>
+
+    <div id="nier-lines" class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"></div>
+  </div>
+</div>
+
+<!-- ===== 全局滚动指示器：fixed 右下角（right:10% bottom:10%），随整页滚动进度移动 ===== -->
+<!-- 两种样式：ruler 横条刻度尺（默认）/ clock 圆形表盘+时针；由 localStorage['scroll-indicator-style'] 切换 -->
+<div id="nier-scroll-hint" class="fixed z-[70] flex flex-col items-center" style="right:10%; bottom:10%; opacity:0; transition: opacity .5s ease; pointer-events:none; background: transparent; padding: 8px 14px 6px;">
+  <!-- 样式一：横向刻度尺（ruler） -->
+  <div id="nier-indicator-ruler" class="flex flex-col items-center">
+    <div id="nier-hint-label" class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:#22D3EE;">向下滚动</div>
+    <div id="nier-ruler" class="relative" style="width:240px; height:22px; background-image: repeating-linear-gradient(90deg, rgba(34,211,238,.4) 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, rgba(34,211,238,.22) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat;">
+      <div class="absolute left-0 right-0" style="top:15px; height:2px; background: rgba(34,211,238,.35);"></div>
+      <!-- 已滚动区域高亮填充层（宽度随进度更新） -->
+      <div id="nier-ruler-fill" class="absolute left-0" style="top:0; bottom:0; width:0%; background-image: repeating-linear-gradient(90deg, #22D3EE 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, rgba(34,211,238,.9) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%); mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%);"></div>
+      <div id="nier-ruler-knob" class="absolute" style="top:-5.5px; left:0; width:2px; height:19.5px; transform:translateX(-50%); background:#7FF3FF; box-shadow:0 0 8px rgba(34,211,238,.9), 0 0 2px rgba(255,255,255,.8);"></div>
+    </div>
+    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:rgba(34,211,238,.55);">SCROLL</div>
   </div>
 
-  <div id="nier-lines" class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"></div>
+  <!-- 样式二：圆形表盘 + 时针（clock），刻度/时针由 JS 动态生成 -->
+  <div id="nier-indicator-clock" class="flex flex-col items-center" style="display:none;">
+    <div class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:#22D3EE;">向下滚动</div>
+    <div id="nier-clock" class="relative" style="width:72px; height:72px;">
+      <svg id="nier-clock-svg" width="72" height="72" viewBox="0 0 72 72"></svg>
+      <div id="nier-clock-center" class="absolute rounded-full" style="top:50%; left:50%; width:6px; height:6px; transform:translate(-50%,-50%); background:#7FF3FF; box-shadow:0 0 8px rgba(34,211,238,.9);"></div>
+    </div>
+    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:rgba(34,211,238,.55);">SCROLL</div>
+  </div>
 </div>
 
 <!-- ===== P3RE 风格 ===== -->
@@ -53,24 +83,44 @@ const base = import.meta.env.BASE_URL;
   var B = document.getElementById('p3re-loading').dataset.base;
 
   var anim = localStorage.getItem('loading-animation') || 'nier';
-  var nierEl = document.getElementById('nier-loading');
+  var nierWrap = document.getElementById('nier-loading');
+  var nierEl = document.getElementById('nier-stage');
   var p3reEl = document.getElementById('p3re-loading');
+  var hintEl = document.getElementById('nier-scroll-hint');
+
+  // 检测页面是否可整页滚动：尝试滚动 10px，看 scrollY 是否变化。
+  // notes/game 等 overflow:hidden 固定布局页滚动无效 → 回退旧 fixed 遮罩模式
+  // （不依赖 getComputedStyle——dev 下 CSS 由 Vite 异步注入，检测样式有时序竞态）
+  var testY = window.scrollY;
+  window.scrollBy(0, 10);
+  var canScroll = window.scrollY !== testY;
+  window.scrollTo(0, testY);
+  var fixedMode = !canScroll;
+  if (fixedMode) {
+    nierWrap?.classList.add('nier-fixed');
+    hintEl?.remove();
+  }
 
   if (anim === 'none') {
-    nierEl?.remove();
+    nierWrap?.remove();
     p3reEl?.remove();
+    hintEl?.remove();
   } else if (anim === 'p3re') {
-    nierEl?.remove();
+    nierWrap?.remove();
+    hintEl?.remove();
     p3reEl.style.display = '';
     runP3RE();
   } else {
     // nier
     p3reEl?.remove();
-    if (!sessionStorage.getItem('nier-intro-done')) {
+    if (fixedMode && sessionStorage.getItem('nier-intro-done')) {
+      // 不可滚动页刷新/回访：直接移除，不占文档流、不阻塞固定布局
+      nierWrap?.remove();
+    } else if (!sessionStorage.getItem('nier-intro-done')) {
       sessionStorage.setItem('nier-intro-done', '1');
-      runNier();
+      runNier(false); // 首次进入：播放打字动画
     } else {
-      nierEl?.remove();
+      runNier(true);  // 可滚动页刷新/回访：跳过动画直接完成态（首屏不销毁，向上滚可见）
     }
   }
 
@@ -127,20 +177,130 @@ const base = import.meta.env.BASE_URL;
   }
 
   /* ============ NieR ============ */
-  function runNier() {
-    // 点击任意位置跳过
+  // quick=true：跳过打字动画，直接渲染完成态（刷新/回访场景）
+  function runNier(quick) {
+    var hintLabel = document.getElementById('nier-hint-label');
+    var rulerKnob = document.getElementById('nier-ruler-knob');
+    var rulerFill = document.getElementById('nier-ruler-fill');
+    var indRuler = document.getElementById('nier-indicator-ruler');
+    var indClock = document.getElementById('nier-indicator-clock');
+    var clockSvg = document.getElementById('nier-clock-svg');
+    var clockHand = null;
+    var clockTicks = [];
+
+    // 指示器样式：ruler（横条刻度尺，默认）/ clock（圆形表盘+时针）
+    var indicatorStyle = localStorage.getItem('scroll-indicator-style') || 'ruler';
+    if (indicatorStyle !== 'ruler' && indicatorStyle !== 'clock') indicatorStyle = 'ruler';
+
+    function applyIndicatorStyle() {
+      if (!indRuler || !indClock) return;
+      if (indicatorStyle === 'clock') {
+        indRuler.style.display = 'none';
+        indClock.style.display = '';
+      } else {
+        indRuler.style.display = '';
+        indClock.style.display = 'none';
+      }
+    }
+
+    // 生成圆形表盘：60 条刻度线（12 主 + 48 次）+ 时针（指向 12 点起始）
+    function buildClock() {
+      if (!clockSvg) return;
+      var NS = 'http://www.w3.org/2000/svg';
+      var cx = 36, cy = 36, R = 30; // 圆心 + 刻度半径
+      clockSvg.innerHTML = '';
+      clockTicks = [];
+      for (var i = 0; i < 60; i++) {
+        var a = (i * 6 - 90) * Math.PI / 180; // 从 12 点方向开始
+        var isMajor = (i % 5 === 0);
+        var r1 = isMajor ? R - 9 : R - 5;     // 主刻度长（向圆心延伸更多）
+        var x1 = cx + r1 * Math.cos(a), y1 = cy + r1 * Math.sin(a);
+        var x2 = cx + R * Math.cos(a), y2 = cy + R * Math.sin(a);
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', isMajor ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)');
+        line.setAttribute('stroke-width', isMajor ? '1.6' : '1');
+        line.setAttribute('stroke-linecap', 'round');
+        clockSvg.appendChild(line);
+        clockTicks.push(line);
+      }
+      // 底环
+      var ring = document.createElementNS(NS, 'circle');
+      ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', 'rgba(34,211,238,.25)');
+      ring.setAttribute('stroke-width', '1.5');
+      clockSvg.appendChild(ring);
+      // 时针：从圆心指向 12 点，rotate 由滚动驱动
+      clockHand = document.createElementNS(NS, 'line');
+      clockHand.setAttribute('x1', cx); clockHand.setAttribute('y1', cy);
+      clockHand.setAttribute('x2', cx); clockHand.setAttribute('y2', cy - 20);
+      clockHand.setAttribute('stroke', '#7FF3FF');
+      clockHand.setAttribute('stroke-width', '2.5');
+      clockHand.setAttribute('stroke-linecap', 'round');
+      clockHand.style.transformOrigin = cx + 'px ' + cy + 'px';
+      clockHand.style.transition = 'transform .08s linear';
+      clockSvg.appendChild(clockHand);
+      applyIndicatorStyle();
+    }
+
+    // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度
+    function onScrollFlip() {
+      var vh = window.innerHeight;
+      // 首屏翻转：前 100vh 内完成 0 → -90°
+      var flip = Math.min(window.scrollY / vh, 1);
+      nierEl.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
+      // 指示器：整个文档滚动进度 0 → 100%
+      var doc = document.documentElement;
+      var maxScroll = doc.scrollHeight - vh;
+      var page = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
+      if (indicatorStyle === 'clock' && clockHand) {
+        // 时针旋转 0 → 360°（从 12 点起），扫过的刻度高亮
+        clockHand.style.transform = 'rotate(' + (page * 360) + 'deg)';
+        var passed = Math.round(page * 60);
+        for (var i = 0; i < 60; i++) {
+          var isMajorT = (i % 5 === 0);
+          clockTicks[i].setAttribute('stroke', i <= passed
+            ? (isMajorT ? '#22D3EE' : 'rgba(34,211,238,.8)')
+            : (isMajorT ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)'));
+        }
+      } else {
+        rulerKnob.style.left = (page * 100) + '%';
+        if (rulerFill) rulerFill.style.width = (page * 100) + '%';
+      }
+      // 提示文字随首屏翻走淡出
+      hintLabel.style.opacity = String(Math.max(0, 1 - flip * 3));
+    }
+
+    function showEnterHint() {
+      buildClock(); // 生成圆形表盘（ruler 样式时仅应用显隐）
+      hintEl.style.opacity = '1';
+      window.addEventListener('scroll', onScrollFlip, { passive: true });
+      onScrollFlip();
+    }
+
+    // 点击首屏任意位置：首屏模式 = 平滑滚到进入点；fixed 模式 = 淡出移除（旧行为）
+    nierEl.addEventListener('click', function() {
+      if (fixedMode) {
+        dismissNier();
+      } else {
+        window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+      }
+    });
+
+    // fixed 模式（notes/game 等不可滚动页）：淡出移除
     function dismissNier() {
       if (!nierEl) return;
       nierEl.style.transition = 'opacity 0.6s ease-out';
       nierEl.style.opacity = '0';
-      setTimeout(function() { nierEl.remove(); }, 600);
+      setTimeout(function() { nierWrap?.remove(); }, 600);
     }
-    nierEl.addEventListener('click', dismissNier);
 
     import('../../ascii-art.txt?raw').then(function(m) {
       var ASCII_EMBLEM = m.default.split('\n').filter(function(r) { return r.length > 0; });
 
-      var GLITCH_CHARS = '!@#$%^&*<>?|/\\\\{}[]\u00b1\u00a7\u203b\u2606\u2605\u25cb\u25cf\u25c7\u25c6\u25a1\u25a0\u25b3\u25b2\u25bd\u25bc\u2192\u2190\u2191\u2193\u2194\u2195\u2660\u2663\u2665\u2666\u2642\u2640\u221e\u2248\u2260\u2264\u2265';
+      var GLITCH_CHARS = '!@#$%^&*<>?|/\\{}[]\u00b1\u00a7\u203b\u2606\u2605\u25cb\u25cf\u25c7\u25c6\u25a1\u25a0\u25b3\u25b2\u25bd\u25bc\u2192\u2190\u2191\u2193\u2194\u2195\u2660\u2663\u2665\u2666\u2642\u2640\u221e\u2248\u2260\u2264\u2265';
       function randomGlitch() { return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]; }
       function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
@@ -198,6 +358,20 @@ const base = import.meta.env.BASE_URL;
       var dotIdx = 0;
       var dotTimer = setInterval(function() { if (dotsEl) dotsEl.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
 
+      // 完成态：直接填满全部终端行（无打字动画）
+      function fillAllLines() {
+        for (var i = 0; i < lines.length; i++) {
+          var el = document.createElement('p');
+          el.className = 'tracking-wider';
+          var span = document.createElement('span');
+          span.style.color = '#fff';
+          span.textContent = lines[i];
+          el.appendChild(span);
+          container.appendChild(el);
+        }
+        clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
+      }
+
       async function typeLine(text, isLast) {
         var el = document.createElement('p');
         el.className = 'tracking-wider';
@@ -221,15 +395,46 @@ const base = import.meta.env.BASE_URL;
         for (var i = 0; i < lines.length; i++) await typeLine(lines[i], i === lines.length - 1);
         clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
         await sleep(500);
-        if (nierEl) { nierEl.style.transition = 'opacity 0.6s ease-out'; nierEl.style.opacity = '0'; setTimeout(function() { nierEl.remove(); }, 600); }
+        if (fixedMode) {
+          // 不可滚动页：播完淡出移除（旧行为）
+          dismissNier();
+        } else {
+          // 播放完不淡出：停留为首屏，亮出右下角刻度尺
+          showEnterHint();
+        }
       }
-      run();
+
+      if (quick) {
+        if (fixedMode) {
+          // 不可滚动页刷新/回访：直接移除，不占文档流
+          nierWrap?.remove();
+        } else {
+          fillAllLines();
+          showEnterHint();
+        }
+      } else {
+        run();
+      }
     });
   }
 </script>
 
 <style is:global>
   #nier-loading { font-family: 'Courier New', 'Source Code Pro', 'Consolas', 'Noto Sans SC', monospace; letter-spacing: 0.05em; }
+
+  /* 不可滚动页（notes/game 等 overflow:hidden 固定布局）回退 fixed 遮罩模式：
+     不占文档流、播完淡出移除，避免 100vh 首屏把固定布局内容推出视口 */
+  #nier-loading.nier-fixed {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    height: 100vh !important;
+  }
+  #nier-loading.nier-fixed #nier-stage {
+    position: absolute !important;
+    top: 0 !important;
+    height: 100vh !important;
+  }
 
   /* P3RE 海浪动画 */
   @keyframes p3re-down {
