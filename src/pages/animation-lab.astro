@@ -277,6 +277,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     // ============ 第四段：composition 混合（斜向圆球线 + 横向线背景，静态布局，动画后续定义） ============
     var mixSvg = document.getElementById('lab-mix');
     var mixBalls = [];
+    var mixLines = [];
+    var mixBallBase = [], mixBallDia = [];
     if (mixSvg) {
       var mNS = 'http://www.w3.org/2000/svg';
       var mCol = a.colors[3 % a.colors.length];   // 第四段弧色（基准）
@@ -299,6 +301,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         ml.setAttribute('stroke', darken(mCol, 0.35));
         ml.setAttribute('stroke-width', 5);
         mixSvg.appendChild(ml);
+        mixLines.push({ el: ml, baseLen: mLen });
       }
       // 斜向圆球线：38 个圆球 Ø12（r 6）、中心距 14（12+2 间距）、水平右上 30°、总长 37×14=518，中心过容器中心
       var mBallR = 6;
@@ -308,16 +311,73 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       var mTotalX = (mBallCount - 1) * mBallStep * mCos30;   // 448.7
       var mTotalY = (mBallCount - 1) * mBallStep * mSin30;   // 259
       var mX0 = 375 - mTotalX / 2, mY0 = 375 + mTotalY / 2;  // 起点（左下），斜线中心过容器中心
+      // 椭圆弧点列：两端点位置不变（直线端点），中间仅 y 轴弯曲成椭圆弧（半椭圆拱形，拱高 mAmp）
+      var mAmp = 150;
       for (var mb = 0; mb < mBallCount; mb++) {
+        var bx = mX0 + mb * mBallStep * mCos30;
+        var by = mY0 - mb * mBallStep * mSin30;
+        mixBallBase.push([bx, by]);
+        var u = mb / (mBallCount - 1) * 2 - 1;        // -1..1
+        var bend = -mAmp * Math.sqrt(1 - u * u);       // 向上凸椭圆弧（两端 0、中间最大）
+        mixBallDia.push([bx, by + bend]);
+      }
+      for (var mb2 = 0; mb2 < mBallCount; mb2++) {
         var ball = document.createElementNS(mNS, 'circle');
-        ball.setAttribute('cx', mX0 + mb * mBallStep * mCos30);
-        ball.setAttribute('cy', mY0 - mb * mBallStep * mSin30);
+        ball.setAttribute('cx', mixBallBase[mb2][0]);
+        ball.setAttribute('cy', mixBallBase[mb2][1]);
         ball.setAttribute('r', mBallR);
         ball.setAttribute('fill', mCol);
         mixSvg.appendChild(ball);
         mixBalls.push(ball);
       }
     }
+    // 第四段 composition：圆球线形态切换（直线 ↔ 圆弧菱形），背景横线按圆球线 x 跨度跟随
+    function mixUpdate(t) {
+      if (!mixBalls.length) return;
+      t = Math.max(0, Math.min(1, t));
+      var cur = [];
+      for (var b = 0; b < mixBalls.length; b++) {
+        var x = mixBallBase[b][0] + (mixBallDia[b][0] - mixBallBase[b][0]) * t;
+        var y = mixBallBase[b][1] + (mixBallDia[b][1] - mixBallBase[b][1]) * t;
+        cur.push([x, y]);
+        mixBalls[b].setAttribute('cx', x);
+        mixBalls[b].setAttribute('cy', y);
+      }
+      // 横线长度 = 圆球线在 y 处的 x 跨度 + 带宽 5（线段求交；直线跨度≈0 → 退化为基础菱形包络）
+      var band = 5;
+      for (var li = 0; li < mixLines.length; li++) {
+        var line = mixLines[li];
+        var ly = mLineTop + li * mLineStep;
+        var xmin = 1e9, xmax = -1e9;
+        for (var i = 0; i < cur.length; i++) {
+          var p1 = cur[i], p2 = cur[(i + 1) % cur.length];
+          if (p1[1] === p2[1]) continue;
+          if ((p1[1] <= ly && ly <= p2[1]) || (p2[1] <= ly && ly <= p1[1])) {
+            var frac = (ly - p1[1]) / (p2[1] - p1[1]);
+            var ix = p1[0] + frac * (p2[0] - p1[0]);
+            if (ix < xmin) xmin = ix;
+            if (ix > xmax) xmax = ix;
+          }
+        }
+        var span = xmax > xmin ? (xmax - xmin) : 0;
+        var len = line.baseLen + ((span + band) - line.baseLen) * t;
+        len = Math.max(5, len);
+        line.el.setAttribute('x1', 375 - len / 2);
+        line.el.setAttribute('x2', 375 + len / 2);
+      }
+    }
+    // composition 独立循环：不随外部进度，rAF 时间驱动三角波往返（直线 ↔ 右下椭圆弧），仅在第四段显示时更新
+    var mixT = 0;
+    function mixLoop() {
+      requestAnimationFrame(mixLoop);
+      if (!mixBalls.length) return;
+      var mIdx = Math.floor(current * a.segments);
+      if (mIdx !== 3) return;
+      var tri = (Date.now() % 4200) / 4200;            // 0→1 循环（4.2s 一个往返周期）
+      mixT = 1 - Math.abs(2 * tri - 1);                 // 三角波 0→1→0
+      mixUpdate(mixT);
+    }
+    mixLoop();
     // ============ 第四段：引擎仪表盘（齿轮咬合 + 转速指针 + RPM 计数器，rAF 时间驱动） ============
     var ENGINE = {
       cx: 375, cy: 375,        // 齿轮轴心 = 容器圆心（375,420 → 375,375），指针从主齿轮中心伸出
@@ -888,7 +948,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           for (var eii2 = 0; eii2 < ellipseItems.length; eii2++) ellipseItems[eii2].drawP = 0;
         }
       }
-      // composition 混合层（第四段）：idx 3 显示，其他段隐藏
+      // composition 混合层（第四段）：idx 3 显示，其他段隐藏（形态变化由 mixLoop 时间驱动，不随外部进度）
       if (mixSvg) mixSvg.style.opacity = (idx === 3) ? '1' : '0';
       // 引擎仪表盘（第六段）：idx 5 显示，其他段隐藏（运转状态由 engineSpin 循环按 current 实时驱动）
       if (engineSvg) engineSvg.style.opacity = (idx === 5) ? '1' : '0';
