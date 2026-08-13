@@ -20,10 +20,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <svg id="lab-shapes" class="lab-arc lab-shapes" viewBox="0 0 750 750"></svg>
         <!-- 椭圆轨迹层：轨迹不可见，色块（弧段样式）绕椭圆运动构建 3D 球（第三段圆弧显示，先单椭圆验证） -->
         <svg id="lab-ellipse" class="lab-arc lab-ellipse" viewBox="0 0 750 750"></svg>
-        <!-- composition 混合层：斜向圆球线 + 横向线背景（第四段圆弧显示） -->
-        <svg id="lab-mix" class="lab-arc lab-mix" viewBox="0 0 750 750"></svg>
-        <!-- 引擎仪表盘层：齿轮咬合 + 转速指针（第四段圆弧显示，rAF 时间驱动） -->
+        <!-- 引擎仪表盘层：齿轮咬合 + 转速指针（第六段圆弧显示，rAF 时间驱动） -->
         <svg id="lab-engine" class="lab-arc lab-engine" viewBox="0 0 750 750"></svg>
+        <!-- 闭合赛道层：圆点沿闭合 path 绕行 + 轨道描边生长（第四段圆弧显示，形状可切换） -->
+        <svg id="lab-track" class="lab-arc lab-track" viewBox="0 0 750 750"></svg>
         <!-- 中心旋转色块：相对主圆容器居中（第一段圆弧色高亮无荧光，anime.js 旋转） -->
         <div id="lab-square" class="lab-square"></div>
         <!-- 引擎 RPM 计数器：齿轮下方（第四段显示，随指针转速跳动） -->
@@ -36,6 +36,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     <!-- 刻度尺上方浮动代码卡片：显示当前段 SCENES[idx].code -->
     <div id="lab-code-card" class="lab-code-card"></div>
+
+    <!-- 第四段形状菜单：闭合赛道形状切换（仅第四段显示） -->
+    <div id="lab-shape-menu" class="lab-shape-menu">
+      <button data-shape="solar" class="active">星系</button>
+      <button data-shape="circle">圆</button>
+      <button data-shape="ellipse">椭圆</button>
+      <button data-shape="diamond">菱形</button>
+      <button data-shape="heart">心形</button>
+      <button data-shape="star">五角星</button>
+      <button data-shape="square">方形</button>
+      <button data-shape="triangle">三角</button>
+    </div>
 
     <!-- 圆外左侧介绍长条：8 张卡片随进度上移 -->
     <div id="lab-left" class="lab-left">
@@ -274,110 +286,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       }
       requestAnimationFrame(breathLoop);
     })();
-    // ============ 第四段：composition 混合（斜向圆球线 + 横向线背景，静态布局，动画后续定义） ============
-    var mixSvg = document.getElementById('lab-mix');
-    var mixBalls = [];
-    var mixLines = [];
-    var mixBallBase = [], mixBallDia = [];
-    if (mixSvg) {
-      var mNS = 'http://www.w3.org/2000/svg';
-      var mCol = a.colors[3 % a.colors.length];   // 第四段弧色（基准）
-      // 横向线背景：宽 5、间隔 1（步长 6），覆盖中央 460×435 区域（居中，72 条）
-      // 长度包络：两端 5px → 中间 460px 线性递增/递减（菱形轮廓），随圆球斜线（30° 直线）为参照
-      var mLineStep = 6;
-      var mLineW = 460, mLineH = 435;
-      var mLineTop = (750 - mLineH) / 2;             // 157.5
-      var mLineCount = Math.floor(mLineH / mLineStep);   // 72
-      for (var mi = 0; mi <= mLineCount; mi++) {
-        var ml = document.createElementNS(mNS, 'line');
-        var mY = mLineTop + mi * mLineStep;
-        // 包络系数：两端 0（最短 5px）→ 中间 1（最长 460px）
-        var mRatio = 1 - Math.abs(2 * mi / mLineCount - 1);
-        var mLen = 5 + (mLineW - 5) * mRatio;
-        ml.setAttribute('x1', 375 - mLen / 2);
-        ml.setAttribute('y1', mY);
-        ml.setAttribute('x2', 375 + mLen / 2);
-        ml.setAttribute('y2', mY);
-        ml.setAttribute('stroke', darken(mCol, 0.35));
-        ml.setAttribute('stroke-width', 5);
-        mixSvg.appendChild(ml);
-        mixLines.push({ el: ml, baseLen: mLen });
-      }
-      // 斜向圆球线：38 个圆球 Ø12（r 6）、中心距 14（12+2 间距）、水平右上 30°、总长 37×14=518，中心过容器中心
-      var mBallR = 6;
-      var mBallStep = 14;
-      var mBallCount = 38;
-      var mCos30 = Math.cos(30 * Math.PI / 180), mSin30 = Math.sin(30 * Math.PI / 180);
-      var mTotalX = (mBallCount - 1) * mBallStep * mCos30;   // 448.7
-      var mTotalY = (mBallCount - 1) * mBallStep * mSin30;   // 259
-      var mX0 = 375 - mTotalX / 2, mY0 = 375 + mTotalY / 2;  // 起点（左下），斜线中心过容器中心
-      // 椭圆弧点列：两端点位置不变（直线端点），中间仅 y 轴弯曲成椭圆弧（半椭圆拱形，拱高 mAmp）
-      var mAmp = 150;
-      for (var mb = 0; mb < mBallCount; mb++) {
-        var bx = mX0 + mb * mBallStep * mCos30;
-        var by = mY0 - mb * mBallStep * mSin30;
-        mixBallBase.push([bx, by]);
-        var u = mb / (mBallCount - 1) * 2 - 1;        // -1..1
-        var bend = -mAmp * Math.sqrt(1 - u * u);       // 向上凸椭圆弧（两端 0、中间最大）
-        mixBallDia.push([bx, by + bend]);
-      }
-      for (var mb2 = 0; mb2 < mBallCount; mb2++) {
-        var ball = document.createElementNS(mNS, 'circle');
-        ball.setAttribute('cx', mixBallBase[mb2][0]);
-        ball.setAttribute('cy', mixBallBase[mb2][1]);
-        ball.setAttribute('r', mBallR);
-        ball.setAttribute('fill', mCol);
-        mixSvg.appendChild(ball);
-        mixBalls.push(ball);
-      }
-    }
-    // 第四段 composition：圆球线形态切换（直线 ↔ 圆弧菱形），背景横线按圆球线 x 跨度跟随
-    function mixUpdate(t) {
-      if (!mixBalls.length) return;
-      t = Math.max(0, Math.min(1, t));
-      var cur = [];
-      for (var b = 0; b < mixBalls.length; b++) {
-        var x = mixBallBase[b][0] + (mixBallDia[b][0] - mixBallBase[b][0]) * t;
-        var y = mixBallBase[b][1] + (mixBallDia[b][1] - mixBallBase[b][1]) * t;
-        cur.push([x, y]);
-        mixBalls[b].setAttribute('cx', x);
-        mixBalls[b].setAttribute('cy', y);
-      }
-      // 横线长度 = 圆球线在 y 处的 x 跨度 + 带宽 5（线段求交；直线跨度≈0 → 退化为基础菱形包络）
-      var band = 5;
-      for (var li = 0; li < mixLines.length; li++) {
-        var line = mixLines[li];
-        var ly = mLineTop + li * mLineStep;
-        var xmin = 1e9, xmax = -1e9;
-        for (var i = 0; i < cur.length; i++) {
-          var p1 = cur[i], p2 = cur[(i + 1) % cur.length];
-          if (p1[1] === p2[1]) continue;
-          if ((p1[1] <= ly && ly <= p2[1]) || (p2[1] <= ly && ly <= p1[1])) {
-            var frac = (ly - p1[1]) / (p2[1] - p1[1]);
-            var ix = p1[0] + frac * (p2[0] - p1[0]);
-            if (ix < xmin) xmin = ix;
-            if (ix > xmax) xmax = ix;
-          }
-        }
-        var span = xmax > xmin ? (xmax - xmin) : 0;
-        var len = line.baseLen + ((span + band) - line.baseLen) * t;
-        len = Math.max(5, len);
-        line.el.setAttribute('x1', 375 - len / 2);
-        line.el.setAttribute('x2', 375 + len / 2);
-      }
-    }
-    // composition 独立循环：不随外部进度，rAF 时间驱动三角波往返（直线 ↔ 右下椭圆弧），仅在第四段显示时更新
-    var mixT = 0;
-    function mixLoop() {
-      requestAnimationFrame(mixLoop);
-      if (!mixBalls.length) return;
-      var mIdx = Math.floor(current * a.segments);
-      if (mIdx !== 3) return;
-      var tri = (Date.now() % 4200) / 4200;            // 0→1 循环（4.2s 一个往返周期）
-      mixT = 1 - Math.abs(2 * tri - 1);                 // 三角波 0→1→0
-      mixUpdate(mixT);
-    }
-    mixLoop();
     // ============ 第四段：引擎仪表盘（齿轮咬合 + 转速指针 + RPM 计数器，rAF 时间驱动） ============
     var ENGINE = {
       cx: 375, cy: 375,        // 齿轮轴心 = 容器圆心（375,420 → 375,375），指针从主齿轮中心伸出
@@ -648,6 +556,251 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       });
       // 椭圆轨迹为手动模式：滚轮/进度直接驱动（见 updateProgress），无需自动动画
     }).catch(function () {});
+
+    // ============ 第四段：闭合赛道（圆点沿闭合 path 绕行 + 轨道描边生长，形状可切换，独立 rAF 时间驱动） ============
+    var trackSvg = document.getElementById('lab-track');
+    var trackColor = a.colors[3 % a.colors.length];   // 第四段弧色
+    var trackShape = 'solar';   // 当前形状（菜单切换；默认星系，2026-08-13：星系作为第四段第一个演示）
+    var trackPath = null, trackDot = null, trackLen = 0;
+    var trackProg = 0, trackLast = 0;                 // 累计进度（第一圈画轨道，之后轨道保持完整圆点继续绕）
+
+    // 形状 → 闭合 path d（采样生成，中心 375,375，外接半径 ~235×trackScale 收进 660 内环）
+    var trackScale = 0.8;   // 形状整体缩放（用户 2026-08-13：图形都变小一些 → 0.8）
+    function trackShapeD(shape) {
+      var cx = a.cx, cy = a.cy, R = 235 * trackScale;
+      var pts = [];
+      var i, n, ang, x, y, t, r;
+      function push(px, py) { pts.push([px, py]); }
+      if (shape === 'circle') {
+        n = 72;
+        for (i = 0; i < n; i++) { ang = i / n * 2 * Math.PI; push(cx + R * Math.cos(ang), cy + R * Math.sin(ang)); }
+      } else if (shape === 'ellipse') {
+        n = 72;
+        for (i = 0; i < n; i++) { ang = i / n * 2 * Math.PI; push(cx + 288 * trackScale * Math.cos(ang), cy + 158 * trackScale * Math.sin(ang)); }
+      } else if (shape === 'diamond') {
+        push(cx + R, cy); push(cx, cy + R); push(cx - R, cy); push(cx, cy - R);
+      } else if (shape === 'heart') {
+        // 心形参数方程 x=16sin³t, y=13cost−5cos2t−2cos3t−cos4t（宽 32 高 ~30 → 缩放 R/17）
+        n = 96;
+        for (i = 0; i <= n; i++) {
+          t = i / n * 2 * Math.PI;
+          x = 16 * Math.pow(Math.sin(t), 3);
+          y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+          push(cx + x * R / 17, cy - y * R / 17);
+        }
+      } else if (shape === 'star') {
+        n = 10;
+        for (i = 0; i < n; i++) {
+          ang = -Math.PI / 2 + i * Math.PI / 5;      // 顶部顶点起
+          r = (i % 2 === 0) ? R : R * 0.42;
+          push(cx + r * Math.cos(ang), cy + r * Math.sin(ang));
+        }
+      } else if (shape === 'square') {
+        var s = R * 0.8;
+        push(cx + s, cy - s); push(cx + s, cy + s); push(cx - s, cy + s); push(cx - s, cy - s);
+      } else if (shape === 'triangle') {
+        n = 3;
+        for (i = 0; i < n; i++) { ang = -Math.PI / 2 + i * 2 * Math.PI / 3; push(cx + R * Math.cos(ang), cy + R * Math.sin(ang)); }
+      }
+      var d = 'M' + pts[0][0] + ' ' + pts[0][1];
+      for (i = 1; i < pts.length; i++) d += ' L' + pts[i][0] + ' ' + pts[i][1];
+      return d + ' Z';
+    }
+
+    function trackRebuild() {
+      if (!trackSvg) return;
+      var ns = 'http://www.w3.org/2000/svg';
+      while (trackSvg.firstChild) trackSvg.removeChild(trackSvg.firstChild);
+      if (trackShape === 'solar') {
+        trackBuildSolar(ns);
+        return;
+      }
+      // 轨道 path
+      trackPath = document.createElementNS(ns, 'path');
+      trackPath.setAttribute('d', trackShapeD(trackShape));
+      trackPath.setAttribute('fill', 'none');
+      trackPath.setAttribute('stroke', trackColor);
+      trackPath.setAttribute('stroke-width', 3.2);
+      trackPath.setAttribute('stroke-linecap', 'round');
+      trackPath.style.filter = 'brightness(1.42)';
+      trackSvg.appendChild(trackPath);
+      // 圆点（沿轨道绕行）
+      trackDot = document.createElementNS(ns, 'circle');
+      trackDot.setAttribute('r', 8);
+      trackDot.setAttribute('fill', trackColor);
+      trackDot.style.filter = 'brightness(1.5)';
+      trackSvg.appendChild(trackDot);
+      trackLen = (trackPath.getTotalLength && trackPath.getTotalLength()) || 1240;
+      trackPath.setAttribute('stroke-dasharray', trackLen + ' ' + trackLen);
+      trackPath.setAttribute('stroke-dashoffset', trackLen);   // 初始全隐藏，圆点跑过即画
+      trackProg = 0;
+      trackLast = 0;
+    }
+
+    // ============ 太阳系模式：太阳 + 3 条同心椭圆轨道 + 每轨一颗行星（独立周期绕行） ============
+    var SOLAR = {
+      sun: null,          // 太阳 circle
+      sunGlow: null,      // 光晕 circle
+      planets: [],        // { orbitPath, orbitLen, planet, angle, period, rx, ry }
+      last: 0,
+    };
+    function trackBuildSolar(ns) {
+      var cx = a.cx, cy = a.cy;
+      SOLAR.planets = [];
+      // 太阳 + 光晕
+      SOLAR.sunGlow = document.createElementNS(ns, 'circle');
+      SOLAR.sunGlow.setAttribute('cx', cx); SOLAR.sunGlow.setAttribute('cy', cy);
+      SOLAR.sunGlow.setAttribute('r', 26);
+      SOLAR.sunGlow.setAttribute('fill', 'none');
+      SOLAR.sunGlow.setAttribute('stroke', trackColor);
+      SOLAR.sunGlow.setAttribute('stroke-width', 10);
+      SOLAR.sunGlow.setAttribute('opacity', 0.25);
+      trackSvg.appendChild(SOLAR.sunGlow);
+      SOLAR.sun = document.createElementNS(ns, 'circle');
+      SOLAR.sun.setAttribute('cx', cx); SOLAR.sun.setAttribute('cy', cy);
+      SOLAR.sun.setAttribute('r', 15);
+      SOLAR.sun.setAttribute('fill', trackColor);
+      SOLAR.sun.style.filter = 'brightness(1.5)';
+      trackSvg.appendChild(SOLAR.sun);
+      // 3 条轨道 + 行星：内圈小快、外圈大慢；水平轨道（用户 2026-08-13：轨道改为水平）
+      // 尺寸微调（2026-08-13：轨道缩小一点 rx 130→110/200→170/270→230，再扁平扁度 0.5→0.38）
+      var SOLAR_TILT = 0;   // 轨道倾斜角（水平）
+      var ORBITS = [
+        { rx: 110, ry: 42, period: 4000, r: 7 },
+        { rx: 170, ry: 65, period: 6000, r: 9 },
+        { rx: 230, ry: 87, period: 8500, r: 11 },
+      ];
+      for (var si = 0; si < ORBITS.length; si++) {
+        var oc = ORBITS[si];
+        var op = document.createElementNS(ns, 'path');
+        op.setAttribute('d', 'M ' + (cx - oc.rx) + ' ' + cy + ' A ' + oc.rx + ' ' + oc.ry + ' 0 1 0 ' + (cx + oc.rx) + ' ' + cy + ' A ' + oc.rx + ' ' + oc.ry + ' 0 1 0 ' + (cx - oc.rx) + ' ' + cy);
+        op.setAttribute('fill', 'none');
+        op.setAttribute('stroke', trackColor);
+        op.setAttribute('stroke-width', 1.6);
+        op.setAttribute('opacity', 0.4);
+        trackSvg.appendChild(op);
+        // 行星组：g 承载 平移+近大远小缩放+自转，组内元素用局部坐标（中心 0,0）
+        var pg = document.createElementNS(ns, 'g');
+        // 行星体：高对比亮色（用户 2026-08-13：行星颜色随意调、与弧色不同、对比强；太阳保持弧色）
+        var PLANET_COLORS = ['#FFD54F', '#7FF3FF', '#FF8A9A'];   // 金 / 青 / 粉
+        var pl = document.createElementNS(ns, 'circle');
+        pl.setAttribute('cx', 0); pl.setAttribute('cy', 0);
+        pl.setAttribute('r', oc.r);
+        pl.setAttribute('fill', PLANET_COLORS[si % PLANET_COLORS.length]);
+        pl.style.filter = 'brightness(1.25)';
+        pg.appendChild(pl);
+        // 自转标记：表面小点（非对称 → 自转可见）
+        var mk = document.createElementNS(ns, 'circle');
+        mk.setAttribute('cx', 0);
+        mk.setAttribute('cy', -oc.r * 0.55);
+        mk.setAttribute('r', Math.max(2, oc.r * 0.3));
+        mk.setAttribute('fill', '#ffffff');
+        mk.setAttribute('opacity', 0.85);
+        pg.appendChild(mk);
+        // 卫星：只配最大那颗（si === ORBITS.length-1），含静态小椭圆轨道线
+        var sat = null;
+        if (si === ORBITS.length - 1) {
+          var sao = document.createElementNS(ns, 'path');
+          sao.setAttribute('d', 'M ' + (-24) + ' 0 A 24 12 0 1 0 24 0 A 24 12 0 1 0 ' + (-24) + ' 0');
+          sao.setAttribute('fill', 'none');
+          sao.setAttribute('stroke', trackColor);
+          sao.setAttribute('stroke-width', 1);
+          sao.setAttribute('opacity', 0.4);
+          pg.appendChild(sao);
+          sat = document.createElementNS(ns, 'circle');
+          sat.setAttribute('r', 3);
+          sat.setAttribute('fill', PLANET_COLORS[si % PLANET_COLORS.length]);
+          sat.style.filter = 'brightness(1.5)';
+          pg.appendChild(sat);
+        }
+        trackSvg.appendChild(pg);
+        SOLAR.planets.push({
+          orbitPath: op,
+          group: pg,
+          planet: pl,
+          mark: mk,
+          satellite: sat,
+          angle: si * Math.PI * 2 / 3,   // 初始轨道相位错开
+          spin: si * 0.8,                // 初始自转角错开
+          spinPeriod: 8000,              // 自转一圈 8s（缓慢）
+          satAngle: 0,
+          satPeriod: 6000,               // 卫星一圈 6s（缓慢）
+          period: oc.period,
+          rx: oc.rx, ry: oc.ry,
+        });
+      }
+      SOLAR.last = 0;
+      SOLAR.tilt = SOLAR_TILT;
+    }
+
+    // 独立 rAF：圆点沿 path 匀速绕行；轨道描边第一圈跟随圆点（跑到哪画到哪），画满后保持完整
+    function trackLoop(t) {
+      if (trackShape === 'solar') {
+        // 太阳系模式：行星各自绕太阳（近大远小：下半放大、上半缩小）
+        if (!SOLAR.sun) { requestAnimationFrame(trackLoop); return; }
+        if (!SOLAR.last) SOLAR.last = t;
+        var sdt = Math.min(t - SOLAR.last, 100);
+        SOLAR.last = t;
+        for (var si2 = 0; si2 < SOLAR.planets.length; si2++) {
+          var sp = SOLAR.planets[si2];
+          sp.angle += sdt / sp.period * Math.PI * 2;
+          sp.spin += sdt / sp.spinPeriod * Math.PI * 2;
+          // 椭圆参数坐标（相对圆心，未旋转）
+          var ox = sp.rx * Math.cos(sp.angle);
+          var oy = sp.ry * Math.sin(sp.angle);
+          // 绕圆心旋转 SOLAR.tilt（与轨道 path transform 一致，否则行星脱离轨道）
+          var px = a.cx + ox * Math.cos(SOLAR.tilt) - oy * Math.sin(SOLAR.tilt);
+          var py = a.cy + ox * Math.sin(SOLAR.tilt) + oy * Math.cos(SOLAR.tilt);
+          // 近大远小：旋转后 y 相对圆心 >0 放大
+          var depth = 1 + 0.25 * (oy / sp.ry);
+          // 行星组：平移 → 近大远小缩放 → 自转
+          var spinDeg = sp.spin * 180 / Math.PI;
+          sp.group.setAttribute('transform', 'translate(' + px + ' ' + py + ') scale(' + depth + ') rotate(' + spinDeg + ')');
+          // 卫星：局部坐标绕行星转（小椭圆 24×12，缓慢）
+          if (sp.satellite) {
+            sp.satAngle += sdt / sp.satPeriod * Math.PI * 2;
+            sp.satellite.setAttribute('cx', 24 * Math.cos(sp.satAngle));
+            sp.satellite.setAttribute('cy', 12 * Math.sin(sp.satAngle));
+          }
+        }
+        requestAnimationFrame(trackLoop);
+        return;
+      }
+      if (!trackPath || !trackDot) return;
+      if (!trackLast) trackLast = t;
+      var tdt = Math.min(t - trackLast, 100);   // 钳制防切后台跳帧
+      trackLast = t;
+      trackProg += tdt / 4200;                  // 4.2s 一圈（不取模：累计用于画轨道）
+      var loopP = trackProg % 1;                // 圆点当前圈内位置
+      var drawP = Math.min(trackProg, 1);       // 轨道画到哪：第一圈画满后保持
+      var p = loopP * trackLen;
+      var pt = trackPath.getPointAtLength(p);
+      var pt2 = trackPath.getPointAtLength(Math.min(p + 1, trackLen - 0.01));
+      var tang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+      trackDot.setAttribute('cx', pt.x);
+      trackDot.setAttribute('cy', pt.y);
+      trackDot.setAttribute('transform', 'rotate(' + tang + ' ' + pt.x + ' ' + pt.y + ')');
+      trackPath.setAttribute('stroke-dashoffset', trackLen * (1 - drawP));
+      requestAnimationFrame(trackLoop);
+    }
+
+    // 形状菜单：点击切换形状 → 重建轨道 + 重置进度
+    var trackMenu = document.getElementById('lab-shape-menu');
+    if (trackMenu) {
+      var tbtns = trackMenu.querySelectorAll('button');
+      for (var tbi = 0; tbi < tbtns.length; tbi++) {
+        (function (btn) {
+          btn.addEventListener('click', function () {
+            trackShape = btn.getAttribute('data-shape');
+            for (var tbi2 = 0; tbi2 < tbtns.length; tbi2++) tbtns[tbi2].classList.remove('active');
+            btn.classList.add('active');
+            trackRebuild();
+          });
+        })(tbtns[tbi]);
+      }
+    }
+    trackRebuild();
+    requestAnimationFrame(trackLoop);
 
     // ============ 点阵背景（方形网格小圆点，中心亮边缘暗） ============
     var dotEls = [];   // 已渲染的点（含基准 opacity）
@@ -948,11 +1101,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           for (var eii2 = 0; eii2 < ellipseItems.length; eii2++) ellipseItems[eii2].drawP = 0;
         }
       }
-      // composition 混合层（第四段）：idx 3 显示，其他段隐藏（形态变化由 mixLoop 时间驱动，不随外部进度）
-      if (mixSvg) mixSvg.style.opacity = (idx === 3) ? '1' : '0';
       // 引擎仪表盘（第六段）：idx 5 显示，其他段隐藏（运转状态由 engineSpin 循环按 current 实时驱动）
       if (engineSvg) engineSvg.style.opacity = (idx === 5) ? '1' : '0';
       if (counterEl) counterEl.style.opacity = (idx === 5) ? '1' : '0';
+      // 闭合赛道（第四段）：idx 3 显示，其他段隐藏（运转由 trackLoop 常驻 rAF 驱动）
+      if (trackSvg) trackSvg.style.opacity = (idx === 3) ? '1' : '0';
+      if (trackMenu) {
+        trackMenu.style.opacity = (idx === 3) ? '1' : '0';
+        trackMenu.style.pointerEvents = (idx === 3) ? 'auto' : 'none';
+      }
       // 代码卡片 + 左侧卡片高亮：idx 变化时切换（中心场景文字已删除）
       if (lastIdx !== idx) {
         lastIdx = idx;
@@ -1175,6 +1332,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     to { transform: translateY(0); opacity: 1; }
   }
 
+
   /* 圆外左侧介绍长条：每张卡片占满整屏高度，随进度整屏上移；无色块融入背景 */
   .lab-left {
     position: fixed;
@@ -1247,17 +1405,49 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     z-index: 6;
     transition: opacity .35s ease;
   }
-  /* composition 混合层：斜向圆球线 + 横向线背景（JS 生成），第四段圆弧显示（opacity 过渡） */
-  .lab-mix {
-    z-index: 6;
-    opacity: 0;
-    transition: opacity .35s ease;
-  }
   /* 引擎仪表盘层：齿轮 + 指针（JS 生成），第六段圆弧显示（opacity 过渡） */
   .lab-engine {
     z-index: 6;
     opacity: 0;
     transition: opacity .35s ease;
+  }
+  /* 闭合赛道层：圆点沿闭合 path 绕行 + 轨道描边生长（JS 生成），第四段圆弧显示 */
+  .lab-track {
+    z-index: 6;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  /* 第四段形状菜单：fixed 右下角（代码卡片上方），仅第四段显示 */
+  .lab-shape-menu {
+    position: fixed;
+    right: 12%;
+    bottom: calc(10% + 165px);
+    z-index: 30;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    background: rgba(10, 14, 18, 0.72);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    border-radius: 10px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .35s ease;
+  }
+  .lab-shape-menu button {
+    padding: 4px 12px;
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    border-radius: 6px;
+    background: rgba(20, 28, 36, 0.85);
+    color: #7FF3FF;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .lab-shape-menu button:hover { background: rgba(34, 211, 238, 0.15); }
+  .lab-shape-menu button.active {
+    background: rgba(34, 211, 238, 0.25);
+    border-color: #22D3EE;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
   }
   /* 引擎 RPM 计数器：齿轮下方，等宽数字 + 荧光，第四段显示 */
   .lab-counter {

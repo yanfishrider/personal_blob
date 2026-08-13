@@ -261,6 +261,14 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
             cursor.style.opacity = 0; shown = false;
             return;
           }
+          // 鼠标在带 data-native-cursor 的元素上（如可拖拽圆球）：隐藏父光标，交还系统光标（grab/grabbing）
+          var nt = e.target;
+          if (nt && nt.closest && nt.closest('[data-native-cursor]')) {
+            clearTimeout(iframeHideTimer);
+            cursor.style.transition = 'none';
+            cursor.style.opacity = 0; shown = false;
+            return;
+          }
           // 在 iframe 外：取消隐藏定时器 + 正常跟随显示
           if (iframeHideTimer) { console.log('[cursor] mousemove 取消 iframe 隐藏'); }
           clearTimeout(iframeHideTimer);
