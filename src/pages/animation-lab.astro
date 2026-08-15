@@ -24,6 +24,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <svg id="lab-engine" class="lab-arc lab-engine" viewBox="0 0 750 750"></svg>
         <!-- 闭合赛道层：圆点沿闭合 path 绕行 + 轨道描边生长（第四段圆弧显示，形状可切换） -->
         <svg id="lab-track" class="lab-arc lab-track" viewBox="0 0 750 750"></svg>
+        <!-- 绽开特效层：中心自动循环 圆环扩散 + 彩色圆点绽开（第五段圆弧显示，独立 rAF） -->
+        <svg id="lab-burst" class="lab-arc lab-burst" viewBox="0 0 750 750"></svg>
         <!-- 中心旋转色块：相对主圆容器居中（第一段圆弧色高亮无荧光，anime.js 旋转） -->
         <div id="lab-square" class="lab-square"></div>
         <!-- 引擎 RPM 计数器：齿轮下方（第四段显示，随指针转速跳动） -->
@@ -483,35 +485,50 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             arcSeg.style.filter = 'drop-shadow(0 0 8px ' + arcSeg._colHi + ')';
           }
         }
-        // 刻度线外移 + 高亮（指针指向的刻度向圆环外移动、正对一条高亮白）：最近刻度 +10px、相邻 +2px、次邻 +1px —— 仅第四段
-        if (active && tickLines.length) {
-          // 指针角度（rotate 坐标 0=12点）→ 刻度线极坐标（0=3点）：差 90°，必须转换（2026-08-11 实测高亮偏 90°）
-          var tipRad = (ENGINE.startDeg + ENGINE.sweepDeg * eSweep - 90) * Math.PI / 180;
-          var tickCol = a.colors[5 % a.colors.length];   // 第六段弧色（刻度线基准色）
-          // 找角度最近的刻度线索引（环形）
-          var minI = 0, minD = 1e9;
-          for (var ti2 = 0; ti2 < tickLines.length; ti2++) {
-            var da2 = Math.abs(Math.atan2(Math.sin(tickLines[ti2].ang - tipRad), Math.cos(tickLines[ti2].ang - tipRad)));
-            if (da2 < minD) { minD = da2; minI = ti2; }
-          }
-          for (var ti3 = 0; ti3 < tickLines.length; ti3++) {
-            var rank = Math.min(Math.abs(ti3 - minI), tickLines.length - Math.abs(ti3 - minI));   // 环形索引距离
-            var sh = (rank <= 3) ? (16 - 4 * rank) : 0;                                          // 外移量递减：16/12/8/4/0
-            var tk2 = tickLines[ti3];
-            var geo2 = tk2.isLong30 ? 40 : 30;   // 几何长度（含隆起余量：长 40 / 短 30）
-            tk2.el.setAttribute('x1', a.cx + (TICKS.r + sh) * Math.cos(tk2.ang));
-            tk2.el.setAttribute('y1', a.cy + (TICKS.r + sh) * Math.sin(tk2.ang));
-            tk2.el.setAttribute('x2', a.cx + (TICKS.r - geo2 + sh) * Math.cos(tk2.ang));
-            tk2.el.setAttribute('y2', a.cy + (TICKS.r - geo2 + sh) * Math.sin(tk2.ang));
-            // 高亮刻度：颜色 #E269A8 + 宽度 3 + 无圆角（butt）；其他刻度基准色、宽度 2、圆角
-            if (ti3 === minI) {
-              tk2.el.setAttribute('stroke', '#E269A8');
-              tk2.el.setAttribute('stroke-width', 3);
-              tk2.el.setAttribute('stroke-linecap', 'butt');
-            } else {
-              tk2.el.setAttribute('stroke', tickCol);
-              tk2.el.setAttribute('stroke-width', TICKS.width);
-              tk2.el.setAttribute('stroke-linecap', 'round');
+        // 刻度线外移 + 高亮（指针指向的刻度向圆环外移动、正对一条高亮白）：最近刻度 +10px、相邻 +2px、次邻 +1px —— 仅第六段；
+        // 离开第六段时全部复位位置（颜色由 updateProgress 按当前段联动，此处不覆盖 —— 2026-08-13 修复竞态）
+        if (tickLines && tickLines.length) {
+          if (active) {
+            var tickCol = a.colors[5 % a.colors.length];   // 第六段弧色（刻度线基准色）
+            // 指针角度（rotate 坐标 0=12点）→ 刻度线极坐标（0=3点）：差 90°，必须转换（2026-08-11 实测高亮偏 90°）
+            var tipRad = (ENGINE.startDeg + ENGINE.sweepDeg * eSweep - 90) * Math.PI / 180;
+            // 找角度最近的刻度线索引（环形）
+            var minI = 0, minD = 1e9;
+            for (var ti2 = 0; ti2 < tickLines.length; ti2++) {
+              var da2 = Math.abs(Math.atan2(Math.sin(tickLines[ti2].ang - tipRad), Math.cos(tickLines[ti2].ang - tipRad)));
+              if (da2 < minD) { minD = da2; minI = ti2; }
+            }
+            for (var ti3 = 0; ti3 < tickLines.length; ti3++) {
+              var rank = Math.min(Math.abs(ti3 - minI), tickLines.length - Math.abs(ti3 - minI));   // 环形索引距离
+              var sh = (rank <= 3) ? (16 - 4 * rank) : 0;                                          // 外移量递减：16/12/8/4/0
+              var tk2 = tickLines[ti3];
+              var geo2 = tk2.isLong30 ? 40 : 30;   // 几何长度（含隆起余量：长 40 / 短 30）
+              tk2.el.setAttribute('x1', a.cx + (TICKS.r + sh) * Math.cos(tk2.ang));
+              tk2.el.setAttribute('y1', a.cy + (TICKS.r + sh) * Math.sin(tk2.ang));
+              tk2.el.setAttribute('x2', a.cx + (TICKS.r - geo2 + sh) * Math.cos(tk2.ang));
+              tk2.el.setAttribute('y2', a.cy + (TICKS.r - geo2 + sh) * Math.sin(tk2.ang));
+              // 高亮刻度：颜色 #E269A8 + 宽度 3 + 无圆角（butt）；其他刻度基准色、宽度 2、圆角
+              if (ti3 === minI) {
+                tk2.el.setAttribute('stroke', '#E269A8');
+                tk2.el.setAttribute('stroke-width', 3);
+                tk2.el.setAttribute('stroke-linecap', 'butt');
+              } else {
+                tk2.el.setAttribute('stroke', tickCol);
+                tk2.el.setAttribute('stroke-width', TICKS.width);
+                tk2.el.setAttribute('stroke-linecap', 'round');
+              }
+            }
+          } else {
+            // 非第六段：只复位位置 + 宽度/线帽（高亮残留清理）——颜色由 updateProgress 按当前段设置，不在此覆盖
+            for (var ti4 = 0; ti4 < tickLines.length; ti4++) {
+              var tk3 = tickLines[ti4];
+              var geo3 = tk3.isLong30 ? 40 : 30;
+              tk3.el.setAttribute('x1', a.cx + TICKS.r * Math.cos(tk3.ang));
+              tk3.el.setAttribute('y1', a.cy + TICKS.r * Math.sin(tk3.ang));
+              tk3.el.setAttribute('x2', a.cx + (TICKS.r - geo3) * Math.cos(tk3.ang));
+              tk3.el.setAttribute('y2', a.cy + (TICKS.r - geo3) * Math.sin(tk3.ang));
+              tk3.el.setAttribute('stroke-width', TICKS.width);
+              tk3.el.setAttribute('stroke-linecap', 'round');
             }
           }
         }
@@ -801,6 +818,118 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
     trackRebuild();
     requestAnimationFrame(trackLoop);
+
+    // ============ 第五段：绽开特效（中心自动循环 圆环扩散 + 彩色几何图形绽开，独立 rAF 时间驱动） ============
+    var burstSvg = document.getElementById('lab-burst');
+    var burstEls = [];        // 当前存活的特效元素
+    var burstStart = null;    // 本次绽开起始时间
+    var burstCount = 0;       // 已触发次数（控制间隔）
+    var BURST = {
+      interval: 1800,         // 两次绽开间隔 ms
+      duration: 1100,         // 单次特效时长 ms
+      dots: 18,               // 每次粒子数
+      ringMaxR: 200,          // 圆环最大半径（用户 2026-08-13：圆环小一点 320 → 200）
+      dotMaxDist: 300,        // 粒子最大飞行距离
+      dotMinR: 10, dotMaxR: 16,// 粒子基准半径范围（用户 2026-08-13：初始大小调大 6~11 → 10~16）
+      colors: ['#FF5C5C', '#4CAF50', '#3B82F6', '#FFD54F', '#A37C17'],  // 红/绿/蓝/黄 + 第五段弧色
+      shapes: ['circle', 'triangle', 'square', 'diamond'],  // 随机几何图形（圆/三角/方形/菱形）
+    };
+    // 按半径生成局部坐标 polygon points（中心 0,0）
+    function burstShapePoints(shape, r) {
+      if (shape === 'triangle') return '0,' + (-r) + ' ' + (r * 0.87) + ',' + (r * 0.5) + ' ' + (-r * 0.87) + ',' + (r * 0.5);
+      if (shape === 'square') return (-r) + ',' + (-r) + ' ' + r + ',' + (-r) + ' ' + r + ',' + r + ' ' + (-r) + ',' + r;
+      if (shape === 'diamond') return '0,' + (-r) + ' ' + r + ',0 0,' + r + ' ' + (-r) + ',0';
+      return '';   // circle 不走 points
+    }
+    // 单次绽开：在中心创建 1 圆环 + N 随机图形粒子
+    function burstFire(now) {
+      if (!burstSvg) return;
+      var ns = 'http://www.w3.org/2000/svg';
+      var cx = a.cx, cy = a.cy;
+      // 圆环
+      var ring = document.createElementNS(ns, 'circle');
+      ring.setAttribute('cx', cx); ring.setAttribute('cy', cy);
+      ring.setAttribute('r', 0);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', BURST.colors[4]);
+      ring.setAttribute('stroke-width', 2.5);
+      ring.style.filter = 'brightness(1.5)';
+      burstSvg.appendChild(ring);
+      burstEls.push({ el: ring, kind: 'ring', t0: now });
+      // 粒子：随机形状/角度/距离/半径/颜色
+      for (var bi = 0; bi < BURST.dots; bi++) {
+        var ang = Math.random() * Math.PI * 2;
+        var dist = 40 + Math.random() * (BURST.dotMaxDist - 40);
+        var r = BURST.dotMinR + Math.random() * (BURST.dotMaxR - BURST.dotMinR);
+        var color = BURST.colors[Math.floor(Math.random() * BURST.colors.length)];
+        var shape = BURST.shapes[Math.floor(Math.random() * BURST.shapes.length)];
+        var dot;
+        if (shape === 'circle') {
+          dot = document.createElementNS(ns, 'circle');
+          dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
+          dot.setAttribute('r', r);
+          dot.setAttribute('fill', color);
+        } else {
+          dot = document.createElementNS(ns, 'polygon');
+          dot.setAttribute('points', burstShapePoints(shape, r));
+          dot.setAttribute('fill', color);
+          dot.setAttribute('transform', 'translate(' + cx + ' ' + cy + ')');
+        }
+        dot.style.filter = 'brightness(1.3)';
+        burstSvg.appendChild(dot);
+        burstEls.push({ el: dot, kind: 'dot', t0: now, ang: ang, dist: dist, r: r, shape: shape });
+      }
+      burstCount++;
+    }
+    // 独立 rAF：驱动存活特效（圆环扩散淡出、粒子外飞缩小淡出），结束后清理
+    function burstLoop(t) {
+      if (burstSvg) {
+        if (!burstStart) burstStart = t;
+        // 每隔 interval 触发一次
+        if (t - burstStart >= BURST.interval) {
+          burstStart = t;
+          burstFire(t);
+        }
+        // 驱动 + 清理过期
+        for (var bi2 = burstEls.length - 1; bi2 >= 0; bi2--) {
+          var b = burstEls[bi2];
+          var age = t - b.t0;
+          var p = age / BURST.duration;   // 0~1
+          if (p >= 1) {
+            if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
+            burstEls.splice(bi2, 1);
+            continue;
+          }
+          if (b.kind === 'ring') {
+            // 圆环：半径从 0 → max，透明度 1 → 0（先扩散后淡出：前 60% 保持可见）
+            var rr = BURST.ringMaxR * p;
+            b.el.setAttribute('r', rr);
+            var op = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+            b.el.setAttribute('opacity', Math.max(0, op));
+          } else {
+            // 粒子：沿角度外飞（先快后慢 ease-out），缩小 + 淡出
+            var ease = 1 - Math.pow(1 - p, 2);   // ease-out
+            var dd = b.dist * ease;
+            var px = a.cx + Math.cos(b.ang) * dd;
+            var py = a.cy + Math.sin(b.ang) * dd;
+            var scale = 1 - p * 0.7;
+            if (b.shape === 'circle') {
+              b.el.setAttribute('cx', px);
+              b.el.setAttribute('cy', py);
+              b.el.setAttribute('r', b.r * scale);
+            } else {
+              // 多边形：points 为局部坐标（中心 0,0），transform 平移 + 缩放（绕自身中心）
+              b.el.setAttribute('transform', 'translate(' + px + ' ' + py + ') scale(' + scale + ')');
+            }
+            b.el.setAttribute('opacity', Math.max(0, 1 - p));
+          }
+        }
+      }
+      requestAnimationFrame(burstLoop);
+    }
+    // 立即触发一次，随后按间隔循环
+    burstStart = null;
+    requestAnimationFrame(burstLoop);
 
     // ============ 点阵背景（方形网格小圆点，中心亮边缘暗） ============
     var dotEls = [];   // 已渲染的点（含基准 opacity）
@@ -1110,6 +1239,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         trackMenu.style.opacity = (idx === 3) ? '1' : '0';
         trackMenu.style.pointerEvents = (idx === 3) ? 'auto' : 'none';
       }
+      // 绽开特效（第五段）：idx 4 显示，其他段隐藏（burstLoop 常驻 rAF 驱动）
+      if (burstSvg) burstSvg.style.opacity = (idx === 4) ? '1' : '0';
       // 代码卡片 + 左侧卡片高亮：idx 变化时切换（中心场景文字已删除）
       if (lastIdx !== idx) {
         lastIdx = idx;
@@ -1413,6 +1544,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   }
   /* 闭合赛道层：圆点沿闭合 path 绕行 + 轨道描边生长（JS 生成），第四段圆弧显示 */
   .lab-track {
+    z-index: 6;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  /* 绽开特效层：中心自动循环 圆环扩散 + 彩色圆点绽开（JS 生成），第五段圆弧显示 */
+  .lab-burst {
     z-index: 6;
     opacity: 0;
     transition: opacity .35s ease;

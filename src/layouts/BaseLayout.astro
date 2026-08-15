@@ -181,7 +181,40 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
         transform-box: view-box;
       }
       @keyframes cursor-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* ── 全局点击绽开特效层 ── */
+      #global-burst {
+        position: fixed; inset: 0;
+        z-index: 99998;           /* 低于光标 99999 */
+        pointer-events: none;     /* 不拦截任何点击 */
+        overflow: hidden;
+      }
+      #global-burst .gb-el {
+        position: absolute;
+        left: 0; top: 0;
+        will-change: transform, opacity;
+      }
+      #global-burst .gb-ring {
+        border-radius: 50%;
+        border: 2.5px solid #A37C17;
+        box-sizing: border-box;
+        filter: brightness(1.5);
+      }
+      #global-burst .gb-dot {
+        border-radius: 50%;
+        filter: brightness(1.3);
+      }
+      #global-burst .gb-square {
+        filter: brightness(1.3);
+      }
+      #global-burst .gb-diamond {
+        filter: brightness(1.3);
+        border-radius: 2px;
+      }
     </style>
+    <!-- 全局点击绽开特效层：fixed 全屏，点击任意处绽开彩色几何图形 + 圆环（pointer-events none 不挡交互） -->
+    <div id="global-burst" aria-hidden="true"></div>
+
     <div id="custom-cursor" aria-hidden="true">
       <div class="cursor-svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
           <g transform="translate(0,448) scale(0.1,-0.1)" fill="#000000" stroke="none">
@@ -298,6 +331,124 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
         document.addEventListener('mouseleave', function () {
           cursor.style.opacity = 0; shown = false;
         });
+      })();
+    </script>
+
+    <script is:inline>
+      // 全局点击绽开特效：点击页面任意处 → 圆环扩散 + 彩色几何图形（圆/三角/方形/菱形）向四周飞散
+      // 独立 rAF 驱动，特效结束自动清理；pointer-events none 容器不拦截点击
+      (function () {
+        var host = document.getElementById('global-burst');
+        if (!host) return;
+        var els = [];   // 存活特效元素 {el, kind, t0, ang, dist, r, shape, baseX, baseY}
+        var CFG = {
+          duration: 1100,
+          dots: 16,
+          ringMaxR: 160,
+          dotMaxDist: 220,
+          dotMinR: 12, dotMaxR: 20,  // 粒子基准半径范围（用户 2026-08-13：中间的图形再大一些 8~13 → 12~20）
+          colors: ['#FF5C5C', '#4CAF50', '#3B82F6', '#FFD54F', '#A37C17'],
+          shapes: ['circle', 'triangle', 'square', 'diamond'],
+        };
+        // 创建元素（HTML div）：圆环用 border，几何图形用 CSS 裁剪
+        function makeEl(type, color, size, x, y) {
+          var d = document.createElement('div');
+          d.className = 'gb-el';
+          if (type === 'ring') {
+            d.className += ' gb-ring';
+            d.style.width = '0px'; d.style.height = '0px';
+          } else {
+            var base = Math.max(1, size * 2);
+            d.style.width = base + 'px'; d.style.height = base + 'px';
+            if (type === 'circle') {
+              d.className += ' gb-dot';
+              d.style.background = color;
+            } else if (type === 'square') {
+              d.className += ' gb-square';
+              d.style.background = color;
+              d.style.borderRadius = '3px';
+            } else if (type === 'diamond') {
+              d.className += ' gb-diamond';
+              d.style.background = color;
+              d.style.transform = 'rotate(45deg)';   // 位置由 left/top 控制，transform 只旋转
+            } else { // triangle
+              d.style.width = '0px'; d.style.height = '0px';
+              d.style.borderLeft = base / 2 + 'px solid transparent';
+              d.style.borderRight = base / 2 + 'px solid transparent';
+              d.style.borderBottom = base + 'px solid ' + color;
+            }
+          }
+          d.style.left = x + 'px';
+          d.style.top = y + 'px';
+          d.style.opacity = '1';
+          host.appendChild(d);
+          return d;
+        }
+        function fire(e) {
+          var x = e.clientX, y = e.clientY;
+          var now = performance.now();
+          // 圆环
+          var ring = makeEl('ring', CFG.colors[4], 0, x, y);
+          els.push({ el: ring, kind: 'ring', t0: now, baseX: x, baseY: y });
+          // 粒子
+          for (var i = 0; i < CFG.dots; i++) {
+            var ang = Math.random() * Math.PI * 2;
+            var dist = 30 + Math.random() * (CFG.dotMaxDist - 30);
+            var r = CFG.dotMinR + Math.random() * (CFG.dotMaxR - CFG.dotMinR);
+            var color = CFG.colors[Math.floor(Math.random() * CFG.colors.length)];
+            var shape = CFG.shapes[Math.floor(Math.random() * CFG.shapes.length)];
+            var dot = makeEl(shape, color, r, x, y);
+            els.push({ el: dot, kind: 'dot', t0: now, ang: ang, dist: dist, r: r, shape: shape, baseX: x, baseY: y });
+          }
+        }
+        function loop(t) {
+          for (var i = els.length - 1; i >= 0; i--) {
+            var b = els[i];
+            var p = (t - b.t0) / CFG.duration;
+            if (p >= 1) {
+              if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
+              els.splice(i, 1);
+              continue;
+            }
+            var ease = 1 - Math.pow(1 - p, 2);
+            if (b.kind === 'ring') {
+              var rr = CFG.ringMaxR * p;
+              var d = rr * 2;
+              b.el.style.width = d + 'px';
+              b.el.style.height = d + 'px';
+              b.el.style.left = (b.baseX - rr) + 'px';
+              b.el.style.top = (b.baseY - rr) + 'px';
+              b.el.style.opacity = p < 0.6 ? '1' : String(Math.max(0, 1 - (p - 0.6) / 0.4));
+            } else {
+              var dd = b.dist * ease;
+              var px = b.baseX + Math.cos(b.ang) * dd;
+              var py = b.baseY + Math.sin(b.ang) * dd;
+              var scale = 1 - p * 0.7;
+              var base = Math.max(1, b.r * 2 * scale);
+              if (b.shape === 'triangle') {
+                b.el.style.left = px + 'px';
+                b.el.style.top = py + 'px';
+                b.el.style.borderBottomWidth = base + 'px';
+                b.el.style.borderLeftWidth = base / 2 + 'px';
+                b.el.style.borderRightWidth = base / 2 + 'px';
+              } else if (b.shape === 'diamond') {
+                b.el.style.left = (px - base / 2) + 'px';
+                b.el.style.top = (py - base / 2) + 'px';
+                b.el.style.width = base + 'px';
+                b.el.style.height = base + 'px';
+              } else {
+                b.el.style.left = (px - base / 2) + 'px';
+                b.el.style.top = (py - base / 2) + 'px';
+                b.el.style.width = base + 'px';
+                b.el.style.height = base + 'px';
+              }
+              b.el.style.opacity = String(Math.max(0, 1 - p));
+            }
+          }
+          requestAnimationFrame(loop);
+        }
+        document.addEventListener('click', fire);
+        requestAnimationFrame(loop);
       })();
     </script>
   </body>
