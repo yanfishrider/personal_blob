@@ -1,5 +1,6 @@
 ---
 import LoadingScreen from '../components/LoadingScreen.astro';
+import LabLoading from '../components/LabLoading.astro';
 import SideToolbar from '../components/SideToolbar.astro';
 import '../styles/global.css';
 
@@ -26,6 +27,7 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
   </head>
   <body class="min-h-screen" style="background: #e0e0e0; font-family: 'Georgia', 'Noto Serif SC', serif; color: #333;">
     <LoadingScreen />
+    <LabLoading />
     <!-- 导航 -->
     <header id="site-header" class="fixed top-0 left-0 right-0 z-50" style="background:transparent;transform:translateY(-8px);transition:all .6s cubic-bezier(.34,1.56,.64,1);">
       <nav class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">

@@ -1,0 +1,1212 @@
+---
+// LabLoading.astro — 首页加载动画：动画实验室 8 段圆弧自动轮播（NieR 首屏模式）
+// 复用 animation-lab 的 8 段动画核心，改为时间驱动自动切换；滚动 rotateX 翻转进入首页
+const base = import.meta.env.BASE_URL;
+---
+
+<!-- ===== 首屏模式：sticky 8 屏（8 段滚轮驱动，照搬 animation-lab 原效果）；默认隐藏，由 LoadingScreen 按 loading-animation 配置调度 ===== -->
+<div id="ll-loading" class="relative z-[60]" style="display:none; height:800vh;">
+  <div id="ll-stage" class="sticky top-0 overflow-hidden" style="height:100vh; background:#1C1814; background-image:linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size:5px 5px; will-change:transform;">
+    <!-- 中央动画容器（750×750 viewBox 等比缩放，同原页面 lab-circle 尺寸） -->
+    <div class="absolute inset-0 flex items-center justify-center">
+      <div class="relative" style="width:min(750px, 92vw, 92vh); aspect-ratio:1/1;">
+        <svg id="ll-dots" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-arc" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-rings" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-tick" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-shapes" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-ellipse" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-track" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-burst" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-engine" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-slots" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <svg id="ll-fengshui" class="ll-layer" viewBox="0 0 750 750"></svg>
+        <div id="ll-square" class="ll-layer"></div>
+      </div>
+    </div>
+    <!-- 引擎 RPM 计数器（第六段显示，随指针转速跳动） -->
+    <div id="ll-counter" class="absolute left-1/2 -translate-x-1/2" style="bottom:5%; z-index:6; font-family:'Courier New','Consolas',monospace; font-size:34px; font-weight:bold; letter-spacing:0.18em; color:#6A9622; filter:brightness(1.42); text-shadow:0 0 10px rgba(106,150,34,.8),0 0 26px rgba(106,150,34,.4); opacity:0; transition:opacity .35s ease; text-align:center;">
+      <span id="ll-counter-val">0000</span><span style="display:block; font-size:12px; letter-spacing:0.25em; color:rgba(106,150,34,.7);">RPM</span>
+    </div>
+
+    <!-- 顶部 LOADING 文字 -->
+    <div class="absolute top-8 left-8 sm:top-12 sm:left-12" style="font-family:'Courier New','Consolas',monospace;">
+      <p class="text-white tracking-[0.15em]">
+        <span class="text-3xl sm:text-4xl">LAB</span><span class="text-lg sm:text-xl">_实验室加载中</span><span id="ll-dots-anim" class="text-lg sm:text-xl"></span>
+      </p>
+    </div>
+    <!-- 跳过按钮：直接跳到首页内容（跳过 8 段动画） -->
+    <button id="ll-skip" class="absolute top-8 right-8 sm:top-12 sm:right-12 px-4 py-2 rounded-full text-xs tracking-[0.25em] transition-all duration-300" style="z-index:10; color:rgba(255,255,255,.9); border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.08); cursor:pointer; font-family:'Courier New','Consolas',monospace;" onmouseover="this.style.background='rgba(255,255,255,.18)';this.style.borderColor='rgba(34,211,238,.8)';this.style.color='#7FF3FF'" onmouseout="this.style.background='rgba(255,255,255,.08)';this.style.borderColor='rgba(255,255,255,.35)';this.style.color='rgba(255,255,255,.9)'">跳过 加载动画 »</button>
+    <!-- 当前段名 -->
+    <div id="ll-label" class="absolute bottom-10 left-1/2 -translate-x-1/2 text-sm tracking-[0.3em]" style="color:rgba(255,255,255,.75); font-family:'Courier New','Consolas',monospace;">SEGMENT 01</div>
+    <!-- 滚动提示 -->
+    <div id="ll-hint" class="absolute bottom-8 right-8 text-xs tracking-[0.25em] transition-opacity duration-500" style="color:rgba(34,211,238,.85); opacity:0; font-family:'Courier New','Consolas',monospace; pointer-events:none;">向下滚动 ↓</div>
+  </div>
+</div>
+
+<script>
+  // ============ 配置（同 animation-lab） ============
+  var ARC = {
+    cx: 375, cy: 375, r: 357.5, width: 5, segments: 8, gapDeg: 1,
+    colors: ['#16899B', '#539EA6', '#228963', '#6A9622', '#A37C17', '#9F4A76', '#6D5AA3', '#AAAAAA'],
+  };
+  var TICKS = { r: 333.5, len: 15, count: 180, width: 2, startDeg: -90 };
+  var RINGS = { radii: [310, 305, 290, 295, 275, 270], width: 2, jitter: 0.8, step: 2 };
+  var DOTS = { gap: 30, radius: 270, dotR: 2.5, minOpacity: 0.06 };
+  var LL_NAMES = ['中心色块旋转', '12图形随机游走', '3D球体错觉', '闭合赛道绕行', '中心绽开特效', '引擎仪表盘', '老虎机排队绕行', '风水转盘解谜'];
+
+  (function () {
+    var NS = 'http://www.w3.org/2000/svg';
+    var a = ARC;
+    var wrap = document.getElementById('ll-loading');
+    var stage = document.getElementById('ll-stage');
+    if (!wrap || !stage) return;
+    // 调度：仅当配置为实验室风格（或未配置且当前为首页）时初始化并显示
+    function isHomePage() {
+      var p = window.location.pathname;
+      var b = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+      return p === b || p === b + '/' || p === '/';
+    }
+    var storedAnim = localStorage.getItem('loading-animation');
+    var wantLab = (storedAnim === 'lab') || (storedAnim === null && isHomePage());
+    if (!wantLab) return;
+    wrap.style.display = '';
+
+    function darken(hex, factor) {
+      var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      r = Math.round(r * factor); g = Math.round(g * factor); b = Math.round(b * factor);
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    // ============ 背景：点阵 + 圆弧 + 手抖环 + 刻度线 ============
+    var svgDots = document.getElementById('ll-dots');
+    var dotEls = [];
+    if (svgDots) {
+      for (var gx = -DOTS.radius; gx <= DOTS.radius; gx += DOTS.gap) {
+        for (var gy = -DOTS.radius; gy <= DOTS.radius; gy += DOTS.gap) {
+          var dd = Math.sqrt(gx * gx + gy * gy);
+          if (dd > DOTS.radius) continue;
+          var op = 1 - dd / DOTS.radius;
+          if (op < DOTS.minOpacity) continue;
+          var dot = document.createElementNS(NS, 'circle');
+          dot.setAttribute('cx', a.cx + gx); dot.setAttribute('cy', a.cy + gy);
+          dot.setAttribute('r', DOTS.dotR); dot.setAttribute('fill', a.colors[0]);
+          dot.setAttribute('opacity', op.toFixed(2));
+          svgDots.appendChild(dot);
+          dotEls.push(dot);
+        }
+      }
+    }
+    var arcSvg = document.getElementById('ll-arc');
+    var arcBases = [], arcTops = [];
+    var arcC = 0, arcSeg = 0, arcStepDeg = 0;
+    if (arcSvg) {
+      arcC = 2 * Math.PI * a.r;
+      var arcGap = arcC * a.gapDeg / 360;
+      arcSeg = arcC / a.segments - arcGap;
+      arcStepDeg = 360 / a.segments;
+      for (var si = 0; si < a.segments; si++) {
+        var rot = 'rotate(' + (si * arcStepDeg - 90) + ' ' + a.cx + ' ' + a.cy + ')';
+        // 底层：整段（初始暗版弧色，细）
+        var base = document.createElementNS(NS, 'circle');
+        base.setAttribute('cx', a.cx); base.setAttribute('cy', a.cy); base.setAttribute('r', a.r);
+        base.setAttribute('fill', 'none');
+        base.setAttribute('stroke', darken(a.colors[si % a.colors.length], 0.35));
+        base.setAttribute('stroke-width', 5);
+        base.setAttribute('stroke-dasharray', arcSeg + ' ' + arcC);
+        base.setAttribute('transform', rot);
+        base.style.transition = 'stroke-width .4s ease';
+        arcSvg.appendChild(base);
+        arcBases.push(base);
+        // 顶层：高亮进度条（初始隐藏）
+        var top = document.createElementNS(NS, 'circle');
+        top.setAttribute('cx', a.cx); top.setAttribute('cy', a.cy); top.setAttribute('r', a.r);
+        top.setAttribute('fill', 'none');
+        top.setAttribute('stroke', a.colors[si % a.colors.length]);
+        top.setAttribute('stroke-width', 10);
+        top.setAttribute('stroke-dasharray', '0 ' + arcC);
+        top.setAttribute('transform', rot);
+        top.style.filter = 'brightness(1.5) drop-shadow(0 0 6px ' + a.colors[si % a.colors.length] + ')';
+        arcSvg.appendChild(top);
+        arcTops.push(top);
+      }
+    }
+    var ringsSvg = document.getElementById('ll-rings');
+    if (ringsSvg) {
+      for (var ri = 0; ri < RINGS.radii.length; ri++) {
+        var pts = '';
+        for (var ai = 0; ai < 360; ai += RINGS.step) {
+          var jx = (Math.random() - 0.5) * RINGS.jitter, jy = (Math.random() - 0.5) * RINGS.jitter;
+          var rx = a.cx + (RINGS.radii[ri] + jx) * Math.cos(ai * Math.PI / 180);
+          var ry = a.cy + (RINGS.radii[ri] + jy) * Math.sin(ai * Math.PI / 180);
+          pts += rx.toFixed(1) + ',' + ry.toFixed(1) + ' ';
+        }
+        var rp = document.createElementNS(NS, 'polyline');
+        rp.setAttribute('points', pts);
+        rp.setAttribute('fill', 'none');
+        rp.setAttribute('stroke', '#000000');
+        rp.setAttribute('stroke-width', RINGS.width);
+        ringsSvg.appendChild(rp);
+      }
+    }
+    var tickSvg = document.getElementById('ll-tick');
+    var tickLines = [];
+    if (tickSvg) {
+      // 刻度线：短刻度几何 20px、30° 长刻度几何 40px；显示长度用 stroke-dashoffset 控制
+      var long30 = {};
+      for (var l30 = 0; l30 < 12; l30++) long30[Math.round(15 * l30)] = true;   // 每 30° 一条（step 2° → 索引间隔 15）
+      for (var ti = 0; ti < TICKS.count; ti++) {
+        var ang = (TICKS.startDeg + ti * 360 / TICKS.count) * Math.PI / 180;
+        var isLong30 = !!long30[ti];
+        var geoLen = (isLong30 ? 30 : 20) + 10;   // 几何长度 = 基础显示 + 隆起余量（短 30 / 长 40）
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', a.cx + TICKS.r * Math.cos(ang));
+        line.setAttribute('y1', a.cy + TICKS.r * Math.sin(ang));
+        line.setAttribute('x2', a.cx + (TICKS.r - geoLen) * Math.cos(ang));
+        line.setAttribute('y2', a.cy + (TICKS.r - geoLen) * Math.sin(ang));
+        line.setAttribute('stroke', a.colors[0]);
+        line.setAttribute('stroke-width', TICKS.width);
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('stroke-dasharray', geoLen + ' ' + geoLen);
+        line.setAttribute('stroke-dashoffset', String(geoLen - 15));   // 初始显示 15px
+        tickSvg.appendChild(line);
+        tickLines.push({ el: line, ang: ang, isLong30: isLong30 });
+      }
+    }
+    var layers = ['ll-dots', 'll-arc', 'll-rings', 'll-tick', 'll-shapes', 'll-ellipse', 'll-track', 'll-burst', 'll-engine', 'll-slots', 'll-fengshui', 'll-square'];
+
+    // ============ 第一段：中心色块旋转（anime.js） ============
+    var squareEl = document.getElementById('ll-square');
+    if (squareEl) {
+      squareEl.style.background = a.colors[0];
+      squareEl.style.filter = 'brightness(1.42)';
+    }
+
+    // ============ 第二段：12 图形随机游走（anime.js） ============
+    var shapesSvg = document.getElementById('ll-shapes');
+    var shapesEls = [];
+    if (shapesSvg) {
+      var shapeG = document.createElementNS(NS, 'g');
+      shapeG.setAttribute('transform', 'translate(375 375)');
+      shapesSvg.appendChild(shapeG);
+      var SHAPES = ['circle', 'triangle', 'rect', 'diamond', 'star', 'crossarc'];
+      function buildShape(type) {
+        var el;
+        if (type === 'circle') { el = document.createElementNS(NS, 'circle'); el.setAttribute('r', 20); }
+        else if (type === 'triangle') { el = document.createElementNS(NS, 'polygon'); el.setAttribute('points', '0,-20 17.3,10 -17.3,10'); }
+        else if (type === 'rect') { el = document.createElementNS(NS, 'rect'); el.setAttribute('x', -18); el.setAttribute('y', -18); el.setAttribute('width', 36); el.setAttribute('height', 36); el.setAttribute('rx', 6); }
+        else if (type === 'diamond') { el = document.createElementNS(NS, 'polygon'); el.setAttribute('points', '0,-22 12,0 0,22 -12,0'); }
+        else if (type === 'star') { el = document.createElementNS(NS, 'polygon'); el.setAttribute('points', '0,-22 5.8,-7 22,-7 9,2 13.6,18 0,10 -13.6,18 -9,2 -22,-7 -5.8,-7'); }
+        else { el = document.createElementNS(NS, 'path'); el.setAttribute('d', 'M 0 -18 A 18 18 0 1 1 -0.1 -18'); }
+        return el;
+      }
+      for (var shi = 0; shi < SHAPES.length; shi++) {
+        for (var svi = 0; svi < 2; svi++) {
+          var se = buildShape(SHAPES[shi]);
+          var col = a.colors[1 % a.colors.length];
+          if (svi === 0) { se.setAttribute('fill', col); }
+          else { se.setAttribute('fill', 'none'); se.setAttribute('stroke', col); se.setAttribute('stroke-width', 2); }
+          shapeG.appendChild(se);
+          shapesEls.push(se);
+        }
+      }
+    }
+
+    // ============ 第三段：20 椭圆 3D 球（时间驱动自动画-保持-擦除） ============
+    var ellipseSvg = document.getElementById('ll-ellipse');
+    var ELLIPSES = [], ellipseItems = [];
+    var ELL_N = 20, ELL_MID = (ELL_N - 1) / 2;
+    for (var ei0 = 0; ei0 < ELL_N; ei0++) {
+      var et = (ei0 - ELL_MID) / ELL_MID;
+      var erx = 57.5 + 201.25 * (1 - et * et);
+      var eshift = 48 * (ei0 - ELL_MID) / ELL_MID;
+      ELLIPSES.push({
+        cx: 375 + (ei0 - ELL_MID) * 12 + eshift, cy: 375 + (ei0 - ELL_MID) * 12 + eshift,
+        rx: erx, ry: Math.round(erx * 0.2), rotate: -45,
+        color: a.colors[2 % a.colors.length],
+        drawRange: { start: ei0 * 0.0125, end: 1 }, drawScale: 2.5
+      });
+    }
+    if (ellipseSvg) {
+      for (var ei = 0; ei < ELLIPSES.length; ei++) {
+        var ec = ELLIPSES[ei];
+        var tp = document.createElementNS(NS, 'path');
+        tp.setAttribute('d', 'M ' + (ec.cx - ec.rx) + ' ' + ec.cy + ' A ' + ec.rx + ' ' + ec.ry + ' 0 1 0 ' + (ec.cx + ec.rx) + ' ' + ec.cy + ' A ' + ec.rx + ' ' + ec.ry + ' 0 1 0 ' + (ec.cx - ec.rx) + ' ' + ec.cy);
+        tp.setAttribute('fill', 'none');
+        tp.setAttribute('stroke', ec.color);
+        tp.setAttribute('stroke-width', 1.2);
+        tp.setAttribute('transform', 'rotate(' + ec.rotate + ' ' + ec.cx + ' ' + ec.cy + ')');
+        tp.style.opacity = '0';
+        ellipseSvg.appendChild(tp);
+        ellipseItems.push({ path: tp, len: 0, drawP: 0, cfg: ec });
+        // 圆点标记（每条轨迹端点）
+        var dp = document.createElementNS(NS, 'circle');
+        dp.setAttribute('cx', ec.cx - ec.rx); dp.setAttribute('cy', ec.cy);
+        dp.setAttribute('r', 3); dp.setAttribute('fill', ec.color);
+        dp.setAttribute('transform', 'rotate(' + ec.rotate + ' ' + ec.cx + ' ' + ec.cy + ')');
+        dp.style.opacity = '0';
+        ellipseSvg.appendChild(dp);
+        ellipseItems[ellipseItems.length - 1].dot = dp;
+        ellipseItems[ellipseItems.length - 1].len = tp.getTotalLength();
+      }
+      // 呼吸浮动（传递式）：每条椭圆独立浮动，带相位差（第 i 条延迟 i×0.35 rad）→ 波浪传递；仅第三段活跃
+      (function breathLoop() {
+        if (llIdx === 2) {
+          var bt = Date.now() / 1000;
+          for (var bi = 0; bi < ellipseItems.length; bi++) {
+            var bit = ellipseItems[bi];
+            var bec = bit.cfg;
+            var bbr = Math.sin(bt * 2 * Math.PI / 3 + bi * 0.35) * 8;
+            var bfx = bbr * 0.707, bfy = bbr * 0.707;
+            bit.path.setAttribute('transform', 'translate(' + bfx + ' ' + bfy + ') rotate(' + bec.rotate + ' ' + bec.cx + ' ' + bec.cy + ')');
+          }
+        }
+        requestAnimationFrame(breathLoop);
+      })();
+    }
+
+    // ============ 第四段：闭合赛道（星系）独立 rAF ============
+    var trackSvg = document.getElementById('ll-track');
+    var trackColor = a.colors[3 % a.colors.length];
+    var trackShape = 'solar', trackPath = null, trackDot = null, trackLen = 0;
+    var trackProg = 0, trackLast = 0, trackScale = 0.8;
+    var PLANET_COLORS = ['#FFD54F', '#7FF3FF', '#FF8A9A'];
+    var ORBITS = [
+      { rx: 110, ry: 42, period: 4000, r: 7 },
+      { rx: 170, ry: 65, period: 6000, r: 9 },
+      { rx: 230, ry: 87, period: 8500, r: 11 },
+    ];
+    var solarPlanets = [];
+    function trackShapeD(shape) {
+      var cx = a.cx, cy = a.cy, R = 235 * trackScale;
+      var pts = [];
+      var i, n, ang, x, y, t, r;
+      function push(px, py) { pts.push([px, py]); }
+      if (shape === 'circle') { n = 72; for (i = 0; i < n; i++) { ang = i / n * 2 * Math.PI; push(cx + R * Math.cos(ang), cy + R * Math.sin(ang)); } }
+      else if (shape === 'ellipse') { n = 72; for (i = 0; i < n; i++) { ang = i / n * 2 * Math.PI; push(cx + 288 * trackScale * Math.cos(ang), cy + 158 * trackScale * Math.sin(ang)); } }
+      else if (shape === 'diamond') { push(cx, cy - R); push(cx + R, cy); push(cx, cy + R); push(cx - R, cy); }
+      else if (shape === 'square') { push(cx - R * 0.78, cy - R * 0.78); push(cx + R * 0.78, cy - R * 0.78); push(cx + R * 0.78, cy + R * 0.78); push(cx - R * 0.78, cy + R * 0.78); }
+      else if (shape === 'triangle') { push(cx, cy - R); push(cx + R * 0.866, cy + R * 0.5); push(cx - R * 0.866, cy + R * 0.5); }
+      else if (shape === 'star') { for (i = 0; i < 10; i++) { ang = -90 + i * 36; r = (i % 2 === 0) ? R : R * 0.42; push(cx + r * Math.cos(ang * Math.PI / 180), cy + r * Math.sin(ang * Math.PI / 180)); } }
+      else if (shape === 'heart') { for (i = 0; i < 96; i++) { t = i / 96 * 2 * Math.PI; x = 16 * Math.pow(Math.sin(t), 3); y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); push(cx + x * R / 17, cy - y * R / 17); } }
+      else { return null; }
+      var d = 'M ';
+      for (i = 0; i < pts.length; i++) d += pts[i][0].toFixed(1) + ' ' + pts[i][1].toFixed(1) + (i === pts.length - 1 ? ' Z' : ' L ');
+      return d;
+    }
+    function trackBuildSolar() {
+      if (!trackSvg) return;
+      var ns = NS;
+      // 太阳 + 光晕
+      var sun = document.createElementNS(ns, 'circle');
+      sun.setAttribute('cx', a.cx); sun.setAttribute('cy', a.cy); sun.setAttribute('r', 15);
+      sun.setAttribute('fill', trackColor); sun.style.filter = 'brightness(1.3)';
+      trackSvg.appendChild(sun);
+      var glow = document.createElementNS(ns, 'circle');
+      glow.setAttribute('cx', a.cx); glow.setAttribute('cy', a.cy); glow.setAttribute('r', 26);
+      glow.setAttribute('fill', 'none'); glow.setAttribute('stroke', trackColor);
+      glow.setAttribute('stroke-width', 10); glow.setAttribute('opacity', 0.25);
+      trackSvg.appendChild(glow);
+      // 轨道（静态）+ 行星组
+      for (var oi = 0; oi < ORBITS.length; oi++) {
+        var ob = ORBITS[oi];
+        var op = document.createElementNS(ns, 'path');
+        op.setAttribute('d', 'M ' + (a.cx - ob.rx) + ' ' + a.cy + ' A ' + ob.rx + ' ' + ob.ry + ' 0 1 0 ' + (a.cx + ob.rx) + ' ' + a.cy + ' A ' + ob.rx + ' ' + ob.ry + ' 0 1 0 ' + (a.cx - ob.rx) + ' ' + a.cy);
+        op.setAttribute('fill', 'none'); op.setAttribute('stroke', trackColor);
+        op.setAttribute('stroke-width', 1.6); op.setAttribute('opacity', 0.4);
+        trackSvg.appendChild(op);
+        var pg = document.createElementNS(ns, 'g');
+        var pl = document.createElementNS(ns, 'circle');
+        pl.setAttribute('cx', 0); pl.setAttribute('cy', 0); pl.setAttribute('r', ob.r);
+        pl.setAttribute('fill', PLANET_COLORS[oi % PLANET_COLORS.length]);
+        pl.style.filter = 'brightness(1.25)';
+        pg.appendChild(pl);
+        var mk = document.createElementNS(ns, 'circle');
+        mk.setAttribute('cx', 0); mk.setAttribute('cy', -ob.r * 0.55);
+        mk.setAttribute('r', Math.max(2, ob.r * 0.3)); mk.setAttribute('fill', '#ffffff'); mk.setAttribute('opacity', 0.85);
+        pg.appendChild(mk);
+        var satOrbit = null, sat = null, satAng = 0;
+        if (oi === ORBITS.length - 1) {
+          satOrbit = document.createElementNS(ns, 'path');
+          satOrbit.setAttribute('d', 'M -24 0 A 24 12 0 1 0 24 0 A 24 12 0 1 0 -24 0');
+          satOrbit.setAttribute('fill', 'none'); satOrbit.setAttribute('stroke', trackColor);
+          satOrbit.setAttribute('stroke-width', 1); satOrbit.setAttribute('opacity', 0.4);
+          pg.appendChild(satOrbit);
+          sat = document.createElementNS(ns, 'circle');
+          sat.setAttribute('r', 3); sat.setAttribute('fill', PLANET_COLORS[oi % PLANET_COLORS.length]);
+          pg.appendChild(sat);
+        }
+        trackSvg.appendChild(pg);
+        solarPlanets.push({ g: pg, angle: oi * 2 * Math.PI / 3, spin: oi * 0.8, sat: sat, satAng: satAng });
+      }
+    }
+    function trackRebuild() {
+      if (!trackSvg) return;
+      trackSvg.innerHTML = '';
+      solarPlanets = [];
+      if (trackShape === 'solar') {
+        trackBuildSolar();
+        trackPath = null; trackDot = null;
+      } else {
+        var d = trackShapeD(trackShape);
+        trackPath = document.createElementNS(NS, 'path');
+        trackPath.setAttribute('d', d);
+        trackPath.setAttribute('fill', 'none');
+        trackPath.setAttribute('stroke', trackColor);
+        trackPath.setAttribute('stroke-width', 2.5);
+        trackSvg.appendChild(trackPath);
+        trackDot = document.createElementNS(NS, 'circle');
+        trackDot.setAttribute('r', 6);
+        trackDot.setAttribute('fill', trackColor);
+        trackSvg.appendChild(trackDot);
+        trackLen = trackPath.getTotalLength();
+        trackPath.setAttribute('stroke-dasharray', trackLen + ' ' + trackLen);
+        trackPath.setAttribute('stroke-dashoffset', trackLen);
+      }
+      trackProg = 0; trackLast = 0;
+    }
+    trackRebuild();
+    (function trackLoop(t) {
+      if (llIdx === 3) {   // 仅第四段活跃
+      var dt = trackLast ? Math.min(t - trackLast, 100) : 0;
+      trackLast = t;
+      trackProg += dt / 4200;
+      var loopP = trackProg % 1;
+      var drawP = Math.min(trackProg, 1);
+      if (trackShape === 'solar') {
+        for (var spi = 0; spi < solarPlanets.length; spi++) {
+          var sp = solarPlanets[spi], ob = ORBITS[spi];
+          sp.angle += dt / ob.period * 2 * Math.PI;
+          sp.spin += dt / 8000 * 2 * Math.PI;
+          var ox = ob.rx * Math.cos(sp.angle), oy = ob.ry * Math.sin(sp.angle);
+          var px = a.cx + ox, py = a.cy + oy;
+          var depth = 1 + 0.25 * (oy / ob.ry);
+          sp.g.setAttribute('transform', 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') scale(' + depth.toFixed(3) + ') rotate(' + (sp.spin * 180 / Math.PI).toFixed(1) + ')');
+          if (sp.sat) {
+            sp.satAng += dt / 6000 * 2 * Math.PI;
+            sp.sat.setAttribute('cx', (24 * Math.cos(sp.satAng)).toFixed(1));
+            sp.sat.setAttribute('cy', (12 * Math.sin(sp.satAng)).toFixed(1));
+          }
+        }
+      } else if (trackPath) {
+        var p = loopP * trackLen;
+        var pt = trackPath.getPointAtLength(p);
+        var pt2 = trackPath.getPointAtLength(Math.min(p + 1, trackLen - 0.01));
+        var ang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+        trackDot.setAttribute('cx', pt.x); trackDot.setAttribute('cy', pt.y);
+        trackDot.setAttribute('transform', 'rotate(' + ang + ' ' + pt.x + ' ' + pt.y + ')');
+        trackPath.setAttribute('stroke-dashoffset', trackLen * (1 - drawP));
+      }
+      }  // trackLoop 活跃段结束
+      requestAnimationFrame(trackLoop);
+    })(0);
+
+    // ============ 第五段：中心绽开特效（独立 rAF） ============
+    var burstSvg = document.getElementById('ll-burst');
+    var BURST = { interval: 1800, duration: 1100, dots: 18, ringMaxR: 200, dotMaxDist: 300, dotMinR: 10, dotMaxR: 16 };
+    var burstEls = [], burstStart = null;
+    var burstColors = ['#FF6B6B', '#4ECB71', '#4A9EFF', '#FFD93D', a.colors[4 % a.colors.length]];
+    var burstShapes = ['circle', 'triangle', 'square', 'diamond'];
+    function burstShapePoints(shape, r) {
+      if (shape === 'triangle') return '0,' + (-r) + ' ' + (r * 0.87).toFixed(1) + ',' + (r * 0.5).toFixed(1) + ' ' + (-r * 0.87).toFixed(1) + ',' + (r * 0.5).toFixed(1);
+      if (shape === 'square') return (-r) + ',' + (-r) + ' ' + r + ',' + (-r) + ' ' + r + ',' + r + ' ' + (-r) + ',' + r;
+      if (shape === 'diamond') return '0,' + (-r) + ' ' + r + ',0 0,' + r + ' ' + (-r) + ',0';
+      return '';
+    }
+    function burstFire(now) {
+      if (!burstSvg) return;
+      var ring = document.createElementNS(NS, 'circle');
+      ring.setAttribute('cx', a.cx); ring.setAttribute('cy', a.cy);
+      ring.setAttribute('r', 4); ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', a.colors[4 % a.colors.length]);
+      ring.setAttribute('stroke-width', 2.5);
+      burstSvg.appendChild(ring);
+      burstEls.push({ el: ring, kind: 'ring', t0: now });
+      for (var bi = 0; bi < BURST.dots; bi++) {
+        var shape = burstShapes[Math.floor(Math.random() * burstShapes.length)];
+        var r0 = BURST.dotMinR + Math.random() * (BURST.dotMaxR - BURST.dotMinR);
+        var col = burstColors[Math.floor(Math.random() * burstColors.length)];
+        var ang = Math.random() * 2 * Math.PI;
+        var dist = 40 + Math.random() * (BURST.dotMaxDist - 40);
+        var el;
+        if (shape === 'circle') {
+          el = document.createElementNS(NS, 'circle');
+          el.setAttribute('r', r0);
+          el.setAttribute('fill', col);
+          burstSvg.appendChild(el);
+        } else {
+          el = document.createElementNS(NS, 'polygon');
+          el.setAttribute('points', burstShapePoints(shape, r0));
+          el.setAttribute('fill', col);
+          burstSvg.appendChild(el);
+        }
+        burstEls.push({ el: el, kind: 'dot', t0: now, ang: ang, dist: dist, r: r0, shape: shape });
+      }
+    }
+    (function burstLoop(t) {
+      if (llIdx === 4) {   // 仅第五段活跃
+      if (!burstStart) burstStart = t;
+      if (t - burstStart >= BURST.interval) { burstStart = t; burstFire(t); }
+      for (var bli = burstEls.length - 1; bli >= 0; bli--) {
+        var b = burstEls[bli];
+        var p = (t - b.t0) / BURST.duration;
+        if (p >= 1) {
+          if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
+          burstEls.splice(bli, 1);
+          continue;
+        }
+        if (b.kind === 'ring') {
+          var rr = BURST.ringMaxR * p;
+          b.el.setAttribute('r', rr);
+          b.el.setAttribute('opacity', p < 0.6 ? '1' : String(1 - (p - 0.6) / 0.4));
+        } else {
+          var e = 1 - Math.pow(1 - p, 2);
+          var px = a.cx + Math.cos(b.ang) * b.dist * e;
+          var py = a.cy + Math.sin(b.ang) * b.dist * e;
+          var sc = 1 - p * 0.7;
+          if (b.shape === 'circle') {
+            b.el.setAttribute('cx', px); b.el.setAttribute('cy', py);
+            b.el.setAttribute('r', b.r * sc);
+          } else {
+            b.el.setAttribute('transform', 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') scale(' + sc.toFixed(2) + ')');
+          }
+          b.el.setAttribute('opacity', String(1 - p));
+        }
+      }
+      }  // burstLoop 活跃段结束
+      requestAnimationFrame(burstLoop);
+    })(0);
+
+    // ============ 第六段：引擎仪表盘（独立 rAF，进度 = 自动段内进度） ============
+    var ENGINE = {
+      cx: 375, cy: 375,
+      gearMain: { n: 16, R: 75, rIn: 63, hole: 11 },
+      gearSub: { n: 10, R: 46.9, rIn: 39.4, hole: 7.5 },
+      subDist: 114.4, subAng: [30, 330], subYOff: 30,
+      subDx: [-5, -30], subDy: [0, 46],
+      needleLen: 250, rpmMax: 9000, gearSpin: 0.5,
+      mainInit: 15, subInit: [36, -3],
+      startDeg: 225, sweepDeg: 270, arcSegs: 6, arcGapDeg: 0,
+      arcColors: ['#9F4A76', '#6D5AA3', '#AAAAAA', '#16889A', '#539EA7', '#228963'],
+      arcColorsHi: ['#E269A8', '#9B80E7', '#F1F1F1', '#1FC1DB', '#76E0EC', '#30C28D'],
+      bumpAmp: 10, static: false,
+    };
+    var engineSvg = document.getElementById('ll-engine');
+    var counterEl = document.getElementById('ll-counter');
+    var counterVal = document.getElementById('ll-counter-val');
+    var gearMainG = null, gearSubGs = [], needleG = null, arcEls = [];
+    function makeGearPoly(n, R, rIn, tTop, tBot) {
+      var step = 2 * Math.PI / n;
+      var wTop = step * (tTop || 0.35), wBot = step * (tBot || 0.65);
+      var pts = '';
+      for (var gi = 0; gi < n; gi++) {
+        var a0 = gi * step;
+        var b1 = a0 + (step - wBot) / 2, t1 = a0 + (step - wTop) / 2, t2 = t1 + wTop, b2 = b1 + wBot;
+        if (gi === 0) pts += (Math.cos(a0) * rIn).toFixed(1) + ',' + (Math.sin(a0) * rIn).toFixed(1) + ' ';
+        pts += (Math.cos(b1) * rIn).toFixed(1) + ',' + (Math.sin(b1) * rIn).toFixed(1) + ' ';
+        pts += (Math.cos(t1) * R).toFixed(1) + ',' + (Math.sin(t1) * R).toFixed(1) + ' ';
+        pts += (Math.cos(t2) * R).toFixed(1) + ',' + (Math.sin(t2) * R).toFixed(1) + ' ';
+        pts += (Math.cos(b2) * rIn).toFixed(1) + ',' + (Math.sin(b2) * rIn).toFixed(1) + ' ';
+      }
+      return pts;
+    }
+    if (engineSvg) {
+      var ecol = a.colors[5 % a.colors.length];
+      function buildGear(n, R, rIn, hole) {
+        var g = document.createElementNS(NS, 'g');
+        var poly = document.createElementNS(NS, 'polygon');
+        poly.setAttribute('points', makeGearPoly(n, R, rIn, 0.35, 0.65));
+        poly.setAttribute('fill', '#2E2D2B'); poly.setAttribute('stroke', ecol); poly.setAttribute('stroke-width', 1.5);
+        g.appendChild(poly);
+        var holeEl = document.createElementNS(NS, 'circle');
+        holeEl.setAttribute('r', hole); holeEl.setAttribute('fill', '#1F1E1C');
+        holeEl.setAttribute('stroke', ecol); holeEl.setAttribute('stroke-width', 1.5);
+        g.appendChild(holeEl);
+        g._parts = [poly, holeEl];
+        engineSvg.appendChild(g);
+        return g;
+      }
+      gearMainG = buildGear(ENGINE.gearMain.n, ENGINE.gearMain.R, ENGINE.gearMain.rIn, ENGINE.gearMain.hole);
+      gearMainG._t = 'translate(' + ENGINE.cx + ' ' + ENGINE.cy + ') rotate(' + ENGINE.mainInit + ')';
+      for (var gi3 = 0; gi3 < ENGINE.subAng.length; gi3++) {
+        var sg2 = buildGear(ENGINE.gearSub.n, ENGINE.gearSub.R, ENGINE.gearSub.rIn, ENGINE.gearSub.hole);
+        var sa = ENGINE.subAng[gi3] * Math.PI / 180;
+        var subX = ENGINE.cx + ENGINE.subDist * Math.sin(sa) + ENGINE.subDx[gi3];
+        var subY = ENGINE.cy - ENGINE.subDist * Math.cos(sa) + ENGINE.subYOff + ENGINE.subDy[gi3];
+        var sdx0 = subX - ENGINE.cx, sdy0 = subY - ENGINE.cy;
+        var sd0 = Math.sqrt(sdx0 * sdx0 + sdy0 * sdy0);
+        var sk = (sd0 > 0.1) ? (ENGINE.subDist / sd0) : 1;
+        subX = ENGINE.cx + sdx0 * sk; subY = ENGINE.cy + sdy0 * sk;
+        sg2._t = 'translate(' + subX.toFixed(1) + ' ' + subY.toFixed(1) + ') rotate(' + ENGINE.subInit[gi3] + ')';
+        gearSubGs.push(sg2);
+      }
+      var arcR = ENGINE.needleLen * 0.75;
+      var arcC2 = 2 * Math.PI * arcR;
+      var segDeg2 = (ENGINE.sweepDeg - ENGINE.arcGapDeg * (ENGINE.arcSegs - 1)) / ENGINE.arcSegs;
+      var segLen2 = arcC2 * segDeg2 / 360;
+      var segStep2 = segDeg2 + ENGINE.arcGapDeg;
+      for (var ai2 = 0; ai2 < ENGINE.arcSegs; ai2++) {
+        var ac = document.createElementNS(NS, 'circle');
+        ac.setAttribute('cx', ENGINE.cx); ac.setAttribute('cy', ENGINE.cy); ac.setAttribute('r', arcR);
+        ac.setAttribute('fill', 'none');
+        ac.setAttribute('stroke', ENGINE.arcColors[ai2]);
+        ac.setAttribute('stroke-width', 10);
+        ac.setAttribute('stroke-linecap', 'butt');
+        ac.setAttribute('stroke-dasharray', segLen2 + ' ' + arcC2);
+        ac.setAttribute('stroke-dashoffset', segLen2);
+        ac.style.transition = 'stroke-width .4s ease';
+        ac.setAttribute('transform', 'rotate(' + (ENGINE.startDeg - 90 + ai2 * segStep2) + ' ' + ENGINE.cx + ' ' + ENGINE.cy + ')');
+        ac._col = ENGINE.arcColors[ai2];
+        ac._colHi = ENGINE.arcColorsHi[ai2];
+        engineSvg.appendChild(ac);
+        arcEls.push(ac);
+      }
+      needleG = document.createElementNS(NS, 'g');
+      var nTail = document.createElementNS(NS, 'line');
+      nTail.setAttribute('x1', 0); nTail.setAttribute('y1', 0); nTail.setAttribute('x2', 0); nTail.setAttribute('y2', 42);
+      nTail.setAttribute('stroke', ecol); nTail.setAttribute('stroke-width', 3); nTail.setAttribute('stroke-linecap', 'round');
+      nTail.style.opacity = '0.45';
+      needleG.appendChild(nTail);
+      var nNeedle = document.createElementNS(NS, 'line');
+      nNeedle.setAttribute('x1', 0); nNeedle.setAttribute('y1', 0); nNeedle.setAttribute('x2', 0); nNeedle.setAttribute('y2', -ENGINE.needleLen);
+      nNeedle.setAttribute('stroke', ecol); nNeedle.setAttribute('stroke-width', 3.5); nNeedle.setAttribute('stroke-linecap', 'round');
+      nNeedle.style.filter = 'brightness(1.42) drop-shadow(0 0 8px ' + ecol + ')';
+      needleG.appendChild(nNeedle);
+      var nHub = document.createElementNS(NS, 'circle');
+      nHub.setAttribute('r', 9); nHub.setAttribute('fill', '#1F1E1C');
+      nHub.setAttribute('stroke', ecol); nHub.setAttribute('stroke-width', 2.5);
+      nHub.style.filter = 'brightness(1.42)';
+      needleG.appendChild(nHub);
+      needleG._parts = [nTail, nNeedle, nHub];
+      engineSvg.appendChild(needleG);
+    }
+    var gearAngle = 0, gearLastT = 0;
+    (function engineSpin() {
+      if (llIdx === 5) {   // 仅第六段活跃（到达其他段停止运转）
+      var now = performance.now();
+      var dt = gearLastT ? Math.min((now - gearLastT) / 1000, 0.1) : 0;
+      gearLastT = now;
+      var eIdx = Math.min(Math.floor(llCurrent * a.segments), a.segments - 1);
+      var active = (eIdx === 5);
+      var gInSeg = active ? (llCurrent * a.segments - 5) : 0;
+      if (active && !ENGINE.static) gearAngle += gInSeg * 360 * ENGINE.gearSpin * dt;
+      if (gearMainG) gearMainG.setAttribute('transform', gearMainG._t + ' rotate(' + gearAngle + ')');
+      var eRatio = ENGINE.gearMain.n / ENGINE.gearSub.n;
+      for (var gsi = 0; gsi < gearSubGs.length; gsi++) {
+        gearSubGs[gsi].setAttribute('transform', gearSubGs[gsi]._t + ' rotate(' + (-gearAngle * eRatio) + ')');
+      }
+      var gearCol = ENGINE.arcColors[Math.min(Math.floor(gInSeg * ENGINE.arcSegs), ENGINE.arcSegs - 1)];
+      var gearList = gearSubGs.slice();
+      if (gearMainG) gearList.push(gearMainG);
+      for (var gsi2 = 0; gsi2 < gearList.length; gsi2++) {
+        var gp = gearList[gsi2]._parts;
+        for (var gpi = 0; gpi < gp.length; gpi++) gp[gpi].setAttribute('stroke', gearCol);
+      }
+      if (needleG && needleG._parts) {
+        for (var npi = 0; npi < needleG._parts.length; npi++) needleG._parts[npi].setAttribute('stroke', gearCol);
+      }
+      if (needleG) {
+        var eSweep = active ? gInSeg : 0;
+        needleG.setAttribute('transform', 'translate(' + ENGINE.cx + ' ' + ENGINE.cy + ') rotate(' + (ENGINE.startDeg + ENGINE.sweepDeg * eSweep) + ')');
+        for (var aii = 0; aii < arcEls.length; aii++) {
+          var segP = Math.min(Math.max(eSweep * ENGINE.arcSegs - aii, 0), 1);
+          var arcSeg = arcEls[aii];
+          if (segP <= 0) {
+            arcSeg.setAttribute('stroke-dashoffset', segLen2);
+          } else if (segP >= 1) {
+            arcSeg.setAttribute('stroke-dashoffset', 0);
+            arcSeg.setAttribute('stroke', arcSeg._col);
+            arcSeg.setAttribute('stroke-width', 10);
+            arcSeg.style.filter = '';
+          } else {
+            arcSeg.setAttribute('stroke-dashoffset', segLen2 * (1 - segP));
+            arcSeg.setAttribute('stroke', arcSeg._colHi);
+            arcSeg.setAttribute('stroke-width', 20);
+            arcSeg.style.filter = 'drop-shadow(0 0 8px ' + arcSeg._colHi + ')';
+          }
+        }
+        if (tickLines.length) {
+          if (active) {
+            var tipRad = (ENGINE.startDeg + ENGINE.sweepDeg * eSweep - 90) * Math.PI / 180;
+            var minI = 0, minD = 1e9;
+            for (var ti2 = 0; ti2 < tickLines.length; ti2++) {
+              var da2 = Math.abs(Math.atan2(Math.sin(tickLines[ti2].ang - tipRad), Math.cos(tickLines[ti2].ang - tipRad)));
+              if (da2 < minD) { minD = da2; minI = ti2; }
+            }
+            for (var ti3 = 0; ti3 < tickLines.length; ti3++) {
+              var rank = Math.min(Math.abs(ti3 - minI), tickLines.length - Math.abs(ti3 - minI));
+              var sh = (rank <= 3) ? (16 - 4 * rank) : 0;
+              var tk2 = tickLines[ti3];
+              tk2.el.setAttribute('x1', a.cx + (TICKS.r + sh) * Math.cos(tk2.ang));
+              tk2.el.setAttribute('y1', a.cy + (TICKS.r + sh) * Math.sin(tk2.ang));
+              tk2.el.setAttribute('x2', a.cx + (TICKS.r - (tk2.isLong30 ? 40 : 30) + sh) * Math.cos(tk2.ang));
+              tk2.el.setAttribute('y2', a.cy + (TICKS.r - (tk2.isLong30 ? 40 : 30) + sh) * Math.sin(tk2.ang));
+              if (ti3 === minI) {
+                // 高亮刻度：跟随指针当前弧段的亮色（arcColorsHi）
+                tk2.el.setAttribute('stroke', ENGINE.arcColorsHi[Math.min(Math.floor(gInSeg * ENGINE.arcSegs), ENGINE.arcSegs - 1)]);
+                tk2.el.setAttribute('stroke-width', 3);
+                tk2.el.setAttribute('stroke-linecap', 'butt');
+              } else {
+                // 刻度颜色随指针指向的弧段颜色变化（gearCol = 当前弧段色）
+                tk2.el.setAttribute('stroke', gearCol);
+                tk2.el.setAttribute('stroke-width', TICKS.width);
+                tk2.el.setAttribute('stroke-linecap', 'round');
+              }
+            }
+          } else {
+            for (var ti4 = 0; ti4 < tickLines.length; ti4++) {
+              var tk3 = tickLines[ti4];
+              tk3.el.setAttribute('x1', a.cx + TICKS.r * Math.cos(tk3.ang));
+              tk3.el.setAttribute('y1', a.cy + TICKS.r * Math.sin(tk3.ang));
+              tk3.el.setAttribute('x2', a.cx + (TICKS.r - (tk3.isLong30 ? 40 : 30)) * Math.cos(tk3.ang));
+              tk3.el.setAttribute('y2', a.cy + (TICKS.r - (tk3.isLong30 ? 40 : 30)) * Math.sin(tk3.ang));
+              tk3.el.setAttribute('stroke-width', TICKS.width);
+              tk3.el.setAttribute('stroke-linecap', 'round');
+            }
+          }
+        }
+      }
+      }  // engineSpin 活跃段结束
+      requestAnimationFrame(engineSpin);
+    })();
+
+    // ============ 第七段：老虎机竖条 + 5×5 网格排队绕行（独立 rAF） ============
+    var slotsSvg = document.getElementById('ll-slots');
+    var SLOTS = {
+      barX: 200, n: 6, w: 46, h: 46, gap: 8, rx: 10,
+      moveMs: 900, pauseMs: 1400,
+      gridCx: 425, gridCy: 375, cell: 50, cellGap: 6,
+      squeezeDur: 700, flyDur: 1100, vanishDur: 650,
+      color: '#6D5AA3',
+    };
+    var slotBars = [], slotsPhase = 'move', slotsPhaseT = 0, slotFlies = [];
+    var slotsStep = 0, slotsTotal = 0, slotsBaseY = 0, slotsLastT = 0;
+    var SLOT_PATH = [
+      [0,4],[1,4],[2,4],[3,4],[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1],[0,2],[0,3],
+      [1,3],[2,3],[3,3],[3,2],[3,1],[2,1],[1,1],[1,2],
+      [2,2]
+    ];
+    function makeBar(ph) {
+      var sr = document.createElementNS(NS, 'rect');
+      sr.setAttribute('x', SLOTS.barX - SLOTS.w / 2);
+      sr.setAttribute('y', slotsBaseY + ph);
+      sr.setAttribute('width', SLOTS.w); sr.setAttribute('height', SLOTS.h);
+      sr.setAttribute('rx', SLOTS.rx);
+      sr.setAttribute('fill', SLOTS.color);
+      sr.style.filter = 'brightness(1.25)';
+      slotsSvg.appendChild(sr);
+      return sr;
+    }
+    function slotCellPos(c, r) {
+      var cs = SLOTS.cell + SLOTS.cellGap;
+      return { x: SLOTS.gridCx - 2 * cs + c * cs + SLOTS.cell / 2, y: SLOTS.gridCy - 2 * cs + r * cs + SLOTS.cell / 2 };
+    }
+    function slotEject() {
+      if (!slotsSvg) return;
+      var nsg = SLOTS;
+      var p0 = slotCellPos(SLOT_PATH[0][0], SLOT_PATH[0][1]);
+      var flyEl = document.createElementNS(NS, 'rect');
+      flyEl.setAttribute('width', nsg.w); flyEl.setAttribute('height', nsg.h);
+      flyEl.setAttribute('rx', nsg.rx);
+      flyEl.setAttribute('fill', a.colors[Math.floor(Math.random() * a.colors.length)]);
+      flyEl.style.filter = 'brightness(1.5)';
+      slotsSvg.appendChild(flyEl);
+      slotFlies.push({
+        el: flyEl, phase: 'squeeze', t0: performance.now(),
+        sx: nsg.barX, sy: slotsBaseY + (nsg.n - 1) * slotsStep + nsg.h / 2,
+        ex: p0.x, ey: p0.y,
+        gx: 0, gy: 0, gi: 0, gPhase: 'move', tLast: 0, posFrac: 0, vanishT: 0
+      });
+      flyEl.setAttribute('x', flyEl.getAttribute('x') || (SLOTS.barX - SLOTS.w / 2));
+      flyEl.setAttribute('y', (slotsBaseY + (nsg.n - 1) * slotsStep + nsg.h / 2) - nsg.h / 2);
+    }
+    if (slotsSvg) {
+      var nsg = SLOTS;
+      slotsStep = nsg.h + nsg.gap;
+      slotsTotal = nsg.n * slotsStep;
+      slotsBaseY = (nsg.gridCy + 2 * (nsg.cell + nsg.cellGap) + nsg.cell) - ((nsg.n - 1) * slotsStep + nsg.h);
+      for (var si = 0; si < nsg.n; si++) {
+        slotBars.push({ el: makeBar(si * slotsStep), ph: si * slotsStep, phStart: si * slotsStep, fresh: false });
+      }
+      var cs = nsg.cell + nsg.cellGap;
+      for (var gr = 0; gr < 5; gr++) {
+        for (var gc = 0; gc < 5; gc++) {
+          var cell = document.createElementNS(NS, 'rect');
+          cell.setAttribute('x', nsg.gridCx - 2 * cs + gc * cs);
+          cell.setAttribute('y', nsg.gridCy - 2 * cs + gr * cs);
+          cell.setAttribute('width', nsg.cell); cell.setAttribute('height', nsg.cell);
+          cell.setAttribute('rx', 6);
+          cell.setAttribute('fill', 'rgba(109, 90, 163, 0.22)');
+          cell.setAttribute('stroke', 'rgba(109, 90, 163, 0.5)');
+          cell.setAttribute('stroke-width', 1.2);
+          slotsSvg.appendChild(cell);
+        }
+      }
+    }
+    (function slotsLoop(t) {
+      if (llIdx === 6) {   // 仅第七段活跃
+      if (slotsSvg) {
+        var nsg2 = SLOTS;
+        var dt = Math.min(t - (slotsLastT || t), 100);
+        slotsLastT = t;
+        slotsPhaseT += dt;
+        if (slotsPhase === 'move') {
+          var bottomPh = (nsg2.n - 1) * slotsStep;
+          // move 第一帧：弹射已在底部槽位的方块（ph >= bottomPh），顶部补入 fresh 方块
+          // （提前弹射 → 移动的方块恰好到位，底部方块永不滚出网格底边悬空）
+          if (slotsPhaseT <= dt) {
+            var ejectIdx = -1;
+            for (var bi0 = 0; bi0 < slotBars.length; bi0++) {
+              if (slotBars[bi0].ph >= bottomPh) { ejectIdx = bi0; break; }
+            }
+            if (ejectIdx >= 0) {
+              slotEject();
+              if (slotBars[ejectIdx].el.parentNode) slotBars[ejectIdx].el.parentNode.removeChild(slotBars[ejectIdx].el);
+              slotBars.splice(ejectIdx, 1);
+              var freshEl = makeBar(0);
+              freshEl.setAttribute('y', slotsBaseY - slotsStep);
+              slotBars.push({ el: freshEl, ph: 0, phStart: 0, fresh: true });
+            }
+          }
+          var mp = Math.min(slotsPhaseT / nsg2.moveMs, 1);
+          var easeM = mp * mp * (3 - 2 * mp);
+          for (var bi = 0; bi < slotBars.length; bi++) {
+            if (slotBars[bi].fresh) {
+              slotBars[bi].el.setAttribute('y', slotsBaseY - slotsStep + slotsStep * easeM);
+            } else {
+              slotBars[bi].el.setAttribute('y', slotsBaseY + slotBars[bi].phStart + slotsStep * easeM);
+            }
+          }
+          if (mp >= 1) {
+            for (var bi2 = 0; bi2 < slotBars.length; bi2++) {
+              if (!slotBars[bi2].fresh) slotBars[bi2].ph = slotBars[bi2].phStart + slotsStep;
+              slotBars[bi2].fresh = false;
+            }
+            slotsPhase = 'pause'; slotsPhaseT = 0;
+          }
+        } else {
+          if (slotsPhaseT >= nsg2.pauseMs) {
+            slotsPhase = 'move'; slotsPhaseT = 0;
+            for (var bi3 = 0; bi3 < slotBars.length; bi3++) slotBars[bi3].phStart = slotBars[bi3].ph;
+          }
+        }
+        for (var fi = slotFlies.length - 1; fi >= 0; fi--) {
+          var f = slotFlies[fi];
+          var age = t - f.t0;
+          if (f.phase === 'squeeze') {
+            var sq = Math.min(age / nsg2.squeezeDur, 1);
+            var hh = nsg2.h * (1 - 0.78 * sq);
+            f.el.setAttribute('y', f.sy - hh / 2);
+            f.el.setAttribute('height', hh);
+            if (sq >= 1) { f.phase = 'fly'; f.t0 = t; }
+          } else if (f.phase === 'fly') {
+            var fp = Math.min(age / nsg2.flyDur, 1);
+            var fe = 1 - Math.pow(1 - fp, 2);
+            var fx = f.sx + (f.ex - f.sx) * fe;
+            var fy = f.sy + (f.ey - f.sy) * fe;
+            var hh2 = nsg2.h * (0.22 + 0.78 * fe);
+            f.el.setAttribute('x', fx - nsg2.w / 2);
+            f.el.setAttribute('y', fy - hh2 / 2);
+            f.el.setAttribute('height', hh2);
+            if (fp >= 1) {
+              f.phase = 'grid'; f.gi = 0; f.gPhase = 'move'; f.posFrac = 0;
+              f.gx = f.ex; f.gy = f.ey; f.tLast = t;
+              f.el.setAttribute('height', nsg2.h);
+            }
+          } else if (f.phase === 'grid') {
+            if (f.gPhase === 'move') {
+              var gp = Math.min((t - f.tLast) / nsg2.moveMs, 1);
+              var gpe = gp * gp * (3 - 2 * gp);
+              var ga0 = SLOT_PATH[f.gi], ga1 = SLOT_PATH[f.gi + 1];
+              var cc0 = slotCellPos(ga0[0], ga0[1]), cc1 = slotCellPos(ga1[0], ga1[1]);
+              var gxe = cc0.x + (cc1.x - cc0.x) * gpe;
+              var gye = cc0.y + (cc1.y - cc0.y) * gpe;
+              f.el.setAttribute('x', gxe - nsg2.w / 2);
+              f.el.setAttribute('y', gye - nsg2.h / 2);
+              if (gp >= 1) {
+                f.gi++;
+                if (f.gi >= SLOT_PATH.length - 1) {
+                  f.phase = 'vanish'; f.vanishT = t;
+                } else {
+                  f.gPhase = 'pause'; f.tLast = t;
+                }
+              }
+            } else {
+              if (t - f.tLast >= nsg2.pauseMs) { f.gPhase = 'move'; f.tLast = t; }
+            }
+          } else if (f.phase === 'vanish') {
+            var vp = Math.min((t - f.vanishT) / nsg2.vanishDur, 1);
+            var center = slotCellPos(2, 2);
+            var vw = nsg2.w * (1 - vp), vh = nsg2.h * (1 - vp);
+            f.el.setAttribute('x', center.x - vw / 2);
+            f.el.setAttribute('y', center.y - vh / 2);
+            f.el.setAttribute('width', vw);
+            f.el.setAttribute('height', vh);
+            f.el.setAttribute('opacity', 1 - vp);
+            if (vp >= 1) {
+              if (f.el.parentNode) f.el.parentNode.removeChild(f.el);
+              slotFlies.splice(fi, 1);
+              continue;
+            }
+          }
+        }
+      }
+      }  // slotsLoop 活跃段结束
+      requestAnimationFrame(slotsLoop);
+    })(0);
+
+    // ============ 第八段：风水转盘（完整交互：点击转动 + 联动 + 数字提示 + 对齐提亮） ============
+    var fengshuiSvg = document.getElementById('ll-fengshui');
+    var FS = { n: 8, width: 18, gap: 14, rMin: 25, segGap: 2, spinMs: 420, stepDeg: 45 };
+    var fsRings = [];
+    function fsShuffle(arr) {
+      var c = arr.slice();
+      for (var si = c.length - 1; si > 0; si--) {
+        var sj = Math.floor(Math.random() * (si + 1));
+        var st = c[si]; c[si] = c[sj]; c[sj] = st;
+      }
+      return c;
+    }
+    if (fengshuiSvg) {
+      var fsg = FS;
+      var fsStep = fsg.width + fsg.gap;
+      // 联动：1~2 独立环（无出边）；其余各 1 条单向出边，入度 ≤ 1、禁止相互关联、步数 1/2
+      var indepN = 1 + Math.floor(Math.random() * 2);
+      var indepSet = {};
+      var shufAll = fsShuffle([0, 1, 2, 3, 4, 5, 6, 7]);
+      for (var idi = 0; idi < indepN; idi++) indepSet[shufAll[idi]] = true;
+      var usedTarget = {}, fsLink = {};
+      for (var lki = 0; lki < 8; lki++) {
+        if (indepSet[lki]) continue;
+        var cands = [];
+        for (var cdi = 0; cdi < 8; cdi++) {
+          if (cdi === lki) continue;
+          if (usedTarget[cdi]) continue;
+          if (fsLink[cdi] && fsLink[cdi].target === lki) continue;
+          cands.push(cdi);
+        }
+        if (!cands.length) continue;
+        var lt2 = cands[Math.floor(Math.random() * cands.length)];
+        usedTarget[lt2] = true;
+        fsLink[lki] = { target: lt2, steps: (Math.random() < 0.5) ? 1 : 2 };
+      }
+      for (var fri = 0; fri < fsg.n; fri++) {
+        var fr = fsg.rMin + fri * fsStep;
+        var farcC = 2 * Math.PI * fr;
+        var fsegDeg = (360 - fsg.segGap * 8) / 8;
+        var fsegLen = farcC * fsegDeg / 360;
+        var fsegStep = fsegDeg + fsg.segGap;
+        var fgrp = document.createElementNS(NS, 'g');
+        var fring = {
+          r: fr, grp: fgrp, arcs: [],
+          spin: { cur: 0, target: 0, from: 0, t0: 0, spinning: false },
+          link: fsLink[fri] || null, label: null, hit: null, aligned: false
+        };
+        for (var fsi = 0; fsi < 8; fsi++) {
+          var fslot = document.createElementNS(NS, 'circle');
+          fslot.setAttribute('cx', a.cx); fslot.setAttribute('cy', a.cy); fslot.setAttribute('r', fr);
+          fslot.setAttribute('fill', 'none');
+          fslot.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+          fslot.setAttribute('stroke-width', fsg.width);
+          fslot.setAttribute('stroke-dasharray', fsegLen + ' ' + (farcC - fsegLen));
+          fslot.setAttribute('stroke-dashoffset', -farcC * (fsi * fsegStep) / 360);
+          fengshuiSvg.appendChild(fslot);
+        }
+        var fcolors = a.colors.slice();
+        var foff = Math.floor(Math.random() * 8);
+        var foffDeg = foff * fsg.stepDeg;
+        fring.spin.cur = foffDeg; fring.spin.target = foffDeg;
+        for (var fsi2 = 0; fsi2 < 8; fsi2++) {
+          var fseg = document.createElementNS(NS, 'circle');
+          fseg.setAttribute('cx', a.cx); fseg.setAttribute('cy', a.cy); fseg.setAttribute('r', fr);
+          fseg.setAttribute('fill', 'none');
+          fseg.setAttribute('stroke', fcolors[fsi2]);
+          fseg.setAttribute('stroke-width', fsg.width);
+          fseg.setAttribute('stroke-dasharray', fsegLen + ' ' + (farcC - fsegLen));
+          fseg.setAttribute('stroke-dashoffset', -farcC * (fsi2 * fsegStep) / 360);
+          fseg.style.filter = 'brightness(1.25)';
+          fgrp.appendChild(fseg);
+          fring.arcs.push(fseg);
+        }
+        fgrp.setAttribute('transform', 'rotate(' + foffDeg + ' ' + a.cx + ' ' + a.cy + ')');
+        fengshuiSvg.appendChild(fgrp);
+        // 数字提示 label（环带外侧上方，不覆盖弧带——否则白色数字盖住彩色弧看起来像环消失）
+        var flb = document.createElementNS(NS, 'text');
+        flb.setAttribute('x', a.cx);
+        flb.setAttribute('y', a.cy - fr - fsg.width / 2 - 6);
+        flb.setAttribute('text-anchor', 'middle');
+        flb.setAttribute('font-size', 11);
+        flb.setAttribute('font-weight', 700);
+        flb.setAttribute('fill', '#FFFFFF');
+        flb.setAttribute('opacity', '0');
+        flb.style.pointerEvents = 'none';
+        flb.style.filter = 'drop-shadow(0 1px 3px rgba(0,0,0,.85))';
+        flb.textContent = '+1';
+        fengshuiSvg.appendChild(flb);
+        fring.label = flb;
+        // 命中层：环形 stroke 带（只命中环带，不遮挡内层环）
+        var fhit = document.createElementNS(NS, 'circle');
+        fhit.setAttribute('cx', a.cx); fhit.setAttribute('cy', a.cy);
+        fhit.setAttribute('r', fr);
+        fhit.setAttribute('fill', 'none');
+        fhit.setAttribute('stroke', 'rgba(255,255,255,0.001)');
+        fhit.setAttribute('stroke-width', fsg.width + 3);
+        fhit.style.pointerEvents = 'stroke';
+        fhit.setAttribute('data-native-cursor', 'true');
+        fengshuiSvg.appendChild(fhit);
+        fring.hit = fhit;
+        fsRings.push(fring);
+      }
+      // 事件绑定（IIFE 捕获；点击 stopPropagation 防触发 stage 滚屏）
+      for (var fei = 0; fei < fsRings.length; fei++) {
+        (function (ring) {
+          ring.hit.addEventListener('mouseenter', function () { fsShowHint(ring); });
+          ring.hit.addEventListener('mouseleave', function () { fsHideHint(); });
+          ring.hit.addEventListener('click', function (e) {
+            e.stopPropagation();
+            fsSpinRing(ring);
+          });
+        })(fsRings[fei]);
+      }
+      function fsShowHint(ring) {
+        for (var hli = 0; hli < fsRings.length; hli++) fsRings[hli].label.setAttribute('opacity', '0');
+        ring.label.setAttribute('opacity', '1');
+        ring.label.textContent = '+1';
+        if (ring.link) {
+          var tgt = fsRings[ring.link.target];
+          tgt.label.setAttribute('opacity', '1');
+          tgt.label.textContent = '+' + ring.link.steps;
+        }
+      }
+      function fsHideHint() {
+        for (var hli2 = 0; hli2 < fsRings.length; hli2++) fsRings[hli2].label.setAttribute('opacity', '0');
+      }
+      function fsSpinRing(ring) {
+        fsAddSpin(ring, 1);
+        if (ring.link) fsAddSpin(fsRings[ring.link.target], ring.link.steps);
+      }
+      function fsAddSpin(ring, steps) {
+        var sp = ring.spin;
+        sp.from = sp.cur;
+        sp.t0 = performance.now();
+        sp.target += FS.stepDeg * steps;
+        sp.spinning = true;
+      }
+      // 对齐提亮（初始 offset 0 的环立即亮起）
+      for (var cai = 0; cai < fsRings.length; cai++) {
+        var car = fsRings[cai];
+        if (Math.abs(car.spin.cur % 360) < 0.01) car.aligned = true;
+      }
+      // 常驻 rAF：转动动画 + 对齐状态更新（点击后状态变化实时反映；仅第八段活跃）
+      (function fsLoop(t) {
+        if (llIdx === 7) {
+        for (var fli = 0; fli < fsRings.length; fli++) {
+          var flr = fsRings[fli], flsp = flr.spin;
+          if (flsp.spinning) {
+            var fp = Math.min((t - flsp.t0) / FS.spinMs, 1);
+            var fe = fp * fp * (3 - 2 * fp);
+            flsp.cur = flsp.from + (flsp.target - flsp.from) * fe;
+            flr.grp.setAttribute('transform', 'rotate(' + flsp.cur + ' ' + a.cx + ' ' + a.cy + ')');
+            if (fp >= 1) { flsp.cur = flsp.target; flsp.spinning = false; }
+          }
+          var cal = !flsp.spinning && (Math.abs(flsp.cur % 360) < 0.01);
+          if (cal !== flr.aligned) {
+            flr.aligned = cal;
+            var f2 = cal ? 'brightness(2)' : 'brightness(1.25)';
+            for (var caj = 0; caj < flr.arcs.length; caj++) flr.arcs[caj].style.filter = f2;
+          }
+        }
+        }  // fsLoop 活跃段结束
+        requestAnimationFrame(fsLoop);
+      })(0);
+    }
+
+    // ============ anime.js：色块旋转 + 12 图形游走（CDN 失败静默降级） ============
+    import('https://esm.sh/animejs@4.4.1').then(function (mod) {
+      if (!mod || !mod.animate) return;
+      var animate = mod.animate;
+      var utils = mod.utils;
+      if (squareEl) animate(squareEl, { rotate: 90, loop: true, duration: 500, ease: 'inOutExpo' });
+      var SHAPE_LIMIT = 200;   // 活动半径：留出图形外接半径(22) + scale 1.6 放大余量(≈35)，保证不超内环 270
+      function randPoint() {
+        var ang = Math.random() * Math.PI * 2;
+        var r = Math.sqrt(Math.random()) * SHAPE_LIMIT;
+        return { x: Math.cos(ang) * r, y: Math.sin(ang) * r };
+      }
+      shapesEls.forEach(function (el, i) {
+        function loop() {
+          var p = randPoint();
+          animate(el, {
+            x: p.x, y: p.y,
+            scale: utils.random(0.4, 1.6),
+            duration: utils.random(600, 1400),
+            ease: 'out(3)',
+          });
+          window.setTimeout(loop, utils.random(500, 1100));
+        }
+        window.setTimeout(loop, utils.random(0, 900));
+      });
+    }).catch(function () {});
+
+    // ============ 滚轮驱动（照搬 animation-lab：滚动推进 8 段，rAF 平滑逼近） ============
+    var llTarget = 0, llCurrent = 0;
+    var llIdx = -1;   // 初始 -1：首帧强制 llSetIdx(0)（设置显隐/颜色/刻度长度）
+    var llLabel = document.getElementById('ll-label');
+    var dotsAnim = document.getElementById('ll-dots-anim');
+    var hintEl = document.getElementById('ll-hint');
+    var dotStates = ['_', '.', '..', '...', ''];
+    var dotIdx = 0;
+    setInterval(function () { if (dotsAnim) dotsAnim.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
+    // 8 段在 7 屏内滚完（最后一段结束时 sticky 恰好到底，进入首页内容）
+    var LL_SCROLL = 7 * window.innerHeight;
+
+    // 段切换：背景层始终显示；8 个动画层按 idx 显隐 + 颜色跟随 + 段名
+    function llSetIdx(idx) {
+      var bgIds = ['ll-dots', 'll-arc', 'll-rings', 'll-tick'];
+      for (var bi = 0; bi < bgIds.length; bi++) {
+        var be = document.getElementById(bgIds[bi]);
+        if (be) be.style.opacity = '1';
+      }
+      // 第八段隐藏背景点阵（风水转盘区域不需要背景小点）
+      if (svgDots) svgDots.style.opacity = (idx === 7) ? '0' : '1';
+      var animIds = ['ll-square', 'll-shapes', 'll-ellipse', 'll-track', 'll-burst', 'll-engine', 'll-slots', 'll-fengshui'];
+      for (var ai = 0; ai < animIds.length; ai++) {
+        var ae = document.getElementById(animIds[ai]);
+        if (ae) ae.style.opacity = (ai === idx) ? '1' : '0';
+      }
+      // 颜色跟随当前弧色（仅段切换时更新，避免每帧 260+ 次 setAttribute 卡顿；引擎段由 engineSpin 管）
+      var curCol = a.colors[idx % a.colors.length];
+      if (idx !== 5) {
+        for (var tki = 0; tki < tickLines.length; tki++) {
+          tickLines[tki].el.setAttribute('stroke', curCol);
+          // 刻度位置/宽度/线帽复位（离开引擎段时清理外移 + 高亮残留；引擎段由 engineSpin 实时驱动）
+          var tk = tickLines[tki];
+          var tgeo = (tk.isLong30 ? 40 : 30);
+          tk.el.setAttribute('x1', a.cx + TICKS.r * Math.cos(tk.ang));
+          tk.el.setAttribute('y1', a.cy + TICKS.r * Math.sin(tk.ang));
+          tk.el.setAttribute('x2', a.cx + (TICKS.r - tgeo) * Math.cos(tk.ang));
+          tk.el.setAttribute('y2', a.cy + (TICKS.r - tgeo) * Math.sin(tk.ang));
+          tk.el.setAttribute('stroke-width', TICKS.width);
+          tk.el.setAttribute('stroke-linecap', 'round');
+        }
+      }
+      for (var di = 0; di < dotEls.length; di++) dotEls[di].setAttribute('fill', curCol);
+      // 刻度显示长度：第六段满长（offset=余量），其他段 15px（offset = 基础+余量-15）
+      for (var tki2 = 0; tki2 < tickLines.length; tki2++) {
+        var tlOff = (idx === 5) ? 10 : ((tickLines[tki2].isLong30 ? 30 : 20) + 10 - 15);
+        tickLines[tki2].el.setAttribute('stroke-dashoffset', tlOff);
+      }
+      // RPM 计数器：仅第六段显示
+      if (counterEl) counterEl.style.opacity = (idx === 5) ? '1' : '0';
+      if (llLabel) llLabel.textContent = 'SEGMENT ' + String(idx + 1).padStart(2, '0') + ' · ' + LL_NAMES[idx];
+    }
+
+    // 每帧：current 逼近 target（限速平滑），驱动圆弧/颜色/显隐/引擎/椭圆
+    var llLastT = 0;
+    function llLoop(t) {
+      var dt = llLastT ? Math.min(t - llLastT, 100) : 0;
+      llLastT = t;
+      // 目标进度 = 滚动位置 / 8 段滚动区间（0~1）
+      llTarget = Math.min(window.scrollY / LL_SCROLL, 1);
+      // 平滑逼近：每帧限速（一次滚动不瞬间画完大半）
+      var diff = llTarget - llCurrent;
+      var maxStep = dt / 1000 * 0.6;   // 每秒最多推进 0.6
+      llCurrent += (diff > 0) ? Math.min(diff, maxStep) : Math.max(diff, -maxStep);
+      llCurrent = Math.min(Math.max(llCurrent, 0), 1);
+
+      var progress = llCurrent;
+      var total = a.segments;
+      var idx = Math.min(Math.floor(progress * total), total - 1);
+      var inSeg = progress * total - idx;
+      if (idx !== llIdx) { llIdx = idx; llSetIdx(idx); }
+
+      // 圆弧三态：已过段高亮整段 / 当前段整段加宽 + 顶层进度条按 inSeg 填充 / 未到段暗版
+      var BASE_W = 5, GROW_W = 10;
+      for (var ai2 = 0; ai2 < total; ai2++) {
+        var base = arcBases[ai2], top = arcTops[ai2];
+        var col = a.colors[ai2 % a.colors.length];
+        if (ai2 < idx) {
+          base.setAttribute('stroke', col);
+          base.setAttribute('stroke-width', BASE_W);
+          base.setAttribute('stroke-dasharray', arcSeg + ' ' + arcC);
+          top.setAttribute('stroke-width', BASE_W);
+          top.setAttribute('stroke-dasharray', arcSeg + ' ' + arcC);
+        } else if (ai2 === idx) {
+          base.setAttribute('stroke', col);
+          base.setAttribute('stroke-width', GROW_W);
+          base.setAttribute('stroke-dasharray', arcSeg + ' ' + arcC);
+          var fillLen = arcSeg * inSeg;
+          top.setAttribute('stroke-width', GROW_W);
+          top.setAttribute('stroke-dasharray', fillLen + ' ' + (arcC - fillLen));
+        } else {
+          base.setAttribute('stroke', darken(col, 0.35));
+          base.setAttribute('stroke-width', BASE_W);
+          base.setAttribute('stroke-dasharray', arcSeg + ' ' + arcC);
+          top.setAttribute('stroke-dasharray', '0 ' + arcC);
+        }
+      }
+
+      // 第三段 ellipse：段内进度 inSeg 驱动画-保持-擦除（0~2.5）
+      if (idx === 2) {
+        var eTarget = inSeg * 2.5;
+        for (var ei3 = 0; ei3 < ellipseItems.length; ei3++) {
+          var item = ellipseItems[ei3];
+          var eDiff = eTarget - item.drawP;
+          var eMax = 0.05;
+          item.drawP += (eDiff > 0) ? Math.min(eDiff, eMax) : Math.max(eDiff, -eMax);
+          item.path.setAttribute('stroke-dasharray', item.len + ' ' + item.len);
+          item.path.style.opacity = (item.drawP >= 2.5) ? '0' : '1';
+          if (item.dot) item.dot.style.opacity = (item.drawP >= 2.5) ? '0' : '1';
+          if (item.drawP <= 1) {
+            item.path.setAttribute('stroke-dashoffset', item.len * (1 - item.drawP));
+          } else if (item.drawP <= 2) {
+            item.path.setAttribute('stroke-dashoffset', 0);
+          } else {
+            var eraseP = (item.drawP - 2) / 0.5;
+            item.path.setAttribute('stroke-dashoffset', -item.len * eraseP);
+          }
+        }
+      } else if (llIdx !== 2) {
+        // 离开第三段：重置 drawP（回滚后重播）
+        for (var ei4 = 0; ei4 < ellipseItems.length; ei4++) ellipseItems[ei4].drawP = 0;
+      }
+      requestAnimationFrame(llLoop);
+    }
+    requestAnimationFrame(llLoop);
+
+    // 首屏初始显示滚动提示
+    if (hintEl) hintEl.style.opacity = '1';
+    // 跳过按钮：平滑滚到动画区结束（800vh 处 = 首页内容开始）
+    var skipBtn = document.getElementById('ll-skip');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', function () {
+        window.scrollTo({ top: 8 * window.innerHeight, behavior: 'smooth' });
+      });
+    }
+  })();
+</script>
+
+<style is:global>
+  #ll-loading { font-family: 'Courier New', 'Consolas', 'Noto Sans SC', monospace; }
+  #ll-loading .ll-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* 背景层不拦截点击（否则中心色块/点阵会挡住内部圆环的命中层） */
+    pointer-events: none;
+  }
+  #ll-loading #ll-square {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    margin: auto;
+    width: 200px;
+    height: 200px;
+    border-radius: 24px;
+    will-change: transform;
+  }
+  /* 命中层（data-native-cursor）：隐藏自定义光标后必须恢复系统光标（覆盖全局 cursor:none） */
+  #ll-loading [data-native-cursor] {
+    cursor: pointer !important;
+  }
+</style>

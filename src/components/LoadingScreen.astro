@@ -82,7 +82,14 @@ const base = import.meta.env.BASE_URL;
 <script>
   var B = document.getElementById('p3re-loading').dataset.base;
 
-  var anim = localStorage.getItem('loading-animation') || 'nier';
+  function isHomePage() {
+    var p = window.location.pathname;
+    var b = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    return p === b || p === b + '/' || p === '/';
+  }
+  var storedAnim = localStorage.getItem('loading-animation');
+  // 未配置时：首页默认实验室风格（LabLoading），其他页默认 NieR
+  var anim = storedAnim || (isHomePage() ? 'lab' : 'nier');
   // animation-lab 测试页暂不需要加载动画（测试画布阶段跳过，正式实现后可移除）
   if (window.location.pathname.indexOf('/animation-lab') !== -1) {
     anim = 'none';
@@ -91,6 +98,7 @@ const base = import.meta.env.BASE_URL;
   var nierEl = document.getElementById('nier-stage');
   var p3reEl = document.getElementById('p3re-loading');
   var hintEl = document.getElementById('nier-scroll-hint');
+  var labWrap = document.getElementById('ll-loading');
 
   // 检测页面是否可整页滚动：尝试滚动 10px，看 scrollY 是否变化。
   // notes/game 等 overflow:hidden 固定布局页滚动无效 → 回退旧 fixed 遮罩模式
@@ -109,14 +117,22 @@ const base = import.meta.env.BASE_URL;
     nierWrap?.remove();
     p3reEl?.remove();
     hintEl?.remove();
+    labWrap?.remove();
+  } else if (anim === 'lab') {
+    // 实验室风格：LabLoading 组件自行显示（其 script 检测到 lab 配置后初始化）
+    nierWrap?.remove();
+    hintEl?.remove();
+    p3reEl?.remove();
   } else if (anim === 'p3re') {
     nierWrap?.remove();
     hintEl?.remove();
+    labWrap?.remove();
     p3reEl.style.display = '';
     runP3RE();
   } else {
     // nier
     p3reEl?.remove();
+    labWrap?.remove();
     if (fixedMode && sessionStorage.getItem('nier-intro-done')) {
       // 不可滚动页刷新/回访：直接移除，不占文档流、不阻塞固定布局
       nierWrap?.remove();
