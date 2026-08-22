@@ -26,6 +26,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <svg id="lab-track" class="lab-arc lab-track" viewBox="0 0 750 750"></svg>
         <!-- 绽开特效层：中心自动循环 圆环扩散 + 彩色圆点绽开（第五段圆弧显示，独立 rAF） -->
         <svg id="lab-burst" class="lab-arc lab-burst" viewBox="0 0 750 750"></svg>
+        <!-- 第七段层：老虎机竖条挤出 + 4x4 网格推箱子绕行（第七段圆弧显示，独立 rAF） -->
+        <svg id="lab-slots" class="lab-arc lab-slots" viewBox="0 0 750 750"></svg>
+        <!-- 第八段层：风水转盘 8 同心环 × 8 段弧，点击联动 + 数字提示（第八段圆弧显示，独立 rAF） -->
+        <svg id="lab-fengshui" class="lab-arc lab-fengshui" viewBox="0 0 750 750"></svg>
         <!-- 中心旋转色块：相对主圆容器居中（第一段圆弧色高亮无荧光，anime.js 旋转） -->
         <div id="lab-square" class="lab-square"></div>
         <!-- 引擎 RPM 计数器：齿轮下方（第四段显示，随指针转速跳动） -->
@@ -931,6 +935,414 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     burstStart = null;
     requestAnimationFrame(burstLoop);
 
+    // ============ 第七段：老虎机竖条 + 4x4 网格推箱子绕行（循环播放主题，独立 rAF 时间驱动） ============
+    var slotsSvg = document.getElementById('lab-slots');
+    var SLOTS = {
+      // 竖条（左侧）
+      barX: 200, n: 6, w: 46, h: 46, gap: 8, rx: 10,   // 竖条 x（往中间靠）
+      moveMs: 900,              // 每次移动一格/一步的时长（平滑平移，慢）
+      pauseMs: 1400,             // 移动后停顿（延迟 1.4 秒）
+      // 网格（中间偏右）
+      gridCx: 425, gridCy: 375, cell: 50, cellGap: 6,   // 网格中心（往中间靠）
+      // 时序（ms）
+      squeezeDur: 700, flyDur: 1100, vanishDur: 650,
+      color: '#6D5AA3',
+    };
+    var slotBars = [];       // 竖条滚动方块 { el, ph, phStart, fresh }（ph=相对顶部偏移；fresh=补入的方块本步不移动）
+    var slotsPhase = 'move'; // 'move' 移动中 | 'pause' 停顿中
+    var slotsPhaseT = 0;     // 当前相位已过时长 ms
+    var slotFlies = [];      // 所有挤出方块状态机（每个滚出方块一个，同轨迹排队移动）
+    var slotsStep = 0, slotsTotal = 0, slotsBaseY = 0;
+    // 创建竖条方块（ph = 顶部偏移，用于补入新方块）
+    function makeBar(ph) {
+      var sr = document.createElementNS(NS, 'rect');
+      sr.setAttribute('x', SLOTS.barX - SLOTS.w / 2);
+      sr.setAttribute('y', slotsBaseY + ph);
+      sr.setAttribute('width', SLOTS.w);
+      sr.setAttribute('height', SLOTS.h);
+      sr.setAttribute('rx', SLOTS.rx);
+      sr.setAttribute('fill', SLOTS.color);
+      sr.style.filter = 'brightness(1.25)';
+      slotsSvg.appendChild(sr);
+      return sr;
+    }
+    // 推箱子路径：外圈 12 格顺时针 + 内圈 4 格 + 中心消失（格坐标 c,r，0 起）
+    var SLOT_PATH = [
+      // 5x5 外圈：从底部 (0,4) 开始 → 右 → 上 → 左 绕一圈（16 格）
+      [0,4],[1,4],[2,4],[3,4],[4,4],[4,3],[4,2],[4,1],[4,0],[3,0],[2,0],[1,0],[0,0],[0,1],[0,2],[0,3],
+      // 内圈 3x3 边（8 格）→ 中心 (2,2)
+      [1,3],[2,3],[3,3],[3,2],[3,1],[2,1],[1,1],[1,2],
+      [2,2]
+    ];
+    if (slotsSvg) {
+      var nsg = SLOTS;
+      slotsStep = nsg.h + nsg.gap;
+      slotsTotal = nsg.n * slotsStep;
+      slotsBaseY = (nsg.gridCy + 2 * (nsg.cell + nsg.cellGap) + nsg.cell) - ((nsg.n - 1) * slotsStep + nsg.h);   // 竖条底边 = 网格底边
+      // 竖条方块：n 块圆角矩形，ph 从 0(顶) 到 (n-1)*step(底) 均匀排布（初始填满）
+      for (var si = 0; si < nsg.n; si++) {
+        slotBars.push({ el: makeBar(si * slotsStep), ph: si * slotsStep, phStart: si * slotsStep, fresh: false });
+      }
+      // 5x5 网格：25 个空心圆角格子
+      var cs = nsg.cell + nsg.cellGap;
+      for (var gr = 0; gr < 5; gr++) {
+        for (var gc = 0; gc < 5; gc++) {
+          var cell = document.createElementNS(NS, 'rect');
+          cell.setAttribute('x', nsg.gridCx - 2 * cs + gc * cs);
+          cell.setAttribute('y', nsg.gridCy - 2 * cs + gr * cs);
+          cell.setAttribute('width', nsg.cell);
+          cell.setAttribute('height', nsg.cell);
+          cell.setAttribute('rx', 6);
+          cell.setAttribute('fill', 'rgba(109, 90, 163, 0.22)');   // 默认填满（暗紫），轨迹亮方块覆盖其上
+          cell.setAttribute('stroke', 'rgba(109, 90, 163, 0.5)');
+          cell.setAttribute('stroke-width', 1.2);
+          slotsSvg.appendChild(cell);
+        }
+      }
+    }
+    // 格坐标 (c, r) → 格中心像素（左上角 + 半格，方块中心对齐格子中心）
+    function slotCellPos(c, r) {
+      var cs = SLOTS.cell + SLOTS.cellGap;
+      return { x: SLOTS.gridCx - 2 * cs + c * cs + SLOTS.cell / 2, y: SLOTS.gridCy - 2 * cs + r * cs + SLOTS.cell / 2 };
+    }
+    // 触发挤出：底部方块副本 变扁 → 弹射到网格外圈起点 → 逐格推箱子 → 中心消失
+    // 弹射方块从竖条出来时就带一个随机圆弧色（移动全程保留）
+    function slotEject() {
+      if (!slotsSvg) return;
+      var nsg = SLOTS;
+      var p0 = slotCellPos(SLOT_PATH[0][0], SLOT_PATH[0][1]);   // 落点 = 轨迹起点（网格底部）
+      var flyEl = document.createElementNS(NS, 'rect');
+      flyEl.setAttribute('width', nsg.w);
+      flyEl.setAttribute('height', nsg.h);
+      flyEl.setAttribute('rx', nsg.rx);
+      flyEl.setAttribute('fill', ARC.colors[Math.floor(Math.random() * ARC.colors.length)]);
+      flyEl.style.filter = 'brightness(1.5)';
+      slotsSvg.appendChild(flyEl);
+      var fly = {
+        el: flyEl,
+        phase: 'squeeze',          // squeeze → fly → grid → vanish
+        t0: performance.now(),
+        sx: nsg.barX,
+        sy: slotsBaseY + (nsg.n - 1) * slotsStep + nsg.h / 2,   // 竖条底部槽位中心（与滚动方块落点对齐）
+        ex: p0.x, ey: p0.y,
+        gx: 0, gy: 0, gi: 0, gPhase: 'move', tLast: 0, posFrac: 0,
+        vanishT: 0,
+      };
+      flyEl.setAttribute('x', fly.sx - nsg.w / 2);
+      flyEl.setAttribute('y', fly.sy - nsg.h / 2);
+      slotFlies.push(fly);
+    }
+    function slotsLoop(t) {
+      if (slotsSvg) {
+        var nsg = SLOTS;
+        var dt = Math.min(t - (slotsLastT || t), 100);
+        slotsLastT = t;
+        // 1) 竖条步进滚动：平滑移动一步（moveMs）→ 停顿（pauseMs）→ 再移一步
+        slotsPhaseT += dt;
+        if (slotsPhase === 'move') {
+          var bottomPh = (nsg.n - 1) * slotsStep;
+          // 进入 move 的第一帧：弹射底部方块（ph>=bottomPh），补入 fresh 顶部方块
+          if (slotsPhaseT <= dt) {
+            var ejectIdx = -1;
+            for (var bi0 = 0; bi0 < slotBars.length; bi0++) {
+              if (slotBars[bi0].ph >= bottomPh) { ejectIdx = bi0; break; }
+            }
+            if (ejectIdx >= 0) {
+              slotEject();   // 弹射副本从竖条出来时随机带圆弧色
+              if (slotBars[ejectIdx].el.parentNode) slotBars[ejectIdx].el.parentNode.removeChild(slotBars[ejectIdx].el);
+              slotBars.splice(ejectIdx, 1);
+              // 顶部补入新方块：fresh=true，从竖条上方一格平移滑入（本步不参与滚动）
+              var freshEl = makeBar(0);
+              freshEl.setAttribute('y', slotsBaseY - slotsStep);
+              slotBars.push({ el: freshEl, ph: 0, phStart: 0, fresh: true });
+            }
+          }
+          // 平滑移动一步（moveMs）：非 fresh 方块 ph+step 平滑移动；fresh 方块停顶部
+          var mp = Math.min(slotsPhaseT / nsg.moveMs, 1);
+          var easeM = mp * mp * (3 - 2 * mp);   // smoothstep 缓动
+          for (var bi = 0; bi < slotBars.length; bi++) {
+            if (slotBars[bi].fresh) {
+              // 新补入：从竖条上方平移滑入顶部槽位（easeM 0→1：上方一格 → 顶部）
+              slotBars[bi].el.setAttribute('y', slotsBaseY - slotsStep + slotsStep * easeM);
+            } else {
+              slotBars[bi].el.setAttribute('y', slotsBaseY + slotBars[bi].phStart + slotsStep * easeM);
+            }
+          }
+          if (mp >= 1) {
+            // 步完成：ph 推进（fresh 方块 ph 保持 0，下一轮参与移动）
+            for (var bi2 = 0; bi2 < slotBars.length; bi2++) {
+              if (!slotBars[bi2].fresh) slotBars[bi2].ph = slotBars[bi2].phStart + slotsStep;
+              slotBars[bi2].fresh = false;
+            }
+            slotsPhase = 'pause'; slotsPhaseT = 0;
+          }
+        } else {
+          if (slotsPhaseT >= nsg.pauseMs) {
+            slotsPhase = 'move'; slotsPhaseT = 0;
+            for (var bi3 = 0; bi3 < slotBars.length; bi3++) slotBars[bi3].phStart = slotBars[bi3].ph;
+          }
+        }
+        // 3) 挤出方块状态机：遍历所有在途方块（各自独立推进）
+        for (var fi = slotFlies.length - 1; fi >= 0; fi--) {
+          var f = slotFlies[fi];
+          var age = t - f.t0;
+          if (f.phase === 'squeeze') {
+            // 变扁：高度 46 → 10（宽度不变）
+            var sq = Math.min(age / nsg.squeezeDur, 1);
+            var hh = nsg.h * (1 - 0.78 * sq);
+            f.el.setAttribute('y', f.sy - hh / 2);
+            f.el.setAttribute('height', hh);
+            if (sq >= 1) { f.phase = 'fly'; f.t0 = t; }
+          } else if (f.phase === 'fly') {
+            // 弹射：竖条底部 → 网格外圈起点，ease-out，同时恢复原尺寸
+            var fp = Math.min(age / nsg.flyDur, 1);
+            var fe = 1 - Math.pow(1 - fp, 2);
+            var fx = f.sx + (f.ex - f.sx) * fe;
+            var fy = f.sy + (f.ey - f.sy) * fe;
+            var hh2 = nsg.h * (0.22 + 0.78 * fe);
+            f.el.setAttribute('x', fx - nsg.w / 2);
+            f.el.setAttribute('y', fy - hh2 / 2);
+            f.el.setAttribute('height', hh2);
+            if (fp >= 1) {
+              f.phase = 'grid';
+              f.gi = 0;
+              f.gPhase = 'move';
+              f.posFrac = 0;
+              f.gx = f.ex; f.gy = f.ey;
+              f.tLast = t;
+              f.el.setAttribute('height', nsg.h);
+            }
+          } else if (f.phase === 'grid') {
+            // 步进平移：每格平滑移动（moveMs）→ 停顿（pauseMs）→ 移动下一格
+            if (f.gPhase === 'move') {
+              var gp = Math.min((t - f.tLast) / nsg.moveMs, 1);
+              var gpe = gp * gp * (3 - 2 * gp);   // smoothstep 缓动
+              var ga0 = SLOT_PATH[f.gi], ga1 = SLOT_PATH[f.gi + 1];
+              var cc0 = slotCellPos(ga0[0], ga0[1]), cc1 = slotCellPos(ga1[0], ga1[1]);
+              var gxe = cc0.x + (cc1.x - cc0.x) * gpe;
+              var gye = cc0.y + (cc1.y - cc0.y) * gpe;
+              f.el.setAttribute('x', gxe - nsg.w / 2);
+              f.el.setAttribute('y', gye - nsg.h / 2);
+              if (gp >= 1) {
+                f.gi++;
+                if (f.gi >= SLOT_PATH.length - 1) {
+                  // 内圈最后格 → 网格中心缩小淡出消失
+                  f.phase = 'vanish';
+                  f.vanishT = t;
+                } else {
+                  f.gPhase = 'pause';
+                  f.tLast = t;
+                }
+              }
+            } else {
+              if (t - f.tLast >= nsg.pauseMs) { f.gPhase = 'move'; f.tLast = t; }
+            }
+          } else if (f.phase === 'vanish') {
+            // 内圈最后格 → 网格中心点缩小淡出消失
+            var vp = Math.min((t - f.vanishT) / nsg.vanishDur, 1);
+            var center = slotCellPos(2, 2);   // 5x5 中心格
+            var vw = nsg.w * (1 - vp), vh = nsg.h * (1 - vp);
+            f.el.setAttribute('x', center.x - vw / 2);
+            f.el.setAttribute('y', center.y - vh / 2);
+            f.el.setAttribute('width', vw);
+            f.el.setAttribute('height', vh);
+            f.el.setAttribute('opacity', 1 - vp);
+            if (vp >= 1) {
+              if (f.el.parentNode) f.el.parentNode.removeChild(f.el);
+              slotFlies.splice(fi, 1);
+              continue;
+            }
+          }
+        }
+      }
+      requestAnimationFrame(slotsLoop);
+    }
+    var slotsLastT = 0;
+    requestAnimationFrame(slotsLoop);
+
+
+    // ============ 第八段：风水转盘（8 同心环 × 8 段弧，点击联动 + 数字提示，独立 rAF 时间驱动） ============
+    var fengshuiSvg = document.getElementById('lab-fengshui');
+    var FS = {
+      n: 8,                // 环数
+      width: 18,           // 弧宽（14 → 18，再增粗）
+      gap: 14,             // 环间距（半径步进 32 = width + gap）
+      rMin: 25,            // 最内环半径（≈25）
+      rMax: 249,           // 最外环半径（≈250，rMin + 7×32）
+      segGap: 2,           // 每环段间空隙（角度）
+      spinMs: 420,         // 转一格动画时长
+      stepDeg: 45,         // 一格角度（顺时针）
+    };
+    var fsRings = [];      // 每环 { r, grp, spin{cur,target,from,t0,spinning}, link{target,steps}|null, label, hit }
+    if (fengshuiSvg) {
+      var fsg = FS;
+      var fcx = a.cx, fcy = a.cy;
+      var fsStep = fsg.width + fsg.gap;    // 半径步进
+      // 颜色打乱（Fisher-Yates）
+      function fsShuffle(arr) {
+        var c = arr.slice();
+        for (var si = c.length - 1; si > 0; si--) {
+          var sj = Math.floor(Math.random() * (si + 1));
+          var st = c[si]; c[si] = c[sj]; c[sj] = st;
+        }
+        return c;
+      }
+      // 联动：必定 1 个、最多 2 个独立环（无出边）；其余环各 1 条单向出边
+      // 入度 ≤ 1：每个环最多被 1 个环关联（usedTarget 去重）；步数 1/2 随机
+      var indepN = 1 + Math.floor(Math.random() * 2);
+      var indepSet = {};
+      var shufAll = fsShuffle([0, 1, 2, 3, 4, 5, 6, 7]);
+      for (var idi = 0; idi < indepN; idi++) indepSet[shufAll[idi]] = true;
+      var usedTarget = {};
+      var fsLink = {};
+      for (var lki = 0; lki < 8; lki++) {
+        if (indepSet[lki]) continue;
+        var cands = [];
+        for (var cdi = 0; cdi < 8; cdi++) {
+          if (cdi !== lki && !usedTarget[cdi]) cands.push(cdi);
+        }
+        if (!cands.length) continue;   // 极端情况目标全被占：此环不联动
+        var lt2 = cands[Math.floor(Math.random() * cands.length)];
+        usedTarget[lt2] = true;
+        fsLink[lki] = { target: lt2, steps: (Math.random() < 0.5) ? 1 : 2 };
+      }
+      // 建 8 环
+      for (var fri = 0; fri < fsg.n; fri++) {
+        var fr = fsg.rMin + fri * fsStep;
+        var farcC = 2 * Math.PI * fr;
+        var fsegDeg = (360 - fsg.segGap * 8) / 8;
+        var fsegLen = farcC * fsegDeg / 360;
+        var fsegStep = fsegDeg + fsg.segGap;
+        var fgrp = document.createElementNS(NS, 'g');
+        // 1) 槽位暗弧：8 段固定不转（彩色弧的槽底，衬托"弧转动"）
+        for (var fsi = 0; fsi < 8; fsi++) {
+          var fslot = document.createElementNS(NS, 'circle');
+          fslot.setAttribute('cx', fcx); fslot.setAttribute('cy', fcy); fslot.setAttribute('r', fr);
+          fslot.setAttribute('fill', 'none');
+          fslot.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+          fslot.setAttribute('stroke-width', fsg.width);
+          fslot.setAttribute('stroke-dasharray', fsegLen + ' ' + (farcC - fsegLen));
+          fslot.setAttribute('stroke-dashoffset', -farcC * (fsi * fsegStep) / 360);
+          fengshuiSvg.appendChild(fslot);
+        }
+        // 2) 彩色弧组：8 段弧颜色 = 外层弧色固定顺序（对齐基准），group rotate 驱动转动
+        //    打乱 = 每环初始旋转 offset 格（offset×45°），点击转回 offset≡0 即复位
+        var fring = {
+          r: fr, grp: fgrp, arcs: [],
+          spin: { cur: 0, target: 0, from: 0, t0: 0, spinning: false },
+          link: fsLink[fri] || null, label: null, hit: null, aligned: false
+        };
+        var fcolors = a.colors.slice();   // 固定外层顺序（不再打乱序列，只靠旋转错位）
+        var foff = Math.floor(Math.random() * 8);          // 打乱格数 0~7
+        var foffDeg = foff * fsg.stepDeg;
+        fring.spin.cur = foffDeg; fring.spin.target = foffDeg;
+        for (var fsi2 = 0; fsi2 < 8; fsi2++) {
+          var fseg = document.createElementNS(NS, 'circle');
+          fseg.setAttribute('cx', fcx); fseg.setAttribute('cy', fcy); fseg.setAttribute('r', fr);
+          fseg.setAttribute('fill', 'none');
+          fseg.setAttribute('stroke', fcolors[fsi2]);
+          fseg.setAttribute('stroke-width', fsg.width);
+          fseg.setAttribute('stroke-dasharray', fsegLen + ' ' + (farcC - fsegLen));
+          fseg.setAttribute('stroke-dashoffset', -farcC * (fsi2 * fsegStep) / 360);
+          fseg.style.filter = 'brightness(1.25)';
+          fgrp.appendChild(fseg);
+          fring.arcs.push(fseg);
+        }
+        fgrp.setAttribute('transform', 'rotate(' + foffDeg + ' ' + fcx + ' ' + fcy + ')');
+        fengshuiSvg.appendChild(fgrp);
+        // 3) 数字提示：环正上方（12 点方向），默认隐藏
+        var flb = document.createElementNS(NS, 'text');
+        flb.setAttribute('x', fcx);
+        flb.setAttribute('y', fcy - fr + fsg.width / 2 - 8);
+        flb.setAttribute('text-anchor', 'middle');
+        flb.setAttribute('font-size', 11);
+        flb.setAttribute('font-weight', 700);
+        flb.setAttribute('fill', '#FFFFFF');
+        flb.setAttribute('opacity', '0');
+        flb.style.pointerEvents = 'none';
+        flb.style.filter = 'drop-shadow(0 1px 3px rgba(0,0,0,.85))';
+        flb.textContent = '+1';
+        fengshuiSvg.appendChild(flb);
+        fring.label = flb;
+        // 4) 命中层：环形 stroke 带（fill none + stroke 带 = 只命中环带区域，不遮挡内层环），hover/点击区域
+        var fhit = document.createElementNS(NS, 'circle');
+        fhit.setAttribute('cx', fcx); fhit.setAttribute('cy', fcy);
+        fhit.setAttribute('r', fr);
+        fhit.setAttribute('fill', 'none');
+        fhit.setAttribute('stroke', 'rgba(255,255,255,0.001)');
+        fhit.setAttribute('stroke-width', fsg.width + 3);
+        fhit.style.pointerEvents = 'stroke';
+        fhit.setAttribute('data-native-cursor', 'true');
+        fengshuiSvg.appendChild(fhit);
+        fring.hit = fhit;
+        fsRings.push(fring);
+      }
+      // 事件绑定（IIFE 捕获，防 var 闭包）
+      for (var fei = 0; fei < fsRings.length; fei++) {
+        (function (ring) {
+          ring.hit.addEventListener('mouseenter', function () { fsShowHint(ring); });
+          ring.hit.addEventListener('mouseleave', function () { fsHideHint(); });
+          ring.hit.addEventListener('click', function () { fsSpinRing(ring); });
+        })(fsRings[fei]);
+      }
+      // 提示：hover 环 +1，联动目标环 +steps（只显示源环出边，单向）
+      function fsShowHint(ring) {
+        for (var hli = 0; hli < fsRings.length; hli++) fsRings[hli].label.setAttribute('opacity', '0');
+        ring.label.setAttribute('opacity', '1');
+        ring.label.textContent = '+1';
+        if (ring.link) {
+          var tgt = fsRings[ring.link.target];
+          tgt.label.setAttribute('opacity', '1');
+          tgt.label.textContent = '+' + ring.link.steps;
+        }
+      }
+      function fsHideHint() {
+        for (var hli2 = 0; hli2 < fsRings.length; hli2++) fsRings[hli2].label.setAttribute('opacity', '0');
+      }
+      // 点击：源环转 1 步 + 联动目标转 steps 步
+      function fsSpinRing(ring) {
+        fsAddSpin(ring, 1);
+        if (ring.link) fsAddSpin(fsRings[ring.link.target], ring.link.steps);
+      }
+      function fsAddSpin(ring, steps) {
+        var sp = ring.spin;
+        sp.from = sp.cur;              // 从当前显示角平滑续转
+        sp.t0 = performance.now();
+        sp.target += FS.stepDeg * steps;
+        sp.spinning = true;
+      }
+      // 对齐反馈：环已复位（cur % 360 ≡ 0）时弧提亮（brightness 1.25 → 2），状态变化才改样式
+      function fsCheckAligned() {
+        for (var cai = 0; cai < fsRings.length; cai++) {
+          var car = fsRings[cai];
+          if (car.spin.spinning) continue;   // 转动中不判定
+          var cal = (Math.abs(car.spin.cur % 360) < 0.01);
+          if (cal !== car.aligned) {
+            car.aligned = cal;
+            var f2 = cal ? 'brightness(2)' : 'brightness(1.25)';
+            for (var caj = 0; caj < car.arcs.length; caj++) car.arcs[caj].style.filter = f2;
+          }
+        }
+      }
+      // rAF 平滑转动（smoothstep 缓动）
+      function fsLoop(t) {
+        for (var fli = 0; fli < fsRings.length; fli++) {
+          var flr = fsRings[fli], flsp = flr.spin;
+          if (!flsp.spinning) continue;
+          var fp = Math.min((t - flsp.t0) / FS.spinMs, 1);
+          var fe = fp * fp * (3 - 2 * fp);
+          flsp.cur = flsp.from + (flsp.target - flsp.from) * fe;
+          flr.grp.setAttribute('transform', 'rotate(' + flsp.cur + ' ' + fcx + ' ' + fcy + ')');
+          if (fp >= 1) { flsp.cur = flsp.target; flsp.spinning = false; }
+        }
+        fsCheckAligned();
+        requestAnimationFrame(fsLoop);
+      }
+      requestAnimationFrame(fsLoop);
+    }
+
+
+
     // ============ 点阵背景（方形网格小圆点，中心亮边缘暗） ============
     var dotEls = [];   // 已渲染的点（含基准 opacity）
     var svgDots = document.getElementById('lab-dots');
@@ -1241,6 +1653,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       }
       // 绽开特效（第五段）：idx 4 显示，其他段隐藏（burstLoop 常驻 rAF 驱动）
       if (burstSvg) burstSvg.style.opacity = (idx === 4) ? '1' : '0';
+
+      // 老虎机竖条 + 4x4 网格（第七段）：idx 6 显示，其他段隐藏（slotsLoop 常驻 rAF 驱动）
+      if (slotsSvg) slotsSvg.style.opacity = (idx === 6) ? '1' : '0';
+
+      // 风水转盘（第八段）：idx 7 显示，其他段隐藏（fsLoop 常驻 rAF 驱动）
+      if (fengshuiSvg) fengshuiSvg.style.opacity = (idx === 7) ? '1' : '0';
+
       // 代码卡片 + 左侧卡片高亮：idx 变化时切换（中心场景文字已删除）
       if (lastIdx !== idx) {
         lastIdx = idx;
@@ -1554,6 +1973,26 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     opacity: 0;
     transition: opacity .35s ease;
   }
+
+  /* 第七段层：老虎机竖条 + 4x4 网格推箱子绕行（JS 生成），第七段圆弧显示 */
+  .lab-slots {
+    z-index: 6;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+
+  /* 第八段层：风水转盘 8 同心环 × 8 段弧，点击联动（JS 生成），第八段圆弧显示 */
+  .lab-fengshui {
+    z-index: 6;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  /* 命中层：覆盖全局 cursor:none（同 !important 拼 specificity），hover 显示手型 */
+  .lab-fengshui [data-native-cursor] {
+    cursor: pointer !important;
+  }
+
+
   /* 第四段形状菜单：fixed 右下角（代码卡片上方），仅第四段显示 */
   .lab-shape-menu {
     position: fixed;
