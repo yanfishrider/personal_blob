@@ -68,14 +68,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // ===== 场景数据（8 段占位，改数组长度即可调整段数） =====
   // 每段：title 左侧卡片标题 / desc 左侧介绍（介绍中心旋转色块动画的各方面）/ code 刻度尺上方代码卡片
   var SCENES = [
-    { title: '增强型变换', desc: '将各个 CSS 变换属性与多功能的组合 API 平滑地融合。', code: "animate(square, {\n  rotate: 90, loop: true, duration: 500,\n  ease: 'inOutExpo'\n});" },
-    { title: '单个CSS变换', desc: '独立控制 translate / rotate / scale 等每个属性。', code: '// 独立属性\nrotate: 90,\nscale: [0.4, 1.6],\nx: 120, y: 80,' },
-    { title: '基于函数的值', desc: '每个元素独立求值，支持随机与计算。', code: '// 函数值：按元素求值\nx: () => utils.random(-240, 240),\ny: () => utils.random(-240, 240),' },
-    { title: '混合成分', desc: 'composition 让多个动画平滑叠加混合。', code: "composition: 'blend',\n// 多动画混合叠加" },
-    { title: '旋转 25%', desc: 'rotate 90°（圆周的 25%）。', code: '// 旋转幅度\nrotate: 90,' },
-    { title: '缓动曲线', desc: 'inOutExpo 两端缓入缓出，往返平滑。', code: "ease: 'inOutExpo'," },
-    { title: '循环播放', desc: 'loop 无限往返，500ms 完成一次旋转。', code: 'loop: true,\nduration: 500,' },
-    { title: '驱动引擎', desc: 'anime.js v4 动态加载驱动旋转。', code: "import('https://esm.sh/animejs@4.4.1')" },
+    { title: '中心色块旋转', desc: 'div 方块填充第一段弧色并 brightness 提亮，anime.js v4 animate() 驱动 rotate 0↔90° 往返，inOutExpo 两端缓入缓出，500ms 无限循环——最基础的 CSS transform 旋转动画。', code: "// 中心色块：弧色填充 + 提亮\nsquareEl.style.background = '#16899B';\nsquareEl.style.filter = 'brightness(1.42)';\n// anime.js 驱动旋转（往返）\nanimate(squareEl, {\n  rotate: 90, loop: true,\n  duration: 500, ease: 'inOutExpo'\n});" },
+    { title: '12 图形随机游走', desc: '6 类形状（圆/三角/方/菱形/星/圆弧）× 实心+线框 = 12 个，anime.js 独立循环随机跳点：目标点极坐标随机（活动半径 ≤240）、scale 0.4~1.6、duration 600~1400ms、ease out(3)，间隔 500~1100ms 递归循环。', code: "// 12 图形：6 类形状 × 实心/线框，独立随机游走\\nshapesEls.forEach(function (el, i) {\\n  function loop() {\\n    var p = randPoint();            // 极坐标随机点\\n    animate(el, {\\n      x: p.x, y: p.y,\\n      scale: utils.random(0.4, 1.6),\\n      duration: utils.random(600, 1400),\\n      ease: 'out(3)',\\n    });\\n    setTimeout(loop, utils.random(500, 1100));\\n  }\\n  setTimeout(loop, utils.random(0, 900));\\n});" },
+    { title: '3D 球体错觉', desc: '20 条扁椭圆沿对角线对称排布（rx 两端 57.5、中间 258.75，扁度 0.2，rotate -45°）叠出球面纬线投影，滚轮驱动 stroke-dashoffset 逐条画-保持-擦除，组级呼吸浮动（独立 rAF 时间驱动）。', code: "// 20 条椭圆：纬线投影 → 3D 球\\nvar t = (i - 9.5) / 9.5;               // -1 ~ 1\\nvar rx = 57.5 + 201.25 * (1 - t * t);  // 两端小中间大\\n// path: M (cx-rx) cy A rx ry 0 1 0 ...\\n// 滚轮驱动: dashoffset = L * (1 - drawP)\\n// 呼吸浮动: 独立 rAF, sin(t) ±8px" },
+    { title: '闭合赛道绕行', desc: '圆点沿闭合 path 匀速绕行（getPointAtLength），轨道描边"跑到哪画到哪"（dashoffset 第一圈画满后保持完整）；菜单可切星系/圆/椭圆/菱形/心形/五角星/方形/三角，星系 = 太阳 + 3 轨道行星自转 + 卫星绕转 + 近大远小。', code: "// 圆点沿闭合 path 绕行 + 轨道描边生长\\nvar pt = path.getPointAtLength(prog * L);\\nvar pt2 = path.getPointAtLength(Math.min(prog * L + 1, L - 0.01));\\nvar ang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;\\ndot.setAttribute('cx', pt.x); dot.setAttribute('cy', pt.y);\\n// 描边: dasharray = L L, dashoffset = L * (1 - drawP)" },
+    { title: '中心绽开特效', desc: '中心自动循环：圆环扩散（0→200px，后 40% 透明度衰减）+ 18 个彩色粒子外飞（随机形状/颜色，飞散距离 40~300），1800ms 间隔触发，1100ms 单次，结束即清理 DOM。', code: "// 圆环 + 18 粒子，1800ms 间隔自动触发\\nfunction burstFire(now) {\\n  // ring: r 0→200, 后 40% 透明度衰减\\n  // dot: 随机形状/颜色, ease 外飞 + scale 缩小\\n}\\n// p >= 1 时 removeChild + splice 清理" },
+    { title: '引擎仪表盘', desc: '齿轮榫卯咬合（16/10 齿，速比 1.6 反向旋转）+ RPM 指针 + 刻度线联动：指针扫过时刻度外移高亮、分段弧三态（低亮/高亮/点亮），转速随段内进度驱动（inSeg=1 满速 0.5 圈/秒）。', code: "var ENGINE = { gearMain: {n:16,R:75}, gearSub: {n:10,R:46.9}, rpmMax: 9000 };\\n// 主齿轮 0.5 圈/秒, 小齿轮反向 ×1.6\\n// 指针角度 = 转速; 刻度线 bumpAmp 外移 + 高亮\\n// 分段弧三态: opacity 0.12 / 0.5 / 1" },
+    { title: '老虎机排队绕行', desc: '竖条 6 块步进滚动（900ms 移动/1400ms 停顿），底部方块变扁弹射进 5×5 网格（随机圆弧色），沿外圈 16 格 → 内圈 8 格 → 中心 (2,2) 缩小淡出；多实例同轨迹排队，fresh 方块从顶部滑入防重叠。', code: "// 竖条步进滚动: move/pause 相位状态机\\nslotEject();   // 底部方块变扁弹射（副本）\\n// 状态机: squeeze → fly → grid → vanish\\n// 路径: 外圈 16 格 → 内圈 8 格 → 中心 (2,2)" },
+    { title: '风水转盘解谜', desc: '8 同心环 × 每环 8 段弧，颜色 = 外层弧色（对齐基准）初始旋转错位打乱；点击环弧顺时针转 1 格 + 联动环转 k 格（k∈{1,2}，每环最多被 1 环关联），hover 显示 +N 提示，转回对齐（cur%360≡0）弧提亮。', code: "// 点击: 源环 +1 格, 联动环 +k 格\\nfsAddSpin(ring, 1);\\nif (ring.link) fsAddSpin(fsRings[ring.link.target], ring.link.steps);\\n// 对齐判定: cur % 360 ≡ 0 → brightness(2)" },
   ];
   var SEG_NUM = SCENES.length;   // 段数由场景数组驱动（当前 8）
 
@@ -1188,7 +1188,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         return c;
       }
       // 联动：必定 1 个、最多 2 个独立环（无出边）；其余环各 1 条单向出边
-      // 入度 ≤ 1：每个环最多被 1 个环关联（usedTarget 去重）；步数 1/2 随机
+      // 入度 ≤ 1：每个环最多被 1 个环关联（usedTarget 去重）
+      // 禁止相互关联：候选排除"已指向自己的环"（A→B 则 B 不能再→A）
+      // 步数 1/2 随机
       var indepN = 1 + Math.floor(Math.random() * 2);
       var indepSet = {};
       var shufAll = fsShuffle([0, 1, 2, 3, 4, 5, 6, 7]);
@@ -1199,7 +1201,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         if (indepSet[lki]) continue;
         var cands = [];
         for (var cdi = 0; cdi < 8; cdi++) {
-          if (cdi !== lki && !usedTarget[cdi]) cands.push(cdi);
+          if (cdi === lki) continue;                                  // 不能指向自己
+          if (usedTarget[cdi]) continue;                              // 入度 ≤ 1
+          if (fsLink[cdi] && fsLink[cdi].target === lki) continue;    // 禁止相互关联
+          cands.push(cdi);
         }
         if (!cands.length) continue;   // 极端情况目标全被占：此环不联动
         var lt2 = cands[Math.floor(Math.random() * cands.length)];
@@ -1214,6 +1219,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         var fsegLen = farcC * fsegDeg / 360;
         var fsegStep = fsegDeg + fsg.segGap;
         var fgrp = document.createElementNS(NS, 'g');
+        var fring = {
+          r: fr, grp: fgrp, arcs: [],
+          spin: { cur: 0, target: 0, from: 0, t0: 0, spinning: false },
+          link: fsLink[fri] || null, label: null, hit: null, aligned: false
+        };
         // 1) 槽位暗弧：8 段固定不转（彩色弧的槽底，衬托"弧转动"）
         for (var fsi = 0; fsi < 8; fsi++) {
           var fslot = document.createElementNS(NS, 'circle');
@@ -1227,11 +1237,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         }
         // 2) 彩色弧组：8 段弧颜色 = 外层弧色固定顺序（对齐基准），group rotate 驱动转动
         //    打乱 = 每环初始旋转 offset 格（offset×45°），点击转回 offset≡0 即复位
-        var fring = {
-          r: fr, grp: fgrp, arcs: [],
-          spin: { cur: 0, target: 0, from: 0, t0: 0, spinning: false },
-          link: fsLink[fri] || null, label: null, hit: null, aligned: false
-        };
         var fcolors = a.colors.slice();   // 固定外层顺序（不再打乱序列，只靠旋转错位）
         var foff = Math.floor(Math.random() * 8);          // 打乱格数 0~7
         var foffDeg = foff * fsg.stepDeg;
@@ -1659,6 +1664,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
       // 风水转盘（第八段）：idx 7 显示，其他段隐藏（fsLoop 常驻 rAF 驱动）
       if (fengshuiSvg) fengshuiSvg.style.opacity = (idx === 7) ? '1' : '0';
+      // 第八段隐藏背景点阵（风水转盘区域不需要背景小点）
+      if (svgDots) svgDots.style.opacity = (idx === 7) ? '0' : '1';
 
       // 代码卡片 + 左侧卡片高亮：idx 变化时切换（中心场景文字已删除）
       if (lastIdx !== idx) {
