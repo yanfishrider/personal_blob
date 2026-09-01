@@ -1,0 +1,179 @@
+---
+// lab-p3re.astro — 动画馆 iframe 内容页 3/3：P3RE 风格加载动画（演示模式）
+// 从 LoadingScreen.astro 的 runP3RE 抽取：海浪幕布下滑 → 视频 1 → 视频 2 → 点击进入
+// 演示模式改动：无页面跳转/淡出移除，点击任意位置 = 重播整个流程
+// ⚠️ import.meta.env 不能出现在内联脚本里（Astro 不替换，浏览器报 TypeError）
+//    必须用 frontmatter 的 define:vars 注入 BASE_URL（2026-09 实测）
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>P3RE 加载动画</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #469ce5; }
+    body { overflow: hidden; }
+
+    /* 海浪幕布 */
+    #p3re-startwaves {
+      position: fixed; display: flex; justify-content: center;
+      width: 100%; height: 120vh; background-color: #469ce5;
+      transform: translateY(-10vh); z-index: 999;
+    }
+    #p3re-waves { display: block; position: absolute; width: 100%; bottom: 120vh; }
+    #p3re-shape { position: absolute; left: 0; bottom: -1vw; }
+    #p3re-waves img:not(#p3re-shape) { position: absolute; left: 0; }
+    #p3re-waves img:nth-child(1) { opacity: 0.8; bottom: -0.1vw; animation: p3re-move-1 5s infinite; }
+    #p3re-waves img:nth-child(2) { opacity: 0.7; bottom: 0.5vw;  animation: p3re-move-2 4s infinite; }
+    #p3re-waves img:nth-child(3) { opacity: 0.6; bottom: 0.3vw;  animation: p3re-move-3 3.5s infinite; }
+    #p3re-waves img:nth-child(4) { opacity: 0.5; bottom: 0.1vw;  animation: p3re-move-4 3s infinite; }
+    @keyframes p3re-move-1 { 50% { transform: translateY(35px); } }
+    @keyframes p3re-move-2 { 50% { transform: translateY(25px); } }
+    @keyframes p3re-move-3 { 50% { transform: translateY(20px); } }
+    @keyframes p3re-move-4 { 50% { transform: translateY(20px); } }
+
+    @keyframes p3re-down {
+      0%   { transform: translateY(-10vh); }
+      100% { transform: translateY(110vh); }
+    }
+    @keyframes p3re-out { 100% { opacity: 0; display: none; } }
+    @keyframes p3re-in  { 100% { opacity: 1; } }
+
+    /* 视频背景 */
+    .p3re-video { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+    #p3re-videobg { width: 100%; height: 100%; }
+    #p3re-centertext {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center; color: #fff;
+      animation: p3re-out 1.5s 3s forwards;
+    }
+    #p3re-centertext h1 { font-size: 3rem; font-weight: bold; margin-bottom: 1rem; letter-spacing: 0.05em; }
+    #p3re-centertext p  { font-size: 1rem; line-height: 1.8; opacity: 0.8; }
+    #p3re-logo {
+      position: absolute; right: 12%; top: 50%;
+      opacity: 0;
+      transform: translateY(-50%);
+      animation: p3re-in 1.5s 5s forwards;
+      max-height: 120px;
+    }
+
+    /* 点击重播提示 */
+    #p3re-enter {
+      display: none; position: absolute; bottom: 3rem; left: 50%;
+      transform: translateX(-50%);
+      color: #fff; font-size: 0.875rem; opacity: 0.6; cursor: pointer;
+      letter-spacing: 0.1em; transition: opacity 0.3s; z-index: 1000;
+      font-family: 'Courier New', Consolas, monospace;
+    }
+    #p3re-enter:hover { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="p3re-startwaves">
+    <div id="p3re-waves">
+      <img src={`${base}/img/waves/wave-1.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-2.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-3.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-4.svg`} alt="" />
+      <img src={`${base}/img/waves/wave-5.svg`} id="p3re-shape" alt="" />
+    </div>
+  </div>
+
+  <div id="p3re-videobg">
+    <video id="p3re-video1" muted playsinline class="p3re-video"></video>
+    <video id="p3re-video2" muted playsinline loop class="p3re-video"></video>
+
+    <div id="p3re-centertext">
+      <h1>Memento Mori</h1>
+      <p>Remember, You Will Die.<br/>Time never waits.<br/>It delivers all equally to the same end.</p>
+    </div>
+
+    <img id="p3re-logo" src={`${base}/img/P3RE.svg`} alt="" />
+  </div>
+
+  <div id="p3re-enter">点击任意位置重播</div>
+
+  <script type="module" define:vars={{ base }}>
+    var baseAsset = (base || '/') + '/assset/';
+    var v1 = document.getElementById('p3re-video1');
+    var v2 = document.getElementById('p3re-video2');
+    var waves = document.getElementById('p3re-startwaves');
+    var enterEl = document.getElementById('p3re-enter');
+    var centerText = document.getElementById('p3re-centertext');
+    var logo = document.getElementById('p3re-logo');
+    var runId = 0;   // 当前运行编号：重播时 ++，旧闭包的定时器/事件触发后检测编号不匹配直接忽略
+
+    // 重播 = 重置所有动画/视频状态后重新走一遍流程
+    function resetAll() {
+      // 海浪幕布恢复原位并重新播放下滑动画
+      waves.style.animation = 'none';
+      waves.style.display = 'flex';
+      void waves.offsetWidth;                       // 强制 reflow 重置动画
+      waves.style.animation = 'p3re-down 3s ease-out 1s forwards';
+      // 视频复位
+      v1.removeAttribute('src'); v2.removeAttribute('src');
+      v1.style.display = ''; v2.style.display = '';
+      v1.pause(); v2.pause();
+      // 文字/logo 动画重置
+      centerText.style.animation = 'none';
+      void centerText.offsetWidth;
+      centerText.style.animation = 'p3re-out 1.5s 3s forwards';
+      logo.style.animation = 'none';
+      void logo.offsetWidth;
+      logo.style.animation = 'p3re-in 1.5s 5s forwards';
+      enterEl.style.display = 'none';
+    }
+
+    function runP3RE() {
+      var myRun = ++runId;
+      resetAll();
+
+      var revealed = false;
+      var WAVE_TOTAL = 3600; // 1s delay + 3s duration - 500ms 提前
+
+      function revealVideo() {
+        if (revealed || myRun !== runId) return;
+        revealed = true;
+        waves.style.display = 'none';
+
+        v1.src = baseAsset + 'fv_movie1.mp4';
+        v1.load();
+        var play1 = v1.play();
+        if (play1) play1.catch(function () {});
+
+        // onended 属性式监听：每次重播覆盖上一次，避免事件累积
+        v1.onended = function () {
+          if (myRun !== runId) return;
+          v1.style.display = 'none';
+          v2.src = baseAsset + 'fv_movie2.mp4';
+          v2.load();
+          var play2 = v2.play();
+          if (play2) play2.catch(function () {});
+
+          setTimeout(function () {
+            if (myRun === runId) enterEl.style.display = 'block';
+          }, 2000);
+        };
+      }
+
+      setTimeout(function () { if (myRun === runId) revealVideo(); }, WAVE_TOTAL);
+      // animationend 兜底（用后即删，避免叠加）
+      var onAnimEnd = function () {
+        waves.removeEventListener('animationend', onAnimEnd);
+        if (myRun === runId) revealVideo();
+      };
+      waves.addEventListener('animationend', onAnimEnd);
+    }
+
+    // 点击任意位置：重播整个流程
+    document.body.addEventListener('click', function () {
+      runP3RE();
+    });
+
+    runP3RE();
+  </script>
+</body>
+</html>

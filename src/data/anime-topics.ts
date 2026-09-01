@@ -1,3 +1,5 @@
+import { hollowKnightTopics } from './hollow-knight-topics';
+
 export interface SubItem {
   id: string; label: string; desc: string; html: string; css: string; js: string;
   children?: SubItem[];
@@ -1952,4 +1954,5 @@ body { height: 400vh; background: #e8e8e8; font-family: 'Courier New', 'Consolas
       },
     ],
   },
+  ...hollowKnightTopics,
 ];
