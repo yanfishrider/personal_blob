@@ -24,27 +24,27 @@ const base = import.meta.env.BASE_URL;
 
 <!-- ===== 全局滚动指示器：fixed 右下角（right:10% bottom:10%），随整页滚动进度移动 ===== -->
 <!-- 两种样式：ruler 横条刻度尺（默认）/ clock 圆形表盘+时针；由 localStorage['scroll-indicator-style'] 切换 -->
-<div id="nier-scroll-hint" class="fixed z-[70] flex flex-col items-center" style="right:10%; bottom:10%; opacity:0; transition: opacity .5s ease; pointer-events:none; background: transparent; padding: 8px 14px 6px;">
+<div id="nier-scroll-hint" class="fixed z-[70] flex flex-col items-center" style="right:10%; bottom:10%; opacity:0; transition: opacity .5s ease; pointer-events:none; background: var(--ih-bg); border:1px solid var(--ih-border); border-radius:12px; backdrop-filter: blur(4px); padding: 10px 16px 8px;">
   <!-- 样式一：横向刻度尺（ruler） -->
   <div id="nier-indicator-ruler" class="flex flex-col items-center">
-    <div id="nier-hint-label" class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:#22D3EE;">向下滚动</div>
-    <div id="nier-ruler" class="relative" style="width:240px; height:22px; background-image: repeating-linear-gradient(90deg, rgba(34,211,238,.4) 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, rgba(34,211,238,.22) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat;">
-      <div class="absolute left-0 right-0" style="top:15px; height:2px; background: rgba(34,211,238,.35);"></div>
+    <div id="nier-hint-label" class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:var(--ih-accent);">向下滚动</div>
+    <div id="nier-ruler" class="relative" style="width:240px; height:22px; background-image: repeating-linear-gradient(90deg, var(--ih-rule-dim) 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, var(--ih-rule-faint) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat;">
+      <div class="absolute left-0 right-0" style="top:15px; height:2px; background: var(--ih-rule-base);"></div>
       <!-- 已滚动区域高亮填充层（宽度随进度更新） -->
-      <div id="nier-ruler-fill" class="absolute left-0" style="top:0; bottom:0; width:0%; background-image: repeating-linear-gradient(90deg, #22D3EE 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, rgba(34,211,238,.9) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%); mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%);"></div>
-      <div id="nier-ruler-knob" class="absolute" style="top:-5.5px; left:0; width:2px; height:19.5px; transform:translateX(-50%); background:#7FF3FF; box-shadow:0 0 8px rgba(34,211,238,.9), 0 0 2px rgba(255,255,255,.8);"></div>
+      <div id="nier-ruler-fill" class="absolute left-0" style="top:0; bottom:0; width:0%; background-image: repeating-linear-gradient(90deg, var(--ih-accent) 0 1.5px, transparent 1.5px 16px), repeating-linear-gradient(90deg, var(--ih-accent-soft) 0 1px, transparent 1px 4px); background-size: 100% 13px, 100% 7px; background-position: 0 1px, 0 6px; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%); mask-image: linear-gradient(90deg, #000 0%, rgba(0,0,0,.92) 100%);"></div>
+      <div id="nier-ruler-knob" class="absolute" style="top:-5.5px; left:0; width:2px; height:19.5px; transform:translateX(-50%); background:var(--ih-knob); box-shadow:0 0 8px var(--ih-glow), 0 0 2px rgba(255,255,255,.8);"></div>
     </div>
-    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:rgba(34,211,238,.55);">SCROLL</div>
+    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:var(--ih-sub);">SCROLL</div>
   </div>
 
   <!-- 样式二：圆形表盘 + 时针（clock），刻度/时针由 JS 动态生成 -->
   <div id="nier-indicator-clock" class="flex flex-col items-center" style="display:none;">
-    <div class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:#22D3EE;">向下滚动</div>
+    <div class="text-xs tracking-[0.25em] mb-2" style="opacity:.9; color:var(--ih-accent);">向下滚动</div>
     <div id="nier-clock" class="relative" style="width:72px; height:72px;">
       <svg id="nier-clock-svg" width="72" height="72" viewBox="0 0 72 72"></svg>
-      <div id="nier-clock-center" class="absolute rounded-full" style="top:50%; left:50%; width:6px; height:6px; transform:translate(-50%,-50%); background:#7FF3FF; box-shadow:0 0 8px rgba(34,211,238,.9);"></div>
+      <div id="nier-clock-center" class="absolute rounded-full" style="top:50%; left:50%; width:6px; height:6px; transform:translate(-50%,-50%); background:var(--ih-knob); box-shadow:0 0 8px var(--ih-glow);"></div>
     </div>
-    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:rgba(34,211,238,.55);">SCROLL</div>
+    <div class="text-[10px] tracking-[0.15em] mt-1.5" style="color:var(--ih-sub);">SCROLL</div>
   </div>
 </div>
 
@@ -224,10 +224,18 @@ const base = import.meta.env.BASE_URL;
     }
 
     // 生成圆形表盘：60 条刻度线（12 主 + 48 次）+ 时针（指向 12 点起始）
+    // 颜色读取 CSS 变量（主题随滚动切换）
+    function hintVar(name) {
+      var cs = getComputedStyle(hintEl);
+      return cs.getPropertyValue(name).trim();
+    }
     function buildClock() {
       if (!clockSvg) return;
       var NS = 'http://www.w3.org/2000/svg';
       var cx = 36, cy = 36, R = 30; // 圆心 + 刻度半径
+      var tMajor = hintVar('--ih-accent');
+      var tMinor = hintVar('--ih-rule-dim');
+      var tRing = hintVar('--ih-rule-base');
       clockSvg.innerHTML = '';
       clockTicks = [];
       for (var i = 0; i < 60; i++) {
@@ -239,7 +247,7 @@ const base = import.meta.env.BASE_URL;
         var line = document.createElementNS(NS, 'line');
         line.setAttribute('x1', x1); line.setAttribute('y1', y1);
         line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', isMajor ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)');
+        line.setAttribute('stroke', isMajor ? tMajor : tMinor);
         line.setAttribute('stroke-width', isMajor ? '1.6' : '1');
         line.setAttribute('stroke-linecap', 'round');
         clockSvg.appendChild(line);
@@ -249,14 +257,14 @@ const base = import.meta.env.BASE_URL;
       var ring = document.createElementNS(NS, 'circle');
       ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
       ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', 'rgba(34,211,238,.25)');
+      ring.setAttribute('stroke', tRing);
       ring.setAttribute('stroke-width', '1.5');
       clockSvg.appendChild(ring);
       // 时针：从圆心指向 12 点，rotate 由滚动驱动
       clockHand = document.createElementNS(NS, 'line');
       clockHand.setAttribute('x1', cx); clockHand.setAttribute('y1', cy);
       clockHand.setAttribute('x2', cx); clockHand.setAttribute('y2', cy - 20);
-      clockHand.setAttribute('stroke', '#7FF3FF');
+      clockHand.setAttribute('stroke', hintVar('--ih-knob'));
       clockHand.setAttribute('stroke-width', '2.5');
       clockHand.setAttribute('stroke-linecap', 'round');
       clockHand.style.transformOrigin = cx + 'px ' + cy + 'px';
@@ -265,12 +273,14 @@ const base = import.meta.env.BASE_URL;
       applyIndicatorStyle();
     }
 
-    // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度
+    // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度 + 主题切换
     function onScrollFlip() {
       var vh = window.innerHeight;
       // 首屏翻转：前 100vh 内完成 0 → -90°
       var flip = Math.min(window.scrollY / vh, 1);
       nierEl.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
+      // 主题切换：首屏动画区（< 100vh）荧光青深底板；正文区深蓝透明底板
+      hintEl.classList.toggle('ih-body', window.scrollY >= vh);
       // 指示器：整个文档滚动进度 0 → 100%
       var doc = document.documentElement;
       var maxScroll = doc.scrollHeight - vh;
@@ -279,11 +289,14 @@ const base = import.meta.env.BASE_URL;
         // 时针旋转 0 → 360°（从 12 点起），扫过的刻度高亮
         clockHand.style.transform = 'rotate(' + (page * 360) + 'deg)';
         var passed = Math.round(page * 60);
+        var tHi = hintVar('--ih-accent');
+        var tMajor = hintVar('--ih-accent');
+        var tMinor = hintVar('--ih-rule-dim');
         for (var i = 0; i < 60; i++) {
           var isMajorT = (i % 5 === 0);
           clockTicks[i].setAttribute('stroke', i <= passed
-            ? (isMajorT ? '#22D3EE' : 'rgba(34,211,238,.8)')
-            : (isMajorT ? 'rgba(34,211,238,.75)' : 'rgba(34,211,238,.3)'));
+            ? (isMajorT ? tHi : tMinor)
+            : (isMajorT ? tMajor : tMinor));
         }
       } else {
         rulerKnob.style.left = (page * 100) + '%';
@@ -441,6 +454,34 @@ const base = import.meta.env.BASE_URL;
 
 <style is:global>
   #nier-loading { font-family: 'Courier New', 'Source Code Pro', 'Consolas', 'Noto Sans SC', monospace; letter-spacing: 0.05em; }
+
+  /* ===== 滚动指示器主题变量 =====
+     顶部动画区（深色首屏）默认荧光青；正文区（白底）由 JS 加 .ih-body 切换深蓝 */
+  #nier-scroll-hint {
+    --ih-bg: rgba(28, 24, 20, 0.55);          /* 底板（顶部动画区深色半透明） */
+    --ih-border: rgba(34, 211, 238, 0.25);    /* 边框 */
+    --ih-accent: #22D3EE;                     /* 主强调色（刻度/填充/文字） */
+    --ih-accent-soft: rgba(34, 211, 238, 0.9);/* 填充次级色 */
+    --ih-rule-dim: rgba(34, 211, 238, 0.4);   /* 刻度尺主刻度 */
+    --ih-rule-faint: rgba(34, 211, 238, 0.22);/* 刻度尺次刻度 */
+    --ih-rule-base: rgba(34, 211, 238, 0.35); /* 刻度尺基线 */
+    --ih-knob: #7FF3FF;                       /* 滑块/时针/中心点 */
+    --ih-glow: rgba(34, 211, 238, 0.9);       /* 辉光 */
+    --ih-sub: rgba(34, 211, 238, 0.55);       /* SCROLL 小字 */
+  }
+  /* 正文区主题：深蓝刻度 + 透明底板（白底上清晰） */
+  #nier-scroll-hint.ih-body {
+    --ih-bg: transparent;
+    --ih-border: rgba(30, 58, 138, 0.3);
+    --ih-accent: #1E3A8A;
+    --ih-accent-soft: rgba(30, 58, 138, 0.85);
+    --ih-rule-dim: rgba(30, 58, 138, 0.45);
+    --ih-rule-faint: rgba(30, 58, 138, 0.2);
+    --ih-rule-base: rgba(30, 58, 138, 0.35);
+    --ih-knob: #1E40AF;
+    --ih-glow: rgba(30, 58, 138, 0.8);
+    --ih-sub: rgba(30, 58, 138, 0.6);
+  }
 
   /* 不可滚动页（notes/game 等 overflow:hidden 固定布局）回退 fixed 遮罩模式：
      不占文档流、播完淡出移除，避免 100vh 首屏把固定布局内容推出视口 */
