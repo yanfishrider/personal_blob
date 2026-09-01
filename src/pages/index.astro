@@ -27,7 +27,7 @@ const postDates = posts.map(p => {
 const lastUpdate = posts.length > 0 ? posts[0].data.date : new Date();
 ---
 
-<BaseLayout title="摸鱼骑士 知识库" description="代码如诗，架构如画。">
+<BaseLayout title="摸鱼骑士 知识库" description="摸鱼骑士的个人学习记录">
   <ProfileSidebar slot="sidebar" postCount={posts.length} tagCount={tagCount} categoryCount={catCount} recentPosts={recentPosts} />
 
   <div id="center-view" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
