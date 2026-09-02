@@ -41,7 +41,10 @@ const base = import.meta.env.BASE_URL;
           </svg>
         </div>
         <h2 class="text-lg font-bold text-gray-800">摸鱼骑士</h2>
-        <p class="text-xs text-gray-500 mt-1">闲来垂钓碧溪上,忽复乘舟梦日边</p>
+        <p id="motto-text" class="text-xs text-gray-500 mt-1">闲来垂钓碧溪上,忽复乘舟梦日边</p>
+        <button id="motto-btn" type="button"
+          class="inline-flex items-center text-[11px] text-gray-600 border border-gray-300 rounded-full px-3 py-0.5 mt-1.5 transition-colors duration-300 cursor-pointer select-none tracking-widest hover:text-[#49B1F5] hover:border-[#49B1F5]"
+          title="切换个性签名">文本改变</button>
         <p class="text-xs text-gray-400 mt-0.5">软件开发</p>
       </div>
 
@@ -98,7 +101,27 @@ const base = import.meta.env.BASE_URL;
 </style>
 
 <script>
-  import { animate } from 'https://esm.sh/animejs@4.4.1';
+  import { animate, scrambleText } from 'https://esm.sh/animejs@4.4.1';
+
+  // 头像卡片：点击「文本改变」轮换个性签名（scrambleText 乱码切换）
+  const mottoEl = document.getElementById('motto-text');
+  const mottoBtn = document.getElementById('motto-btn');
+  if (mottoEl && mottoBtn) {
+    const mottoes = [
+      '闲来垂钓碧溪上,忽复乘舟梦日边',
+      '长风破浪会有时,直挂云帆济沧海',
+      '行到水穷处,坐看云起时',
+      '竹杖芒鞋轻胜马,谁怕?一蓑烟雨任平生',
+      '此心安处是吾乡',
+    ];
+    let mottoIdx = 0;
+    mottoBtn.addEventListener('click', () => {
+      mottoIdx = (mottoIdx + 1) % mottoes.length;
+      animate(mottoEl, {
+        innerHTML: scrambleText({ text: mottoes[mottoIdx] }),
+      });
+    });
+  }
 
   const avatars = document.querySelectorAll('.avatar-ring');
   if (avatars.length) {

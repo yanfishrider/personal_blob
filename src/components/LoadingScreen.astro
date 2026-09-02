@@ -5,11 +5,9 @@
 const base = import.meta.env.BASE_URL;
 ---
 
-<!-- ===== NieR 风格（首屏模式） ===== -->
-<!-- #nier-loading 占 100vh 文档流、永驻页面顶部（刷新不销毁，向上滚可看回加载动画）；
-     #nier-stage sticky 钉在视口顶部，滚动时实时 rotateX 翻转（可逆：向下滚翻走、向上滚翻回） -->
-<div id="nier-loading" class="relative z-[60]" style="height:100vh;">
-  <div id="nier-stage" class="sticky top-0 overflow-hidden" style="height:100vh; background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px; transform-origin: 50% 50%; will-change: transform;">
+<!-- ===== NieR 风格（fixed 全屏遮罩，同 P3RE：播放 → 点击任意位置进入 → 淡出移除） ===== -->
+<div id="nier-loading" class="fixed inset-0 z-[9999] overflow-hidden" style="display:none;">
+  <div id="nier-stage" class="absolute inset-0 overflow-hidden" style="background: #1C1814; background-image: linear-gradient(rgba(0,0,0,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.15) 1px, transparent 1px); background-size: 5px 5px;">
     <canvas id="nier-grid-art" class="absolute inset-0 w-full h-full z-[5] pointer-events-none"></canvas>
 
     <div class="absolute top-8 left-8 sm:top-12 sm:left-12 z-10">
@@ -19,6 +17,11 @@ const base = import.meta.env.BASE_URL;
     </div>
 
     <div id="nier-lines" class="absolute top-[22%] left-[3%] sm:top-[28%] sm:left-[3%] space-y-2 text-sm sm:text-base z-10"></div>
+
+    <!-- 播完亮出的进入提示（同 P3RE） -->
+    <div id="nier-enter" style="display:none;position:absolute;bottom:3rem;left:50%;transform:translateX(-50%);color:#fff;font-size:0.875rem;opacity:0.6;cursor:pointer;letter-spacing:0.1em;z-index:10;transition:opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">
+      点击任意位置进入
+    </div>
   </div>
 </div>
 
@@ -88,33 +91,28 @@ const base = import.meta.env.BASE_URL;
     return p === b || p === b + '/' || p === '/';
   }
   var storedAnim = localStorage.getItem('loading-animation');
-  // 未配置时：首页默认实验室风格（LabLoading），其他页默认 NieR
-  var anim = storedAnim || (isHomePage() ? 'lab' : 'nier');
+  // 加载动画只在首页展示：非首页一律 none（其他页面无首屏适配，直接进正文）。
+  // 首页未配置时默认实验室风格（LabLoading），也可在右下角工具栏切换 lab/nier/p3re/none。
+  var anim = isHomePage() ? (storedAnim || 'lab') : 'none';
   // animation-lab 测试页暂不需要加载动画（测试画布阶段跳过，正式实现后可移除）
   if (window.location.pathname.indexOf('/animation-lab') !== -1) {
     anim = 'none';
   }
   var nierWrap = document.getElementById('nier-loading');
-  var nierEl = document.getElementById('nier-stage');
   var p3reEl = document.getElementById('p3re-loading');
   var hintEl = document.getElementById('nier-scroll-hint');
   var labWrap = document.getElementById('ll-loading');
 
   // 检测页面是否可整页滚动：尝试滚动 10px，看 scrollY 是否变化。
-  // notes/game 等 overflow:hidden 固定布局页滚动无效 → 回退旧 fixed 遮罩模式
   // （不依赖 getComputedStyle——dev 下 CSS 由 Vite 异步注入，检测样式有时序竞态）
   // 注意：module script 执行时图片可能未加载、文章列表高度未撑起，scrollHeight 可能
-  // 偏小导致误判 fixedMode —— 因此这里只决定 nier-fixed 类，指示器显隐放到 load 后复检。
+  // 偏小导致误判 —— 因此指示器显隐放到 load 后复检（见下方 window load）。
   function detectScrollable() {
     var ty = window.scrollY;
     window.scrollBy(0, 10);
     var cs = window.scrollY !== ty;
     window.scrollTo(0, ty);
     return cs;
-  }
-  var fixedMode = !detectScrollable();
-  if (fixedMode) {
-    nierWrap?.classList.add('nier-fixed');
   }
 
   // 滚动指示器与加载动画风格解耦：不随 lab/p3re/none 分支删除，
@@ -189,17 +187,12 @@ const base = import.meta.env.BASE_URL;
     applyIndicatorStyle();
   }
 
-  // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度 + 主题切换
+  // 滚动驱动：指示器整页进度 + 主题切换（NieR 已是 fixed 遮罩，无 sticky 翻转）
   function onScrollFlip() {
     var vh = window.innerHeight;
-    // 首屏翻转：前 100vh 内完成 0 → -90°（nierEl 可能已被 lab/p3re 分支移除 → null 保护）
-    var flip = Math.min(window.scrollY / vh, 1);
-    if (nierEl) {
-      nierEl.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
-    }
-    // 主题切换：动画区（深色首屏）荧光青深底板；正文区深蓝透明底板。
-    // 动画区高度 = nier 首屏 100vh / lab 8 屏 800vh / 无动画 0（恒正文主题）
-    // 变色时机：指示器底边（视口底部 10% 处）滚到正文顶部即切换，而非完全进入正文
+    // 主题切换：动画区（深色遮罩）荧光青深底板；正文区深蓝透明底板。
+    // 动画区高度 = nier 遮罩视口高 / lab 8 屏 800vh / 无动画 0（恒正文主题）；
+    // nier 遮罩移除后 offsetHeight=0 → 恒正文主题
     var animAreaH = (nierWrap && nierWrap.offsetHeight) || (labWrap && labWrap.offsetHeight) || 0;
     var hintBottomY = animAreaH - vh * 0.9;
     hintEl?.classList.toggle('ih-body', window.scrollY >= hintBottomY);
@@ -222,7 +215,8 @@ const base = import.meta.env.BASE_URL;
       rulerKnob.style.left = (page * 100) + '%';
       if (rulerFill) rulerFill.style.width = (page * 100) + '%';
     }
-    // 提示文字随首屏翻走淡出
+    // 提示文字随离开顶部淡出
+    var flip = Math.min(window.scrollY / vh, 1);
     if (hintLabel) hintLabel.style.opacity = String(Math.max(0, 1 - flip * 3));
   }
 
@@ -249,31 +243,25 @@ const base = import.meta.env.BASE_URL;
     p3reEl.style.display = '';
     runP3RE();
   } else {
-    // nier
+    // nier：fixed 全屏遮罩（同 P3RE：播放 → 点击任意位置进入 → 淡出移除）
     p3reEl?.remove();
     labWrap?.remove();
-    if (fixedMode && sessionStorage.getItem('nier-intro-done')) {
-      // 不可滚动页刷新/回访：直接移除，不占文档流、不阻塞固定布局
+    if (sessionStorage.getItem('nier-intro-done')) {
+      // 刷新/回访：直接移除，不再播放（不占文档流）
       nierWrap?.remove();
-    } else if (!sessionStorage.getItem('nier-intro-done')) {
-      sessionStorage.setItem('nier-intro-done', '1');
-      runNier(false); // 首次进入：播放打字动画
     } else {
-      runNier(true);  // 可滚动页刷新/回访：跳过动画直接完成态（首屏不销毁，向上滚可见）
+      sessionStorage.setItem('nier-intro-done', '1');
+      nierWrap.style.display = '';
+      runNier(); // 首次进入：播放打字动画 → 播完亮出进入提示
     }
   }
 
   // load 后复检可滚动性：此时图片/字体已加载，scrollHeight 为真实高度。
-  // - 可滚动：若初始误判 fixedMode（内容加载后变高）→ 恢复首屏模式；非 nier 风格立即亮出指示器
-  //   （nier 风格由 runNier 播放完 showEnterHint，避免动画中途亮出破坏氛围）
+  // - 可滚动：亮出滚动指示器（nieR/p3re 遮罩播放中会被盖住，点击进入移除后自然可见）
   // - 不可滚动：确认移除指示器
   window.addEventListener('load', function () {
     if (detectScrollable()) {
-      if (fixedMode) {
-        nierWrap?.classList.remove('nier-fixed');
-        fixedMode = false;
-      }
-      if (anim !== 'nier') showEnterHint();
+      showEnterHint();
     } else {
       hintEl?.remove();
     }
@@ -332,25 +320,20 @@ const base = import.meta.env.BASE_URL;
   }
 
   /* ============ NieR ============ */
-  // quick=true：跳过打字动画，直接渲染完成态（刷新/回访场景）
-  // 指示器/翻转逻辑已提升到顶层（showEnterHint/onScrollFlip/buildClock 等），这里直接复用
-  function runNier(quick) {
-    // 点击首屏任意位置：首屏模式 = 平滑滚到进入点；fixed 模式 = 淡出移除（旧行为）
-    nierEl.addEventListener('click', function() {
-      if (fixedMode) {
-        dismissNier();
-      } else {
-        window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-      }
-    });
+  // fixed 全屏遮罩（同 P3RE 交互）：播放打字动画 → 播完亮出「点击任意位置进入」→
+  // 点击任意位置 → 淡出移除。指示器/进度逻辑在顶层（showEnterHint/onScrollFlip 等），
+  // 遮罩移除后指示器自然可见。
+  function runNier() {
+    var enterEl = document.getElementById('nier-enter');
 
-    // fixed 模式（notes/game 等不可滚动页）：淡出移除
+    // 点击任意位置进入：淡出移除遮罩（同 P3RE）
     function dismissNier() {
-      if (!nierEl) return;
-      nierEl.style.transition = 'opacity 0.6s ease-out';
-      nierEl.style.opacity = '0';
+      if (!nierWrap) return;
+      nierWrap.style.transition = 'opacity 0.6s ease-out';
+      nierWrap.style.opacity = '0';
       setTimeout(function() { nierWrap?.remove(); }, 600);
     }
+    nierWrap.addEventListener('click', dismissNier);
 
     import('../../ascii-art.txt?raw').then(function(m) {
       var ASCII_EMBLEM = m.default.split('\n').filter(function(r) { return r.length > 0; });
@@ -413,20 +396,6 @@ const base = import.meta.env.BASE_URL;
       var dotIdx = 0;
       var dotTimer = setInterval(function() { if (dotsEl) dotsEl.textContent = dotStates[dotIdx]; dotIdx = (dotIdx + 1) % dotStates.length; }, 400);
 
-      // 完成态：直接填满全部终端行（无打字动画）
-      function fillAllLines() {
-        for (var i = 0; i < lines.length; i++) {
-          var el = document.createElement('p');
-          el.className = 'tracking-wider';
-          var span = document.createElement('span');
-          span.style.color = '#fff';
-          span.textContent = lines[i];
-          el.appendChild(span);
-          container.appendChild(el);
-        }
-        clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
-      }
-
       async function typeLine(text, isLast) {
         var el = document.createElement('p');
         el.className = 'tracking-wider';
@@ -450,26 +419,11 @@ const base = import.meta.env.BASE_URL;
         for (var i = 0; i < lines.length; i++) await typeLine(lines[i], i === lines.length - 1);
         clearInterval(dotTimer); if (dotsEl) dotsEl.textContent = '';
         await sleep(500);
-        if (fixedMode) {
-          // 不可滚动页：播完淡出移除（旧行为）
-          dismissNier();
-        } else {
-          // 播放完不淡出：停留为首屏，亮出右下角刻度尺
-          showEnterHint();
-        }
+        // 播完亮出「点击任意位置进入」提示（同 P3RE），点击任意位置淡出移除
+        if (enterEl) enterEl.style.display = 'block';
       }
 
-      if (quick) {
-        if (fixedMode) {
-          // 不可滚动页刷新/回访：直接移除，不占文档流
-          nierWrap?.remove();
-        } else {
-          fillAllLines();
-          showEnterHint();
-        }
-      } else {
-        run();
-      }
+      run();
     });
   }
 </script>
@@ -503,20 +457,6 @@ const base = import.meta.env.BASE_URL;
     --ih-knob: #1E40AF;
     --ih-glow: rgba(30, 58, 138, 0.8);
     --ih-sub: rgba(30, 58, 138, 0.6);
-  }
-
-  /* 不可滚动页（notes/game 等 overflow:hidden 固定布局）回退 fixed 遮罩模式：
-     不占文档流、播完淡出移除，避免 100vh 首屏把固定布局内容推出视口 */
-  #nier-loading.nier-fixed {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 9999 !important;
-    height: 100vh !important;
-  }
-  #nier-loading.nier-fixed #nier-stage {
-    position: absolute !important;
-    top: 0 !important;
-    height: 100vh !important;
   }
 
   /* P3RE 海浪动画 */

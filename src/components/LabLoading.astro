@@ -68,7 +68,8 @@ const base = import.meta.env.BASE_URL;
       return p === b || p === b + '/' || p === '/';
     }
     var storedAnim = localStorage.getItem('loading-animation');
-    var wantLab = (storedAnim === 'lab') || (storedAnim === null && isHomePage());
+    // 实验室 8 屏动画只在首页展示（非首页无首屏适配）：首页未配置或显式选 lab 时显示
+    var wantLab = isHomePage() && (storedAnim === 'lab' || storedAnim === null);
     if (!wantLab) return;
     wrap.style.display = '';
 
