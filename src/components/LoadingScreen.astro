@@ -257,10 +257,10 @@ const base = import.meta.env.BASE_URL;
   }
 
   // load 后复检可滚动性：此时图片/字体已加载，scrollHeight 为真实高度。
-  // - 可滚动：亮出滚动指示器（nieR/p3re 遮罩播放中会被盖住，点击进入移除后自然可见）
-  // - 不可滚动：确认移除指示器
+  // - 首页且可滚动：亮出滚动指示器（nieR/p3re 遮罩播放中会被盖住，点击进入移除后自然可见）
+  // - 其他页面：移除指示器（刻度尺只在首页展示）
   window.addEventListener('load', function () {
-    if (detectScrollable()) {
+    if (detectScrollable() && isHomePage()) {
       showEnterHint();
     } else {
       hintEl?.remove();

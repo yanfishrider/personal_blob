@@ -1,6 +1,10 @@
 ---
 import type { CollectionEntry } from 'astro:content';
 import BaseLayout from './BaseLayout.astro';
+import ProfileSidebar from '../components/ProfileSidebar.astro';
+import SiteStats from '../components/SiteStats.astro';
+import BlogCalendar from '../components/BlogCalendar.astro';
+import { getBlogData } from '../lib/blog-data';
 
 export interface Props {
   post: CollectionEntry<'posts'>;
@@ -8,10 +12,20 @@ export interface Props {
 
 const { post } = Astro.props;
 const { Content } = await post.render();
+// 与首页同构的三栏数据：SPA 原地加载与整页刷新（F5）布局一致，左右栏不消失
+const { postCount, tagCount, categoryCount, recentPosts, postDates, lastUpdate } = await getBlogData();
 ---
 
-<BaseLayout title={`${post.data.title} - 我的博客`} description={post.data.description}>
-  <article id="post-article">
+<BaseLayout title={`${post.data.title} - 摸鱼骑士 知识库`} description={post.data.description}>
+  <ProfileSidebar slot="sidebar" postCount={postCount} tagCount={tagCount} categoryCount={categoryCount} recentPosts={recentPosts} />
+
+  <article id="post-article" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+    <!-- 返回列表：整页刷新时是真实链接（回首页）；SPA 原地加载时由 spa-loader 接管为 history.back -->
+    <a id="back-to-list" href={import.meta.env.BASE_URL}
+       class="flex items-center gap-1 text-sm text-gray-400 hover:text-[#49B1F5] transition-colors mb-6">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      返回列表
+    </a>
     <header class="mb-10">
       <h1 class="text-3xl font-bold text-gray-900 mb-3">{post.data.title}</h1>
       <div class="flex items-center gap-4 text-sm text-gray-400">
@@ -32,4 +46,11 @@ const { Content } = await post.render();
 
     <Content />
   </article>
+
+  <aside slot="rightSidebar" class="w-full md:w-[14%] md:min-w-[150px] shrink-0 md:relative">
+    <div class="md:sticky md:top-[18%] space-y-4">
+      <SiteStats postCount={postCount} lastUpdate={lastUpdate} />
+      <BlogCalendar postDates={postDates} />
+    </div>
+  </aside>
 </BaseLayout>

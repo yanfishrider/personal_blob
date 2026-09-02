@@ -5,12 +5,6 @@
 
   var listHTML = centerView.innerHTML;
 
-  function backBtn() {
-    return '<button id="back-to-list" class="flex items-center gap-1 text-sm text-gray-400 hover:text-[#49B1F5] transition-colors mb-6">' +
-      '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>' +
-      '返回列表</button>';
-  }
-
   var MIN_LOADING_MS = 400; // 加载圆环最小展示时长，避免加载太快像闪烁
   var loadSeq = 0; // 请求序号，防止快速连点时旧请求的 setTimeout 误复位光标
 
@@ -28,8 +22,10 @@
       var article = doc.getElementById('post-article');
       if (!article) throw new Error('article#post-article not found in ' + href);
 
-      centerView.innerHTML = backBtn() + article.outerHTML;
+      centerView.innerHTML = article.outerHTML;
 
+      // 返回列表按钮是文章页自带的（整页刷新时是真实链接回首页），
+      // SPA 场景接管为 history.back() 返回列表
       var btn = document.getElementById('back-to-list');
       if (btn) {
         btn.addEventListener('click', function(e) {

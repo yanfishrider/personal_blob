@@ -3,32 +3,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import ProfileSidebar from '../components/ProfileSidebar.astro';
 import SiteStats from '../components/SiteStats.astro';
 import BlogCalendar from '../components/BlogCalendar.astro';
-import { getCollection } from 'astro:content';
+import { getBlogData } from '../lib/blog-data';
 
-const posts = await getCollection('posts', ({ data }) => !data.draft);
-posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
-
-const tagSet = new Set<string>();
-const catSet = new Set<string>();
-posts.forEach(p => {
-  p.data.tags?.forEach(t => tagSet.add(t));
-  if (p.data.category) catSet.add(p.data.category);
-});
-const tagCount = tagSet.size;
-const catCount = catSet.size;
-
-const recentPosts = posts.slice(0, 8).map(p => ({ slug: p.slug, title: p.data.title }));
-
-const postDates = posts.map(p => {
-  const d = p.data.date;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-});
-
-const lastUpdate = posts.length > 0 ? posts[0].data.date : new Date();
+const { posts, postCount, tagCount, categoryCount, recentPosts, postDates, lastUpdate } = await getBlogData();
 ---
 
 <BaseLayout title="摸鱼骑士 知识库" description="摸鱼骑士的个人学习记录">
-  <ProfileSidebar slot="sidebar" postCount={posts.length} tagCount={tagCount} categoryCount={catCount} recentPosts={recentPosts} />
+  <ProfileSidebar slot="sidebar" postCount={postCount} tagCount={tagCount} categoryCount={categoryCount} recentPosts={recentPosts} />
 
   <div id="center-view" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
     <h2 class="section-header text-sm font-medium text-gray-400 uppercase tracking-wider mb-6">最新文章</h2>
@@ -67,7 +48,7 @@ const lastUpdate = posts.length > 0 ? posts[0].data.date : new Date();
 
   <aside slot="rightSidebar" class="w-full md:w-[14%] md:min-w-[150px] shrink-0 md:relative">
     <div class="md:sticky md:top-[18%] space-y-4">
-      <SiteStats postCount={posts.length} lastUpdate={lastUpdate} />
+      <SiteStats postCount={postCount} lastUpdate={lastUpdate} />
       <BlogCalendar postDates={postDates} />
     </div>
   </aside>
