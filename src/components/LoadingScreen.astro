@@ -103,29 +103,148 @@ const base = import.meta.env.BASE_URL;
   // 检测页面是否可整页滚动：尝试滚动 10px，看 scrollY 是否变化。
   // notes/game 等 overflow:hidden 固定布局页滚动无效 → 回退旧 fixed 遮罩模式
   // （不依赖 getComputedStyle——dev 下 CSS 由 Vite 异步注入，检测样式有时序竞态）
-  var testY = window.scrollY;
-  window.scrollBy(0, 10);
-  var canScroll = window.scrollY !== testY;
-  window.scrollTo(0, testY);
-  var fixedMode = !canScroll;
+  // 注意：module script 执行时图片可能未加载、文章列表高度未撑起，scrollHeight 可能
+  // 偏小导致误判 fixedMode —— 因此这里只决定 nier-fixed 类，指示器显隐放到 load 后复检。
+  function detectScrollable() {
+    var ty = window.scrollY;
+    window.scrollBy(0, 10);
+    var cs = window.scrollY !== ty;
+    window.scrollTo(0, ty);
+    return cs;
+  }
+  var fixedMode = !detectScrollable();
   if (fixedMode) {
     nierWrap?.classList.add('nier-fixed');
-    hintEl?.remove();
+  }
+
+  // 滚动指示器与加载动画风格解耦：不随 lab/p3re/none 分支删除，
+  // 由 showEnterHint() 亮出（nieR 动画播完 / 其他风格 load 后复检可滚动即显示）。
+  var indicatorStyle = localStorage.getItem('scroll-indicator-style') || 'ruler';
+  if (indicatorStyle !== 'ruler' && indicatorStyle !== 'clock') indicatorStyle = 'ruler';
+  var indRuler = document.getElementById('nier-indicator-ruler');
+  var indClock = document.getElementById('nier-indicator-clock');
+  var clockSvg = document.getElementById('nier-clock-svg');
+  var rulerKnob = document.getElementById('nier-ruler-knob');
+  var rulerFill = document.getElementById('nier-ruler-fill');
+  var hintLabel = document.getElementById('nier-hint-label');
+  var clockHand = null;
+  var clockTicks = [];
+  var hintShown = false;
+
+  function hintVar(name) {
+    if (!hintEl) return '';
+    var cs = getComputedStyle(hintEl);
+    return cs.getPropertyValue(name).trim();
+  }
+  function applyIndicatorStyle() {
+    if (!indRuler || !indClock) return;
+    if (indicatorStyle === 'clock') {
+      indRuler.style.display = 'none';
+      indClock.style.display = '';
+    } else {
+      indRuler.style.display = '';
+      indClock.style.display = 'none';
+    }
+  }
+  // 生成圆形表盘：60 条刻度线（12 主 + 48 次）+ 时针（指向 12 点起始）
+  function buildClock() {
+    if (!clockSvg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+    var cx = 36, cy = 36, R = 30;
+    var tMajor = hintVar('--ih-accent');
+    var tMinor = hintVar('--ih-rule-dim');
+    var tRing = hintVar('--ih-rule-base');
+    clockSvg.innerHTML = '';
+    clockTicks = [];
+    for (var i = 0; i < 60; i++) {
+      var a = (i * 6 - 90) * Math.PI / 180;
+      var isMajor = (i % 5 === 0);
+      var r1 = isMajor ? R - 9 : R - 5;
+      var x1 = cx + r1 * Math.cos(a), y1 = cy + r1 * Math.sin(a);
+      var x2 = cx + R * Math.cos(a), y2 = cy + R * Math.sin(a);
+      var line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', isMajor ? tMajor : tMinor);
+      line.setAttribute('stroke-width', isMajor ? '1.6' : '1');
+      line.setAttribute('stroke-linecap', 'round');
+      clockSvg.appendChild(line);
+      clockTicks.push(line);
+    }
+    var ring = document.createElementNS(NS, 'circle');
+    ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', tRing);
+    ring.setAttribute('stroke-width', '1.5');
+    clockSvg.appendChild(ring);
+    clockHand = document.createElementNS(NS, 'line');
+    clockHand.setAttribute('x1', cx); clockHand.setAttribute('y1', cy);
+    clockHand.setAttribute('x2', cx); clockHand.setAttribute('y2', cy - 20);
+    clockHand.setAttribute('stroke', hintVar('--ih-knob'));
+    clockHand.setAttribute('stroke-width', '2.5');
+    clockHand.setAttribute('stroke-linecap', 'round');
+    clockHand.style.transformOrigin = cx + 'px ' + cy + 'px';
+    clockHand.style.transition = 'transform .08s linear';
+    clockSvg.appendChild(clockHand);
+    applyIndicatorStyle();
+  }
+
+  // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度 + 主题切换
+  function onScrollFlip() {
+    var vh = window.innerHeight;
+    // 首屏翻转：前 100vh 内完成 0 → -90°（nierEl 可能已被 lab/p3re 分支移除 → null 保护）
+    var flip = Math.min(window.scrollY / vh, 1);
+    if (nierEl) {
+      nierEl.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
+    }
+    // 主题切换：动画区（深色首屏）荧光青深底板；正文区深蓝透明底板。
+    // 动画区高度 = nier 首屏 100vh / lab 8 屏 800vh / 无动画 0（恒正文主题）
+    // 变色时机：指示器底边（视口底部 10% 处）滚到正文顶部即切换，而非完全进入正文
+    var animAreaH = (nierWrap && nierWrap.offsetHeight) || (labWrap && labWrap.offsetHeight) || 0;
+    var hintBottomY = animAreaH - vh * 0.9;
+    hintEl?.classList.toggle('ih-body', window.scrollY >= hintBottomY);
+    // 指示器：整个文档滚动进度 0 → 100%
+    var doc = document.documentElement;
+    var maxScroll = doc.scrollHeight - vh;
+    var page = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
+    if (indicatorStyle === 'clock' && clockHand) {
+      clockHand.style.transform = 'rotate(' + (page * 360) + 'deg)';
+      var passed = Math.round(page * 60);
+      var tHi = hintVar('--ih-accent');
+      var tMinor = hintVar('--ih-rule-dim');
+      for (var i = 0; i < 60; i++) {
+        var isMajorT = (i % 5 === 0);
+        clockTicks[i].setAttribute('stroke', i <= passed
+          ? (isMajorT ? tHi : tMinor)
+          : (isMajorT ? tHi : tMinor));
+      }
+    } else if (rulerKnob) {
+      rulerKnob.style.left = (page * 100) + '%';
+      if (rulerFill) rulerFill.style.width = (page * 100) + '%';
+    }
+    // 提示文字随首屏翻走淡出
+    if (hintLabel) hintLabel.style.opacity = String(Math.max(0, 1 - flip * 3));
+  }
+
+  function showEnterHint() {
+    if (hintShown || !hintEl) return;
+    hintShown = true;
+    buildClock();
+    hintEl.style.opacity = '1';
+    window.addEventListener('scroll', onScrollFlip, { passive: true });
+    onScrollFlip();
   }
 
   if (anim === 'none') {
     nierWrap?.remove();
     p3reEl?.remove();
-    hintEl?.remove();
     labWrap?.remove();
   } else if (anim === 'lab') {
     // 实验室风格：LabLoading 组件自行显示（其 script 检测到 lab 配置后初始化）
     nierWrap?.remove();
-    hintEl?.remove();
     p3reEl?.remove();
   } else if (anim === 'p3re') {
     nierWrap?.remove();
-    hintEl?.remove();
     labWrap?.remove();
     p3reEl.style.display = '';
     runP3RE();
@@ -143,6 +262,22 @@ const base = import.meta.env.BASE_URL;
       runNier(true);  // 可滚动页刷新/回访：跳过动画直接完成态（首屏不销毁，向上滚可见）
     }
   }
+
+  // load 后复检可滚动性：此时图片/字体已加载，scrollHeight 为真实高度。
+  // - 可滚动：若初始误判 fixedMode（内容加载后变高）→ 恢复首屏模式；非 nier 风格立即亮出指示器
+  //   （nier 风格由 runNier 播放完 showEnterHint，避免动画中途亮出破坏氛围）
+  // - 不可滚动：确认移除指示器
+  window.addEventListener('load', function () {
+    if (detectScrollable()) {
+      if (fixedMode) {
+        nierWrap?.classList.remove('nier-fixed');
+        fixedMode = false;
+      }
+      if (anim !== 'nier') showEnterHint();
+    } else {
+      hintEl?.remove();
+    }
+  });
 
   /* ============ P3RE ============ */
   function runP3RE() {
@@ -198,121 +333,8 @@ const base = import.meta.env.BASE_URL;
 
   /* ============ NieR ============ */
   // quick=true：跳过打字动画，直接渲染完成态（刷新/回访场景）
+  // 指示器/翻转逻辑已提升到顶层（showEnterHint/onScrollFlip/buildClock 等），这里直接复用
   function runNier(quick) {
-    var hintLabel = document.getElementById('nier-hint-label');
-    var rulerKnob = document.getElementById('nier-ruler-knob');
-    var rulerFill = document.getElementById('nier-ruler-fill');
-    var indRuler = document.getElementById('nier-indicator-ruler');
-    var indClock = document.getElementById('nier-indicator-clock');
-    var clockSvg = document.getElementById('nier-clock-svg');
-    var clockHand = null;
-    var clockTicks = [];
-
-    // 指示器样式：ruler（横条刻度尺，默认）/ clock（圆形表盘+时针）
-    var indicatorStyle = localStorage.getItem('scroll-indicator-style') || 'ruler';
-    if (indicatorStyle !== 'ruler' && indicatorStyle !== 'clock') indicatorStyle = 'ruler';
-
-    function applyIndicatorStyle() {
-      if (!indRuler || !indClock) return;
-      if (indicatorStyle === 'clock') {
-        indRuler.style.display = 'none';
-        indClock.style.display = '';
-      } else {
-        indRuler.style.display = '';
-        indClock.style.display = 'none';
-      }
-    }
-
-    // 生成圆形表盘：60 条刻度线（12 主 + 48 次）+ 时针（指向 12 点起始）
-    // 颜色读取 CSS 变量（主题随滚动切换）
-    function hintVar(name) {
-      var cs = getComputedStyle(hintEl);
-      return cs.getPropertyValue(name).trim();
-    }
-    function buildClock() {
-      if (!clockSvg) return;
-      var NS = 'http://www.w3.org/2000/svg';
-      var cx = 36, cy = 36, R = 30; // 圆心 + 刻度半径
-      var tMajor = hintVar('--ih-accent');
-      var tMinor = hintVar('--ih-rule-dim');
-      var tRing = hintVar('--ih-rule-base');
-      clockSvg.innerHTML = '';
-      clockTicks = [];
-      for (var i = 0; i < 60; i++) {
-        var a = (i * 6 - 90) * Math.PI / 180; // 从 12 点方向开始
-        var isMajor = (i % 5 === 0);
-        var r1 = isMajor ? R - 9 : R - 5;     // 主刻度长（向圆心延伸更多）
-        var x1 = cx + r1 * Math.cos(a), y1 = cy + r1 * Math.sin(a);
-        var x2 = cx + R * Math.cos(a), y2 = cy + R * Math.sin(a);
-        var line = document.createElementNS(NS, 'line');
-        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-        line.setAttribute('stroke', isMajor ? tMajor : tMinor);
-        line.setAttribute('stroke-width', isMajor ? '1.6' : '1');
-        line.setAttribute('stroke-linecap', 'round');
-        clockSvg.appendChild(line);
-        clockTicks.push(line);
-      }
-      // 底环
-      var ring = document.createElementNS(NS, 'circle');
-      ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', R);
-      ring.setAttribute('fill', 'none');
-      ring.setAttribute('stroke', tRing);
-      ring.setAttribute('stroke-width', '1.5');
-      clockSvg.appendChild(ring);
-      // 时针：从圆心指向 12 点，rotate 由滚动驱动
-      clockHand = document.createElementNS(NS, 'line');
-      clockHand.setAttribute('x1', cx); clockHand.setAttribute('y1', cy);
-      clockHand.setAttribute('x2', cx); clockHand.setAttribute('y2', cy - 20);
-      clockHand.setAttribute('stroke', hintVar('--ih-knob'));
-      clockHand.setAttribute('stroke-width', '2.5');
-      clockHand.setAttribute('stroke-linecap', 'round');
-      clockHand.style.transformOrigin = cx + 'px ' + cy + 'px';
-      clockHand.style.transition = 'transform .08s linear';
-      clockSvg.appendChild(clockHand);
-      applyIndicatorStyle();
-    }
-
-    // 滚动驱动（可逆）：首屏翻转 + 指示器整页进度 + 主题切换
-    function onScrollFlip() {
-      var vh = window.innerHeight;
-      // 首屏翻转：前 100vh 内完成 0 → -90°
-      var flip = Math.min(window.scrollY / vh, 1);
-      nierEl.style.transform = 'rotateX(' + (-90 * flip) + 'deg)';
-      // 主题切换：首屏动画区（< 100vh）荧光青深底板；正文区深蓝透明底板
-      hintEl.classList.toggle('ih-body', window.scrollY >= vh);
-      // 指示器：整个文档滚动进度 0 → 100%
-      var doc = document.documentElement;
-      var maxScroll = doc.scrollHeight - vh;
-      var page = maxScroll > 0 ? Math.min(window.scrollY / maxScroll, 1) : 0;
-      if (indicatorStyle === 'clock' && clockHand) {
-        // 时针旋转 0 → 360°（从 12 点起），扫过的刻度高亮
-        clockHand.style.transform = 'rotate(' + (page * 360) + 'deg)';
-        var passed = Math.round(page * 60);
-        var tHi = hintVar('--ih-accent');
-        var tMajor = hintVar('--ih-accent');
-        var tMinor = hintVar('--ih-rule-dim');
-        for (var i = 0; i < 60; i++) {
-          var isMajorT = (i % 5 === 0);
-          clockTicks[i].setAttribute('stroke', i <= passed
-            ? (isMajorT ? tHi : tMinor)
-            : (isMajorT ? tMajor : tMinor));
-        }
-      } else {
-        rulerKnob.style.left = (page * 100) + '%';
-        if (rulerFill) rulerFill.style.width = (page * 100) + '%';
-      }
-      // 提示文字随首屏翻走淡出
-      hintLabel.style.opacity = String(Math.max(0, 1 - flip * 3));
-    }
-
-    function showEnterHint() {
-      buildClock(); // 生成圆形表盘（ruler 样式时仅应用显隐）
-      hintEl.style.opacity = '1';
-      window.addEventListener('scroll', onScrollFlip, { passive: true });
-      onScrollFlip();
-    }
-
     // 点击首屏任意位置：首屏模式 = 平滑滚到进入点；fixed 模式 = 淡出移除（旧行为）
     nierEl.addEventListener('click', function() {
       if (fixedMode) {
