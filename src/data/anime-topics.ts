@@ -1950,6 +1950,267 @@ body { height: 400vh; background: #e8e8e8; font-family: 'Courier New', 'Consolas
 })();`,
             },
 
+        {
+          id: 'stagger-grid',
+          label: '交错网格',
+          desc: `**交错网格** — \`stagger()\` 的 \`grid\` 网格布局用法。
+
+44 个方块排成 11×4 网格，脉冲从**随机**一格开始，按网格行列逐格扩散（每格间隔 100ms）：方块先放大到 1.25 再缩回 0，同时 \`boxShadow\` 以 \`currentColor\` 扩散一圈光晕。
+
+要点：
+- \`stagger(delay, { grid: [11, 4], from: utils.random(0, 44) })\` — \`grid\` 让延迟按二维行列扩散而非纯顺序；\`from\` 支持索引 / 方向 / 'center'，随机起点让每轮扩散方向都不同
+- \`utils.$('.square')\` 等价 \`document.querySelectorAll\`，返回元素数组可直接交给 animate
+- 无限循环不用 \`loop: true\`，而是 \`onComplete\` 递归重开 —— 每次重新随机起点`,
+          html: `<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>`,
+          css: `html, body { height: 100%; }
+body {
+  margin: 0; background: #4B3A23; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.row { display: flex; gap: 8px; }
+.row + .row { margin-top: 10px; }
+.square {
+  flex: 1 1 0; aspect-ratio: 1 / 1; border-radius: 2px;
+  background: currentColor; color: #ffb454;
+}`,
+          js: `import { animate, stagger, utils } from 'https://esm.sh/animejs@4.4.1';
+
+const $squares = utils.$('.square');
+
+function animateGrid() {
+  animate($squares, {
+    scale: [
+      { to: [0, 1.25] },
+      { to: 0 }
+    ],
+    boxShadow: [
+      { to: '0 0 1rem 0 currentColor' },
+      { to: '0 0 0rem 0 currentColor' }
+    ],
+    delay: stagger(100, {
+      grid: [11, 4],
+      from: utils.random(0, 11 * 4)
+    }),
+    onComplete: animateGrid
+  });
+}
+
+animateGrid();`,
+        },
+
+        {
+          id: 'stagger-grid-axis',
+          label: '交错网格轴',
+          desc: `**交错网格轴** — 用 \`axis\` 限制 stagger 的扩散轴，制造方向性。
+
+同样是 11×4 = 44 个方块，每轮起点随机：
+- \`translateX\` 的 stagger 限定 \`axis: 'x'\` → 位移沿**列**方向逐格延迟（横向波纹）
+- \`translateY\` 限定 \`axis: 'y'\` → 位移沿**行**方向逐格延迟（纵向波纹）
+- x/y 两条波纹叠加 = 从随机起点向四周扩散的对角波；\`delay\` 不设 axis，按二维网格扩散
+
+要点：
+- \`stagger(value, { grid, from, axis })\` — \`axis: 'x'\` 只按列索引排序延迟、\`axis: 'y'\` 只按行索引；省略 axis 则按行列二维扩散（配合 delay 用）
+- 关键帧里每段可单独指定 stagger：位移第一段 \`{ to: stagger('-.75rem', { grid, from, axis: 'x' }) }\`，第二段统一回 0
+- 随机起点 \`from: utils.random(0, 44)\` 每轮不同，扩散方向每轮都在变`,
+          html: `<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>
+<div class="small justified row">
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+  <div class="square"></div>
+</div>`,
+          css: `html, body { height: 100%; }
+body {
+  margin: 0; background: #4B3A23; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.row { display: flex; gap: 8px; }
+.row + .row { margin-top: 10px; }
+.square {
+  flex: 1 1 0; aspect-ratio: 1 / 1; border-radius: 2px;
+  background: currentColor; color: #ffb454;
+}`,
+          js: `import { animate, stagger, utils } from 'https://esm.sh/animejs@4.4.1';
+
+const grid = [11, 4];
+const $squares = utils.$('.square');
+
+function animateGrid() {
+  const from = utils.random(0, 11 * 4);
+  animate($squares, {
+    translateX: [
+      { to: stagger('-.75rem', { grid, from, axis: 'x' }) },
+      { to: 0, ease: 'inOutQuad' },
+    ],
+    translateY: [
+      { to: stagger('-.75rem', { grid, from, axis: 'y' }) },
+      { to: 0, ease: 'inOutQuad' },
+    ],
+    opacity: [
+      { to: .5 },
+      { to: 1 }
+    ],
+    delay: stagger(85, { grid, from }),
+    onComplete: animateGrid
+  });
+}
+
+animateGrid();`,
+        },
+
+        {
+          id: 'text-scramble',
+          label: '文本变化',
+          desc: `**文本变化** — anime.js 的 \`scrambleText()\` 乱码切换动画（首页头像卡片「文本改变」按钮同款）。
+
+点击按钮，当前文字先打散成随机字符、再"解码"成下一句；5 句签名轮换。
+
+要点：
+- \`scrambleText({ text: '下一句' })\` 返回的是一个**关键帧对象**（不是普通字符串），直接放进 animate 的 \`innerHTML\` 属性即可
+- 标准用法：\`animate(el, { innerHTML: scrambleText({ text: newText }) })\` —— anime.js 内部完成乱码→正文字符的逐字符替换动画
+- 想自定义乱码字符集、过渡时长可查 \`scrambleText\` 的参数（text 必填，其余可选）`,
+          html: `<div class="card">
+  <p id="motto-demo" class="motto">闲来垂钓碧溪上,忽复乘舟梦日边</p>
+  <button type="button" id="motto-btn" class="btn">文本改变</button>
+</div>`,
+          css: `html, body { height: 100%; }
+body {
+  margin: 0; background: #4B3A23; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.card {
+  background: #fff; border-radius: 16px; padding: 26px 30px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.28); text-align: center;
+  max-width: 340px;
+}
+.motto {
+  font-size: 14px; color: #333; margin: 0 0 16px;
+  line-height: 1.7; min-height: 48px;
+}
+.btn {
+  border: 1px solid #d0d0d0; background: transparent; color: #666;
+  border-radius: 999px; padding: 5px 16px; font-size: 12px;
+  letter-spacing: .15em; cursor: pointer; user-select: none;
+  transition: color .25s, border-color .25s;
+}
+.btn:hover { color: #49B1F5; border-color: #49B1F5; }`,
+          js: `import { animate, scrambleText } from 'https://esm.sh/animejs@4.4.1';
+
+const el = document.getElementById('motto-demo');
+const btn = document.getElementById('motto-btn');
+const mottoes = [
+  '闲来垂钓碧溪上,忽复乘舟梦日边',
+  '长风破浪会有时,直挂云帆济沧海',
+  '行到水穷处,坐看云起时',
+  '竹杖芒鞋轻胜马,谁怕?一蓑烟雨任平生',
+  '此心安处是吾乡',
+];
+let mottoIdx = 0;
+
+btn.addEventListener('click', () => {
+  mottoIdx = (mottoIdx + 1) % mottoes.length;
+  animate(el, {
+    innerHTML: scrambleText({ text: mottoes[mottoIdx] }),
+  });
+});`,
+        },
         ],
       },
     ],

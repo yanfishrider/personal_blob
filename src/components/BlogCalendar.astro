@@ -15,11 +15,12 @@ const daysInMonth = new Date(year, month + 1, 0).getDate();
 const today = now.getDate();
 
 // 日历格子：补齐前面的空白 + 当月日期
-const cells: { day: number; isToday: boolean; hasPost: boolean }[] = [];
-for (let i = 0; i < firstDay; i++) cells.push({ day: 0, isToday: false, hasPost: false });
+const cells: { day: number; isToday: boolean; hasPost: boolean; isWeekend: boolean }[] = [];
+for (let i = 0; i < firstDay; i++) cells.push({ day: 0, isToday: false, hasPost: false, isWeekend: false });
 for (let d = 1; d <= daysInMonth; d++) {
   const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  cells.push({ day: d, isToday: d === today, hasPost: postDateSet.has(ds) });
+  const dow = (firstDay + d - 1) % 7; // 0=Sun
+  cells.push({ day: d, isToday: d === today, hasPost: postDateSet.has(ds), isWeekend: dow === 0 || dow === 6 });
 }
 
 const weekHeaders = ['日', '一', '二', '三', '四', '五', '六'];
@@ -31,23 +32,45 @@ const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9�
 
   <!-- 星期头 -->
   <div class="grid grid-cols-7 text-center mb-1">
-    {weekHeaders.map(w => (
-      <span class="text-xs text-gray-400 py-1">{w}</span>
+    {weekHeaders.map((w, i) => (
+      <span class={`text-xs py-1 ${i === 0 || i === 6 ? 'text-rose-400' : 'text-gray-400'}`}>{w}</span>
     ))}
   </div>
 
   <!-- 日期格 -->
   <div class="grid grid-cols-7 text-center">
-    {cells.map((c) => (
-      c.day === 0 ? <div class="py-1" /> : (
-        <div class={`py-1 text-xs rounded-full mx-0.5
-          ${c.isToday ? 'bg-[#49B1F5] text-white font-bold' : ''}
-          ${!c.isToday && c.hasPost ? 'text-blue-600 font-semibold' : ''}
-          ${!c.isToday && !c.hasPost ? 'text-gray-600' : ''}
-        `}>
-          {c.day}
+    {cells.map((c) =>
+      c.day === 0 ? (
+        <div class="h-6" />
+      ) : (
+        <div class="relative flex items-center justify-center h-6">
+          <span
+            class={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] leading-none transition-colors duration-150
+              ${c.isToday
+                ? 'bg-[#49B1F5] text-white font-bold shadow-sm'
+                : c.hasPost
+                  ? 'text-blue-600 font-semibold hover:bg-blue-100'
+                  : c.isWeekend
+                    ? 'text-gray-400 hover:bg-gray-100'
+                    : 'text-gray-600 hover:bg-gray-100'}`}
+          >
+            {c.day}
+          </span>
+          {c.hasPost && !c.isToday && (
+            <span class="absolute bottom-0 left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full bg-blue-500"></span>
+          )}
         </div>
-      )
-    ))}
+      ),
+    )}
+  </div>
+
+  <!-- 图例 -->
+  <div class="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-gray-100">
+    <span class="inline-flex items-center gap-1 text-[10px] text-gray-400">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#49B1F5]"></span>今日
+    </span>
+    <span class="inline-flex items-center gap-1 text-[10px] text-gray-400">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>有文章
+    </span>
   </div>
 </div>
