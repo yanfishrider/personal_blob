@@ -858,6 +858,7 @@ const base = import.meta.env.BASE_URL;
 
     // ============ 第八段：风水转盘（完整交互：点击转动 + 联动 + 数字提示 + 对齐提亮） ============
     var fengshuiSvg = document.getElementById('ll-fengshui');
+    var llCurStep = -1;  // 当前显示段(供交互层判断是否启用)
     var FS = { n: 8, width: 18, gap: 14, rMin: 25, segGap: 2, spinMs: 420, stepDeg: 45 };
     var fsRings = [];
     function fsShuffle(arr) {
@@ -970,6 +971,7 @@ const base = import.meta.env.BASE_URL;
         })(fsRings[fei]);
       }
       function fsShowHint(ring) {
+        if (llCurStep !== 7) return;
         for (var hli = 0; hli < fsRings.length; hli++) fsRings[hli].label.setAttribute('opacity', '0');
         ring.label.setAttribute('opacity', '1');
         ring.label.textContent = '+1';
@@ -980,9 +982,11 @@ const base = import.meta.env.BASE_URL;
         }
       }
       function fsHideHint() {
+        if (llCurStep !== 7) return;
         for (var hli2 = 0; hli2 < fsRings.length; hli2++) fsRings[hli2].label.setAttribute('opacity', '0');
       }
       function fsSpinRing(ring) {
+        if (llCurStep !== 7) return;
         fsAddSpin(ring, 1);
         if (ring.link) fsAddSpin(fsRings[ring.link.target], ring.link.steps);
       }
@@ -1063,17 +1067,19 @@ const base = import.meta.env.BASE_URL;
 
     // 段切换：背景层始终显示；8 个动画层按 idx 显隐 + 颜色跟随 + 段名
     function llSetIdx(idx) {
+      llCurStep = idx;
       var bgIds = ['ll-dots', 'll-arc', 'll-rings', 'll-tick'];
       for (var bi = 0; bi < bgIds.length; bi++) {
         var be = document.getElementById(bgIds[bi]);
         if (be) be.style.opacity = '1';
+        if (be) be.style.visibility = 'visible';
       }
       // 第八段隐藏背景点阵（风水转盘区域不需要背景小点）
-      if (svgDots) svgDots.style.opacity = (idx === 7) ? '0' : '1';
+      if (svgDots) { svgDots.style.opacity = (idx === 7) ? '0' : '1'; svgDots.style.visibility = (idx === 7) ? 'hidden' : 'visible'; }
       var animIds = ['ll-square', 'll-shapes', 'll-ellipse', 'll-track', 'll-burst', 'll-engine', 'll-slots', 'll-fengshui'];
       for (var ai = 0; ai < animIds.length; ai++) {
         var ae = document.getElementById(animIds[ai]);
-        if (ae) ae.style.opacity = (ai === idx) ? '1' : '0';
+        if (ae) { ae.style.opacity = (ai === idx) ? '1' : '0'; ae.style.visibility = (ai === idx) ? 'visible' : 'hidden'; }
       }
       // 颜色跟随当前弧色（仅段切换时更新，避免每帧 260+ 次 setAttribute 卡顿；引擎段由 engineSpin 管）
       var curCol = a.colors[idx % a.colors.length];
@@ -1098,7 +1104,7 @@ const base = import.meta.env.BASE_URL;
         tickLines[tki2].el.setAttribute('stroke-dashoffset', tlOff);
       }
       // RPM 计数器：仅第六段显示
-      if (counterEl) counterEl.style.opacity = (idx === 5) ? '1' : '0';
+      if (counterEl) { counterEl.style.opacity = (idx === 5) ? '1' : '0'; counterEl.style.visibility = (idx === 5) ? 'visible' : 'hidden'; }
       if (llLabel) llLabel.textContent = 'SEGMENT ' + String(idx + 1).padStart(2, '0') + ' · ' + LL_NAMES[idx];
     }
 

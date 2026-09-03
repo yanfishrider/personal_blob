@@ -1297,6 +1297,7 @@
       }
       // 提示：hover 环 +1，联动目标环 +steps（只显示源环出边，单向）
       function fsShowHint(ring) {
+        if (curStep !== 7) return;
         for (var hli = 0; hli < fsRings.length; hli++) fsRings[hli].label.setAttribute('opacity', '0');
         ring.label.setAttribute('opacity', '1');
         ring.label.textContent = '+1';
@@ -1307,10 +1308,12 @@
         }
       }
       function fsHideHint() {
+        if (curStep !== 7) return;
         for (var hli2 = 0; hli2 < fsRings.length; hli2++) fsRings[hli2].label.setAttribute('opacity', '0');
       }
       // 点击：源环转 1 步 + 联动目标转 steps 步
       function fsSpinRing(ring) {
+        if (curStep !== 7) return;
         fsAddSpin(ring, 1);
         if (ring.link) fsAddSpin(fsRings[ring.link.target], ring.link.steps);
       }
@@ -1550,6 +1553,7 @@
     var current = 0;    // 当前渲染进度（rAF 每帧逼近 target）
     var rafId = null;   // 动画帧句柄
     var lastIdx = -1;   // 上次渲染的段号（场景/代码卡片切换检测）
+var curStep = -1;   // 当前显示段（供交互层判断是否启用）
     var BASE_W = 5;     // 基础宽度（未到段 / 已过段）
     var GROW_W = 10;    // 当前段整段宽度（基础 + 5）
 
@@ -1558,6 +1562,7 @@
       var total = a.segments;
       var idx = Math.min(Math.floor(progress * total), total - 1);  // 当前段
       var inSeg = progress * total - idx;                           // 段内 0~1
+      curStep = idx;
 
       for (var i = 0; i < total; i++) {
         var base = arcBases[i];
@@ -1614,10 +1619,12 @@
       // 中心旋转色块：只关联第一段圆弧（idx 0 显示，进入下一段自动隐藏）
       if (squareEl) {
         squareEl.style.opacity = (idx === 0) ? '1' : '0';
+        squareEl.style.visibility = (idx === 0) ? 'visible' : 'hidden';
       }
       // 12 图形随机游走：只关联第二段圆弧（idx 1 显示，其他段隐藏）
       if (shapesSvg) {
         shapesSvg.style.opacity = (idx === 1) ? '1' : '0';
+        shapesSvg.style.visibility = (idx === 1) ? 'visible' : 'hidden';
       }
       // 椭圆轨迹组（第三段）：每条线 画(0~1) → 保持(1~2) → 擦除(2~3) → 消失；第二条在第一条画到半圆（inSeg 0.05）时出现
       if (ellipseSvg) {
@@ -1651,26 +1658,27 @@
           ellipseSvg.style.opacity = '0';
           for (var eii2 = 0; eii2 < ellipseItems.length; eii2++) ellipseItems[eii2].drawP = 0;
         }
+        ellipseSvg.style.visibility = (idx === 2) ? 'visible' : 'hidden';
       }
       // 引擎仪表盘（第六段）：idx 5 显示，其他段隐藏（运转状态由 engineSpin 循环按 current 实时驱动）
-      if (engineSvg) engineSvg.style.opacity = (idx === 5) ? '1' : '0';
-      if (counterEl) counterEl.style.opacity = (idx === 5) ? '1' : '0';
+      if (engineSvg) { engineSvg.style.opacity = (idx === 5) ? '1' : '0'; engineSvg.style.visibility = (idx === 5) ? 'visible' : 'hidden'; }
+      if (counterEl) { counterEl.style.opacity = (idx === 5) ? '1' : '0'; counterEl.style.visibility = (idx === 5) ? 'visible' : 'hidden'; }
       // 闭合赛道（第四段）：idx 3 显示，其他段隐藏（运转由 trackLoop 常驻 rAF 驱动）
-      if (trackSvg) trackSvg.style.opacity = (idx === 3) ? '1' : '0';
+      if (trackSvg) { trackSvg.style.opacity = (idx === 3) ? '1' : '0'; trackSvg.style.visibility = (idx === 3) ? 'visible' : 'hidden'; }
       if (trackMenu) {
         trackMenu.style.opacity = (idx === 3) ? '1' : '0';
         trackMenu.style.pointerEvents = (idx === 3) ? 'auto' : 'none';
       }
       // 绽开特效（第五段）：idx 4 显示，其他段隐藏（burstLoop 常驻 rAF 驱动）
-      if (burstSvg) burstSvg.style.opacity = (idx === 4) ? '1' : '0';
+      if (burstSvg) { burstSvg.style.opacity = (idx === 4) ? '1' : '0'; burstSvg.style.visibility = (idx === 4) ? 'visible' : 'hidden'; }
 
       // 老虎机竖条 + 4x4 网格（第七段）：idx 6 显示，其他段隐藏（slotsLoop 常驻 rAF 驱动）
-      if (slotsSvg) slotsSvg.style.opacity = (idx === 6) ? '1' : '0';
+      if (slotsSvg) { slotsSvg.style.opacity = (idx === 6) ? '1' : '0'; slotsSvg.style.visibility = (idx === 6) ? 'visible' : 'hidden'; }
 
       // 风水转盘（第八段）：idx 7 显示，其他段隐藏（fsLoop 常驻 rAF 驱动）
-      if (fengshuiSvg) fengshuiSvg.style.opacity = (idx === 7) ? '1' : '0';
+      if (fengshuiSvg) { fengshuiSvg.style.opacity = (idx === 7) ? '1' : '0'; fengshuiSvg.style.visibility = (idx === 7) ? 'visible' : 'hidden'; }
       // 第八段隐藏背景点阵（风水转盘区域不需要背景小点）
-      if (svgDots) svgDots.style.opacity = (idx === 7) ? '0' : '1';
+      if (svgDots) { svgDots.style.opacity = (idx === 7) ? '0' : '1'; svgDots.style.visibility = (idx === 7) ? 'hidden' : 'visible'; }
 
       // 代码卡片 + 左侧卡片高亮：idx 变化时切换（中心场景文字已删除）
       if (lastIdx !== idx) {
