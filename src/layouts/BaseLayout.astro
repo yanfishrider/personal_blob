@@ -35,16 +35,16 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
           <span id="logo-text-3d" class="logo-text-3d">摸鱼骑士 知识库</span>
         </a>
         <div class="flex gap-4 text-sm" id="nav-links">
-          <a href={`${import.meta.env.BASE_URL}/ascii-converter`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">转换</a>
-          <a href={`${import.meta.env.BASE_URL}/search`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">搜索</a>
           <a href={import.meta.env.BASE_URL} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">首页</a>
+          <a href={`${import.meta.env.BASE_URL}/notes`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">笔记</a>
+          <a href={`${import.meta.env.BASE_URL}/animation-lab`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">动画</a>
           <a href={`${import.meta.env.BASE_URL}/archive`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">归档</a>
           <a href={`${import.meta.env.BASE_URL}/categories`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">分类</a>
           <a href={`${import.meta.env.BASE_URL}/tags`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">标签</a>
-          <a href={`${import.meta.env.BASE_URL}/notes`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">笔记</a>
           <a href={`${import.meta.env.BASE_URL}/game`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">游戏</a>
-          <a href={`${import.meta.env.BASE_URL}/animation-lab`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">动画</a>
           <a href={`${import.meta.env.BASE_URL}/about`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">关于</a>
+          <a href={`${import.meta.env.BASE_URL}/ascii-converter`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">转换</a>
+          <a href={`${import.meta.env.BASE_URL}/search`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">搜索</a>
         </div>
       </nav>
     </header>
