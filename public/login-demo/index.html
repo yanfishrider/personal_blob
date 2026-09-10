@@ -394,8 +394,10 @@
     .character {
       position: absolute;
       bottom: 0;
-      transition: all 0.7s ease-in-out;
+      /* height(打字增高) 与 translate(打字位移) 是离散状态；倾斜/跟随走 anime 的 transform */
+      transition: height 0.7s ease-in-out, translate 0.7s ease-in-out;
       transform-origin: bottom center;
+      will-change: transform;
     }
 
     /* Purple rectangle */
@@ -442,7 +444,8 @@
     .eyes {
       position: absolute;
       display: flex;
-      transition: all 0.7s ease-in-out;
+      /* left/top 是常量基准位；所有位移（跟随 + 姿势）都走 anime 的 transform */
+      will-change: transform;
     }
 
     /* Eyeball (white with pupil) */
@@ -460,7 +463,8 @@
     .pupil {
       border-radius: 50%;
       background: #2d2d2d;
-      transition: transform 0.1s ease-out;
+      /* transform 交给 anime.js，避免 CSS 过渡与它互相打架 */
+      will-change: transform;
     }
 
     /* Bare pupil (no white eyeball) */
@@ -469,7 +473,7 @@
       height: 12px;
       border-radius: 50%;
       background: #2d2d2d;
-      transition: transform 0.7s ease-in-out;
+      will-change: transform;
     }
 
     /* Yellow mouth */
@@ -479,7 +483,7 @@
       height: 4px;
       background: #2d2d2d;
       border-radius: 2px;
-      transition: all 0.7s ease-in-out;
+      will-change: transform;
     }
 
     /* Shake-head: smooth left-right oscillation on face parts */
@@ -542,7 +546,8 @@
       border-top: none;
       border-radius: 0 0 14px 14px;
       opacity: 0;
-      transition: all 0.7s ease-in-out;
+      transition: opacity 0.7s ease-in-out;
+      will-change: transform;
     }
 
     .orange-mouth.visible {
@@ -747,21 +752,174 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { createAnimatable } from "./anime.esm.min.js";
+
+    // ============ 元素引用缓存（只查一次，不进每帧热路径） ============
+    const $id = (id) => document.getElementById(id);
+    const els = {
+      purple: $id("char-purple"),
+      black: $id("char-black"),
+      orange: $id("char-orange"),
+      yellow: $id("char-yellow"),
+      purpleEyes: $id("purple-eyes"),
+      purpleEyeL: $id("purple-eye-l"),
+      purpleEyeR: $id("purple-eye-r"),
+      blackEyes: $id("black-eyes"),
+      blackEyeL: $id("black-eye-l"),
+      blackEyeR: $id("black-eye-r"),
+      orangeEyes: $id("orange-eyes"),
+      orangeMouth: $id("orange-mouth"),
+      yellowEyes: $id("yellow-eyes"),
+      yellowMouth: $id("yellow-mouth"),
+      password: $id("password"),
+      email: $id("email"),
+      toggleBtn: $id("toggle-password"),
+      eyeIcon: $id("eye-icon"),
+      eyeOffIcon: $id("eye-off-icon"),
+      errorEl: $id("error-msg"),
+      emailLabel: $id("email-label"),
+      passwordLabel: $id("password-label"),
+      loginForm: $id("login-form"),
+      btnLogin: $id("btn-login"),
+    };
+
+    // ============ 几何缓存 ============
+    // getBoundingClientRect 会强制同步重排 → 只在初始化 / resize 时量一次，热路径不再调用
+    const geo = { face: {}, pupil: {} };
+    const MEASURE_FACE = [
+      ["purple", els.purple],
+      ["black", els.black],
+      ["orange", els.orange],
+      ["yellow", els.yellow],
+    ];
+    const MEASURE_PUPIL = [
+      ["purple", els.purpleEyeL],
+      ["black", els.blackEyeL],
+      ["orange", $id("orange-pupil-l")],
+      ["yellow", $id("yellow-pupil-l")],
+    ];
+
+    function measureGeometry() {
+      // 量之前先清掉 transform：否则量到的是被 transform 过的 bbox，自身反馈会让坐标漂
+      const touched = [];
+      MEASURE_FACE.concat(MEASURE_PUPIL).forEach(([, el]) => {
+        if (el.style.transform) {
+          touched.push([el, el.style.transform]);
+          el.style.transform = "";
+        }
+      });
+      MEASURE_FACE.forEach(([key, el]) => {
+        const r = el.getBoundingClientRect();
+        geo.face[key] = { x: r.left + r.width / 2, y: r.top + r.height / 3 };
+      });
+      MEASURE_PUPIL.forEach(([key, el]) => {
+        const r = el.getBoundingClientRect();
+        geo.pupil[key] = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+      touched.forEach(([el, v]) => {
+        el.style.transform = v;
+      });
+    }
+
+    // ============ anime.js 可动画对象 ============
+    // 跟随（track）：每帧重定目标，短时长 + out 缓动 → 起步快、跟得紧
+    // 姿势（pose）：状态切换，0.7s，保持原来的节奏感
+    const TRACK_MS = 320;
+    const POSE_MS = 700;
+    const EASE = "out(2)";
+    const mk = (targets, dur) => createAnimatable(targets, { x: dur, y: dur, ease: EASE });
+    const anim = {
+      purpleEyes: mk("#purple-eyes", TRACK_MS),
+      blackEyes: mk("#black-eyes", TRACK_MS),
+      orangeEyes: mk("#orange-eyes", TRACK_MS),
+      yellowEyes: mk("#yellow-eyes", TRACK_MS),
+      // 瞳孔沿用原来的相对手感：紫/黑快（原 0.1s）、橙/黄慢（原 0.7s）
+      purplePupil: mk(["#purple-pupil-l", "#purple-pupil-r"], 200),
+      blackPupil: mk(["#black-pupil-l", "#black-pupil-r"], 200),
+      orangePupil: mk(["#orange-pupil-l", "#orange-pupil-r"], 600),
+      yellowPupil: mk(["#yellow-pupil-l", "#yellow-pupil-r"], 600),
+      orangeMouth: mk("#orange-mouth", TRACK_MS),
+      yellowMouth: createAnimatable("#yellow-mouth", { x: TRACK_MS, y: TRACK_MS, rotate: TRACK_MS, ease: EASE }),
+      // 身体倾斜（重心偏一点，比脸慢一拍）
+      purpleBody: createAnimatable("#char-purple", { skewX: 420, ease: EASE }),
+      blackBody: createAnimatable("#char-black", { skewX: 420, ease: EASE }),
+      orangeBody: createAnimatable("#char-orange", { skewX: 420, ease: EASE }),
+      yellowBody: createAnimatable("#char-yellow", { skewX: 420, ease: EASE }),
+    };
+
+    // 基准位 = HTML 里写死的 left/top；所有姿势都表达成相对它的偏移
+    const BASE = {
+      purpleEyes: [45, 40],
+      blackEyes: [26, 32],
+      orangeEyes: [82, 90],
+      yellowEyes: [52, 40],
+      orangeMouth: [90, 120],
+      yellowMouth: [40, 88],
+    };
+
+    // 已下发的值，同值不重复起 tween（鼠标静止时零开销）
+    const sent = {};
+    function send(key, prop, val, dur) {
+      const c = sent[key] || (sent[key] = {});
+      const prev = c[prop];
+      if (prev !== undefined && Math.abs(prev - val) < 0.01) return;
+      c[prop] = val;
+      if (dur === undefined) anim[key][prop](val);
+      else anim[key][prop](val, dur);
+    }
+    // 状态姿势基准位（离散，走 CSS left/top 过渡）
+    function place(key, left, top) {
+      const el = els[key];
+      const l = left + "px";
+      const t = top + "px";
+      if (el.style.left !== l) el.style.left = l;
+      if (el.style.top !== t) el.style.top = t;
+    }
+    // 跟随偏移（每帧，走 anime 的 transform，不碰 layout）
+    function track(key, dx, dy) {
+      send(key, "x", dx);
+      send(key, "y", dy);
+    }
+    // 状态姿势偏移（固定值 + 0.7s）
+    function pose(key, dx, dy) {
+      send(key, "x", dx, POSE_MS);
+      send(key, "y", dy, POSE_MS);
+    }
+    function posePupil(key, dx, dy) {
+      send(key, "x", dx);
+      send(key, "y", dy);
+    }
+    // 身体位移用独立的 CSS translate 属性（与 anime 写的 transform 互不干扰，也躲开 transform 函数顺序问题）
+    const bodyShift = {};
+    function setBodyShift(key, px) {
+      if (bodyShift[key] === px) return;
+      bodyShift[key] = px;
+      els[key].style.translate = px + "px 0";
+    }
+    function bodySkew(key, deg, isPose) {
+      send(key + "Body", "skewX", deg, isPose ? POSE_MS : undefined);
+    }
+
+    // ============ 更新调度：一帧最多跑一次（mousemove 可能一帧触发多次） ============
+    let updateRafId = null;
+    function scheduleUpdate() {
+      if (updateRafId !== null) return;
+      updateRafId = requestAnimationFrame(() => {
+        updateRafId = null;
+        updateCharacters();
+      });
+    }
+
     // ============ PASSWORD TOGGLE ============
-    const passwordInput = document.getElementById("password");
-    const emailInput = document.getElementById("email");
-    const toggleBtn = document.getElementById("toggle-password");
-    const eyeIcon = document.getElementById("eye-icon");
-    const eyeOffIcon = document.getElementById("eye-off-icon");
     let showPassword = false;
     let isLoginError = false;
-
-    toggleBtn.addEventListener("click", () => {
+    els.toggleBtn.addEventListener("click", () => {
       showPassword = !showPassword;
-      passwordInput.type = showPassword ? "text" : "password";
-      eyeIcon.style.display = showPassword ? "none" : "block";
-      eyeOffIcon.style.display = showPassword ? "block" : "none";
+      els.password.type = showPassword ? "text" : "password";
+      els.eyeIcon.style.display = showPassword ? "none" : "block";
+      els.eyeOffIcon.style.display = showPassword ? "block" : "none";
+      if (showPassword) schedulePeek();
       updateCharacters();
     });
 
@@ -778,30 +936,42 @@
     document.addEventListener("mousemove", (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
-      if (!isTyping && !isLoginError) updateCharacters();
+      if (!isTyping && !isLoginError) scheduleUpdate();
     });
+    window.addEventListener("resize", () => {
+      measureGeometry();
+      scheduleUpdate();
+    });
+    window.addEventListener(
+      "scroll",
+      () => {
+        measureGeometry();
+        scheduleUpdate();
+      },
+      { passive: true },
+    );
 
     let isPasswordFocused = false;
 
     // Typing detection
-    emailInput.addEventListener("focus", () => {
+    els.email.addEventListener("focus", () => {
       setTyping(true);
     });
-    emailInput.addEventListener("blur", () => {
+    els.email.addEventListener("blur", () => {
       setTyping(false);
     });
-    emailInput.addEventListener("input", () => {
+    els.email.addEventListener("input", () => {
       updateCharacters();
     });
-    passwordInput.addEventListener("focus", () => {
+    els.password.addEventListener("focus", () => {
       isPasswordFocused = true;
       updateCharacters();
     });
-    passwordInput.addEventListener("blur", () => {
+    els.password.addEventListener("blur", () => {
       isPasswordFocused = false;
       updateCharacters();
     });
-    passwordInput.addEventListener("input", () => {
+    els.password.addEventListener("input", () => {
       updateCharacters();
     });
 
@@ -856,10 +1026,10 @@
 
     // Purple peeking when password is visible
     function schedulePeek() {
-      if (passwordInput.value.length > 0 && showPassword) {
+      if (els.password.value.length > 0 && showPassword) {
         setTimeout(
           () => {
-            if (passwordInput.value.length > 0 && showPassword) {
+            if (els.password.value.length > 0 && showPassword) {
               isPurplePeeking = true;
               updateCharacters();
               setTimeout(() => {
@@ -874,246 +1044,201 @@
       }
     }
 
-    // Watch for password visibility changes to trigger peeking
-    toggleBtn.addEventListener("click", () => {
-      if (showPassword) schedulePeek();
-    });
-
-    // Calculate character position based on mouse
-    function calcPosition(el) {
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 3;
-      const dx = mouseX - cx;
-      const dy = mouseY - cy;
+    // Calculate character position based on mouse (uses cached geometry)
+    function calcPosition(key) {
+      const g = geo.face[key];
+      const dx = mouseX - g.x;
+      const dy = mouseY - g.y;
       const faceX = Math.max(-15, Math.min(15, dx / 20));
       const faceY = Math.max(-10, Math.min(10, dy / 30));
       const bodySkew = Math.max(-6, Math.min(6, -dx / 120));
       return { faceX, faceY, bodySkew };
     }
 
-    function calcPupilOffset(el, maxDist) {
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = mouseX - cx;
-      const dy = mouseY - cy;
+    function calcPupilOffset(key, maxDist) {
+      const g = geo.pupil[key];
+      const dx = mouseX - g.x;
+      const dy = mouseY - g.y;
       const dist = Math.min(Math.sqrt(dx * dx + dy * dy), maxDist);
       const angle = Math.atan2(dy, dx);
       return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist };
     }
 
     function updateCharacters() {
-      const purple = document.getElementById("char-purple");
-      const black = document.getElementById("char-black");
-      const orange = document.getElementById("char-orange");
-      const yellow = document.getElementById("char-yellow");
-
-      const purplePos = calcPosition(purple);
-      const blackPos = calcPosition(black);
-      const orangePos = calcPosition(orange);
-      const yellowPos = calcPosition(yellow);
-
-      const pwdLen = passwordInput.value.length;
+      const pwdLen = els.password.value.length;
       const isShowingPwd = pwdLen > 0 && showPassword;
       // Characters look away when password field is focused (hiding password)
       const isLookingAway = isPasswordFocused && !showPassword;
 
+      const purplePos = calcPosition("purple");
+      const blackPos = calcPosition("black");
+      const orangePos = calcPosition("orange");
+      const yellowPos = calcPosition("yellow");
+
       // ---- Purple body ----
       if (isShowingPwd) {
-        purple.style.transform = "skewX(0deg)";
-        purple.style.height = "370px";
+        bodySkew("purple", 0, true);
+        setBodyShift("purple", 0);
       } else if (isLookingAway) {
-        // 密码聚焦：不转头倾斜，保持正立（原 skewX(-14deg) 已移除）
-        purple.style.transform = "skewX(0deg)";
-        purple.style.height = "370px";
+        // 密码聚焦：不转头倾斜，保持正立
+        bodySkew("purple", 0, true);
+        setBodyShift("purple", 0);
       } else if (isTyping) {
-        purple.style.transform = `skewX(${(purplePos.bodySkew || 0) - 12}deg) translateX(40px)`;
-        purple.style.height = "410px";
+        bodySkew("purple", purplePos.bodySkew - 12, true);
+        setBodyShift("purple", 40);
       } else {
-        purple.style.transform = `skewX(${purplePos.bodySkew}deg)`;
-        purple.style.height = "370px";
+        bodySkew("purple", purplePos.bodySkew);
+        setBodyShift("purple", 0);
       }
+      els.purple.style.height = isTyping ? "410px" : "370px";
 
       // Purple eyes
-      const purpleEyes = document.getElementById("purple-eyes");
-      const purpleEyeL = document.getElementById("purple-eye-l");
-      const purpleEyeR = document.getElementById("purple-eye-r");
-      const purplePupilL = document.getElementById("purple-pupil-l");
-      const purplePupilR = document.getElementById("purple-pupil-r");
-
-      purpleEyeL.style.background = (isLookingAway || isShowingPwd || isPurpleBlinking) ? "#000" : "white";
-      purpleEyeL.style.height = (isLookingAway || isShowingPwd) ? "1px" : (isPurpleBlinking ? "2px" : "18px");
-      purpleEyeR.style.background = (isLookingAway || isShowingPwd || isPurpleBlinking) ? "#000" : "white";
-      purpleEyeR.style.height = (isLookingAway || isShowingPwd) ? "1px" : (isPurpleBlinking ? "2px" : "18px");
+      els.purpleEyeL.style.background = isLookingAway || isShowingPwd || isPurpleBlinking ? "#000" : "white";
+      els.purpleEyeL.style.height = isLookingAway || isShowingPwd ? "1px" : isPurpleBlinking ? "2px" : "18px";
+      els.purpleEyeR.style.background = isLookingAway || isShowingPwd || isPurpleBlinking ? "#000" : "white";
+      els.purpleEyeR.style.height = isLookingAway || isShowingPwd ? "1px" : isPurpleBlinking ? "2px" : "18px";
 
       if (isLoginError) {
         // Sad look down-left
-        purpleEyes.style.left = "30px";
-        purpleEyes.style.top = "55px";
-        purplePupilL.style.transform = "translate(-3px, 4px)";
-        purplePupilR.style.transform = "translate(-3px, 4px)";
+        place("purpleEyes", ...BASE.purpleEyes);
+        pose("purpleEyes", -15, 15);
+        posePupil("purplePupil", -3, 4);
       } else if (isShowingPwd) {
-        purpleEyes.style.left = "20px";
-        purpleEyes.style.top = "35px";
+        place("purpleEyes", ...BASE.purpleEyes);
+        pose("purpleEyes", -25, -5);
         const px = isPurplePeeking ? 4 : -4;
         const py = isPurplePeeking ? 5 : -4;
-        purplePupilL.style.transform = `translate(${px}px, ${py}px)`;
-        purplePupilR.style.transform = `translate(${px}px, ${py}px)`;
+        posePupil("purplePupil", px, py);
       } else if (isLookingAtEachOther) {
-        purpleEyes.style.left = "55px";
-        purpleEyes.style.top = "65px";
-        purplePupilL.style.transform = "translate(3px, 4px)";
-        purplePupilR.style.transform = "translate(3px, 4px)";
+        place("purpleEyes", ...BASE.purpleEyes);
+        pose("purpleEyes", 10, 25);
+        posePupil("purplePupil", 3, 4);
       } else {
-        purpleEyes.style.left = 45 + purplePos.faceX + "px";
-        purpleEyes.style.top = 40 + purplePos.faceY + "px";
-        const po = calcPupilOffset(purpleEyeL, 5);
-        purplePupilL.style.transform = `translate(${po.x}px, ${po.y}px)`;
-        purplePupilR.style.transform = `translate(${po.x}px, ${po.y}px)`;
+        place("purpleEyes", ...BASE.purpleEyes);
+        track("purpleEyes", purplePos.faceX, purplePos.faceY);
+        const po = calcPupilOffset("purple", 5);
+        posePupil("purplePupil", po.x, po.y);
       }
 
       // ---- Black body ----
       if (isShowingPwd) {
-        black.style.transform = "skewX(0deg)";
+        bodySkew("black", 0, true);
+        setBodyShift("black", 0);
       } else if (isLookingAway) {
-        // 密码聚焦：不转头倾斜，保持正立（原 skewX(12deg) 已移除）
-        black.style.transform = "skewX(0deg)";
+        // 密码聚焦：不转头倾斜，保持正立
+        bodySkew("black", 0, true);
+        setBodyShift("black", 0);
       } else if (isLookingAtEachOther) {
-        black.style.transform = `skewX(${(blackPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`;
+        bodySkew("black", blackPos.bodySkew * 1.5 + 10, true);
+        setBodyShift("black", 20);
       } else if (isTyping) {
-        black.style.transform = `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)`;
+        bodySkew("black", blackPos.bodySkew * 1.5, true);
+        setBodyShift("black", 0);
       } else {
-        black.style.transform = `skewX(${blackPos.bodySkew}deg)`;
+        bodySkew("black", blackPos.bodySkew);
+        setBodyShift("black", 0);
       }
 
       // Black eyes
-      const blackEyes = document.getElementById("black-eyes");
-      const blackEyeL = document.getElementById("black-eye-l");
-      const blackEyeR = document.getElementById("black-eye-r");
-      const blackPupilL = document.getElementById("black-pupil-l");
-      const blackPupilR = document.getElementById("black-pupil-r");
-
-      blackEyeL.style.background = isBlackBlinking ? "#000" : "white";
-      blackEyeL.style.height = (isLookingAway || isShowingPwd) ? "16px" : (isBlackBlinking ? "2px" : "16px");
-      blackEyeR.style.background = isBlackBlinking ? "#000" : "white";
-      blackEyeR.style.height = (isLookingAway || isShowingPwd) ? "16px" : (isBlackBlinking ? "2px" : "16px");
+      els.blackEyeL.style.background = isBlackBlinking ? "#000" : "white";
+      els.blackEyeL.style.height = isLookingAway || isShowingPwd ? "16px" : isBlackBlinking ? "2px" : "16px";
+      els.blackEyeR.style.background = isBlackBlinking ? "#000" : "white";
+      els.blackEyeR.style.height = isLookingAway || isShowingPwd ? "16px" : isBlackBlinking ? "2px" : "16px";
 
       if (isLoginError) {
-        blackEyes.style.left = "15px";
-        blackEyes.style.top = "40px";
-        blackPupilL.style.transform = "translate(-3px, 4px)";
-        blackPupilR.style.transform = "translate(-3px, 4px)";
+        place("blackEyes", ...BASE.blackEyes);
+        pose("blackEyes", -11, 8);
+        posePupil("blackPupil", -3, 4);
       } else if (isLookingAway) {
         // 聚焦密码：睁眼好奇地盯着右侧输入框看（与紫色闭眼形成对比）
-        blackEyes.style.left = "42px";
-        blackEyes.style.top = "28px";
-        blackPupilL.style.transform = "translate(4px, 0px)";
-        blackPupilR.style.transform = "translate(4px, 0px)";
+        place("blackEyes", ...BASE.blackEyes);
+        pose("blackEyes", 16, -4);
+        posePupil("blackPupil", 4, 0);
       } else if (isShowingPwd) {
-        blackEyes.style.left = "10px";
-        blackEyes.style.top = "28px";
-        blackPupilL.style.transform = "translate(-4px, -4px)";
-        blackPupilR.style.transform = "translate(-4px, -4px)";
+        place("blackEyes", ...BASE.blackEyes);
+        pose("blackEyes", -16, -4);
+        posePupil("blackPupil", -4, -4);
       } else if (isLookingAtEachOther) {
-        blackEyes.style.left = "32px";
-        blackEyes.style.top = "12px";
-        blackPupilL.style.transform = "translate(0px, -4px)";
-        blackPupilR.style.transform = "translate(0px, -4px)";
+        place("blackEyes", ...BASE.blackEyes);
+        pose("blackEyes", 6, -20);
+        posePupil("blackPupil", 0, -4);
       } else {
-        blackEyes.style.left = 26 + blackPos.faceX + "px";
-        blackEyes.style.top = 32 + blackPos.faceY + "px";
-        const bo = calcPupilOffset(blackEyeL, 4);
-        blackPupilL.style.transform = `translate(${bo.x}px, ${bo.y}px)`;
-        blackPupilR.style.transform = `translate(${bo.x}px, ${bo.y}px)`;
+        place("blackEyes", ...BASE.blackEyes);
+        track("blackEyes", blackPos.faceX, blackPos.faceY);
+        const bo = calcPupilOffset("black", 4);
+        posePupil("blackPupil", bo.x, bo.y);
       }
 
       // ---- Orange body ----
-      const orangeMouth = document.getElementById("orange-mouth");
-      if (isLoginError) {
-        orangeMouth.style.left = 80 + orangePos.faceX + "px";
-        orangeMouth.style.top = "130px";
-      }
       if (isShowingPwd) {
-        orange.style.transform = "skewX(0deg)";
+        bodySkew("orange", 0, true);
       } else {
-        orange.style.transform = `skewX(${orangePos.bodySkew}deg)`;
+        bodySkew("orange", orangePos.bodySkew);
+      }
+
+      // Orange mouth：出错时才摆到下方（基准位 90,120）
+      if (isLoginError) {
+        place("orangeMouth", ...BASE.orangeMouth);
+        pose("orangeMouth", orangePos.faceX - 10, 10);
       }
 
       // Orange eyes
-      const orangeEyes = document.getElementById("orange-eyes");
-      const orangePupilL = document.getElementById("orange-pupil-l");
-      const orangePupilR = document.getElementById("orange-pupil-r");
-
       if (isLoginError) {
-        orangeEyes.style.left = "60px";
-        orangeEyes.style.top = "95px";
-        orangePupilL.style.transform = "translate(-3px, 4px)";
-        orangePupilR.style.transform = "translate(-3px, 4px)";
+        place("orangeEyes", ...BASE.orangeEyes);
+        pose("orangeEyes", -22, 5);
+        posePupil("orangePupil", -3, 4);
       } else if (isLookingAway) {
-        orangeEyes.style.left = "50px";
-        orangeEyes.style.top = "75px";
-        orangePupilL.style.transform = "translate(-5px, -5px)";
-        orangePupilR.style.transform = "translate(-5px, -5px)";
+        place("orangeEyes", ...BASE.orangeEyes);
+        pose("orangeEyes", -32, -15);
+        posePupil("orangePupil", -5, -5);
       } else if (isShowingPwd) {
-        orangeEyes.style.left = "50px";
-        orangeEyes.style.top = "85px";
-        orangePupilL.style.transform = "translate(-5px, -4px)";
-        orangePupilR.style.transform = "translate(-5px, -4px)";
+        place("orangeEyes", ...BASE.orangeEyes);
+        pose("orangeEyes", -32, -5);
+        posePupil("orangePupil", -5, -4);
       } else {
-        orangeEyes.style.left = 82 + orangePos.faceX + "px";
-        orangeEyes.style.top = 90 + orangePos.faceY + "px";
-        const oo = calcPupilOffset(orangePupilL, 5);
-        orangePupilL.style.transform = `translate(${oo.x}px, ${oo.y}px)`;
-        orangePupilR.style.transform = `translate(${oo.x}px, ${oo.y}px)`;
+        place("orangeEyes", ...BASE.orangeEyes);
+        track("orangeEyes", orangePos.faceX, orangePos.faceY);
+        const oo = calcPupilOffset("orange", 5);
+        posePupil("orangePupil", oo.x, oo.y);
       }
 
       // ---- Yellow body ----
       if (isShowingPwd) {
-        yellow.style.transform = "skewX(0deg)";
+        bodySkew("yellow", 0, true);
       } else {
-        yellow.style.transform = `skewX(${yellowPos.bodySkew}deg)`;
+        bodySkew("yellow", yellowPos.bodySkew);
       }
 
       // Yellow eyes & mouth
-      const yellowEyes = document.getElementById("yellow-eyes");
-      const yellowPupilL = document.getElementById("yellow-pupil-l");
-      const yellowPupilR = document.getElementById("yellow-pupil-r");
-      const yellowMouth = document.getElementById("yellow-mouth");
-
       if (isLoginError) {
-        yellowEyes.style.left = "35px";
-        yellowEyes.style.top = "45px";
-        yellowPupilL.style.transform = "translate(-3px, 4px)";
-        yellowPupilR.style.transform = "translate(-3px, 4px)";
-        yellowMouth.style.left = "30px";
-        yellowMouth.style.top = "92px";
-        yellowMouth.style.transform = "rotate(-8deg)";
+        place("yellowEyes", ...BASE.yellowEyes);
+        pose("yellowEyes", -17, 5);
+        posePupil("yellowPupil", -3, 4);
+        place("yellowMouth", ...BASE.yellowMouth);
+        pose("yellowMouth", -10, 4);
+        send("yellowMouth", "rotate", -8, POSE_MS);
       } else if (isLookingAway) {
-        yellowEyes.style.left = "20px";
-        yellowEyes.style.top = "30px";
-        yellowPupilL.style.transform = "translate(-5px, -5px)";
-        yellowPupilR.style.transform = "translate(-5px, -5px)";
-        yellowMouth.style.left = "15px";
-        yellowMouth.style.top = "78px";
-        yellowMouth.style.transform = "rotate(0deg)";
+        place("yellowEyes", ...BASE.yellowEyes);
+        pose("yellowEyes", -32, -10);
+        posePupil("yellowPupil", -5, -5);
+        place("yellowMouth", ...BASE.yellowMouth);
+        pose("yellowMouth", -25, -10);
+        send("yellowMouth", "rotate", 0, POSE_MS);
       } else if (isShowingPwd) {
-        yellowEyes.style.left = "20px";
-        yellowEyes.style.top = "35px";
-        yellowPupilL.style.transform = "translate(-5px, -4px)";
-        yellowPupilR.style.transform = "translate(-5px, -4px)";
-        yellowMouth.style.left = "10px";
-        yellowMouth.style.top = "88px";
-        yellowMouth.style.transform = "rotate(0deg)";
+        place("yellowEyes", ...BASE.yellowEyes);
+        pose("yellowEyes", -32, -5);
+        posePupil("yellowPupil", -5, -4);
+        place("yellowMouth", ...BASE.yellowMouth);
+        pose("yellowMouth", -30, 0);
+        send("yellowMouth", "rotate", 0, POSE_MS);
       } else {
-        yellowEyes.style.left = 52 + yellowPos.faceX + "px";
-        yellowEyes.style.top = 40 + yellowPos.faceY + "px";
-        const yo = calcPupilOffset(yellowPupilL, 5);
-        yellowPupilL.style.transform = `translate(${yo.x}px, ${yo.y}px)`;
-        yellowPupilR.style.transform = `translate(${yo.x}px, ${yo.y}px)`;
-        yellowMouth.style.left = 40 + yellowPos.faceX + "px";
-        yellowMouth.style.top = 88 + yellowPos.faceY + "px";
-        yellowMouth.style.transform = "rotate(0deg)";
+        place("yellowEyes", ...BASE.yellowEyes);
+        track("yellowEyes", yellowPos.faceX, yellowPos.faceY);
+        const yo = calcPupilOffset("yellow", 5);
+        posePupil("yellowPupil", yo.x, yo.y);
+        place("yellowMouth", ...BASE.yellowMouth);
+        track("yellowMouth", yellowPos.faceX, yellowPos.faceY);
+        send("yellowMouth", "rotate", 0, POSE_MS);
       }
     }
 
@@ -1166,54 +1291,51 @@
     // ============ FORM VALIDATION ============
     document.getElementById("login-form").addEventListener("submit", (e) => {
       e.preventDefault();
-      const email = emailInput.value.trim();
-      const pwd = passwordInput.value;
-      const errEl = document.getElementById("error-msg");
-      const emailLabel = document.getElementById("email-label");
-      const pwdLabel = document.getElementById("password-label");
+      const email = els.email.value.trim();
+      const pwd = els.password.value;
 
       // Reset
-      errEl.style.display = "none";
-      emailInput.classList.remove("error");
-      passwordInput.classList.remove("error");
-      emailLabel.classList.remove("error-label");
-      pwdLabel.classList.remove("error-label");
+      els.errorEl.style.display = "none";
+      els.email.classList.remove("error");
+      els.password.classList.remove("error");
+      els.emailLabel.classList.remove("error-label");
+      els.passwordLabel.classList.remove("error-label");
 
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        emailInput.classList.add("error");
-        emailLabel.classList.add("error-label");
-        errEl.textContent = "请输入有效的邮箱地址。";
-        errEl.style.display = "block";
+        els.email.classList.add("error");
+        els.emailLabel.classList.add("error-label");
+        els.errorEl.textContent = "请输入有效的邮箱地址。";
+        els.errorEl.style.display = "block";
         triggerLoginError();
         return;
       }
 
       if (!pwd || pwd.length < 6) {
-        passwordInput.classList.add("error");
-        pwdLabel.classList.add("error-label");
-        errEl.textContent = "密码至少需要 6 个字符。";
-        errEl.style.display = "block";
+        els.password.classList.add("error");
+        els.passwordLabel.classList.add("error-label");
+        els.errorEl.textContent = "密码至少需要 6 个字符。";
+        els.errorEl.style.display = "block";
         triggerLoginError();
         return;
       }
 
       // Simulate login (always fails for demo to show the animation)
-      const btn = document.getElementById("btn-login");
-      btn.querySelector(".btn-text").textContent = "登录中...";
-      btn.disabled = true;
+      els.btnLogin.querySelector(".btn-text").textContent = "登录中...";
+      els.btnLogin.disabled = true;
 
       setTimeout(() => {
-        btn.querySelector(".btn-text").textContent = "登 录";
-        btn.disabled = false;
-        errEl.textContent = "邮箱或密码错误，请重试。";
-        errEl.style.display = "block";
-        passwordInput.classList.add("error");
-        pwdLabel.classList.add("error-label");
+        els.btnLogin.querySelector(".btn-text").textContent = "登 录";
+        els.btnLogin.disabled = false;
+        els.errorEl.textContent = "邮箱或密码错误，请重试。";
+        els.errorEl.style.display = "block";
+        els.password.classList.add("error");
+        els.passwordLabel.classList.add("error-label");
         triggerLoginError();
       }, 1500);
     });
 
     // Initial render
+    measureGeometry();
     updateCharacters();
   </script>
 </body>
