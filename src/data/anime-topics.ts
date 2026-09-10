@@ -1,5 +1,3 @@
-import { hollowKnightTopics } from './hollow-knight-topics';
-
 export interface SubItem {
   id: string; label: string; desc: string; html: string; css: string; js: string;
   children?: SubItem[];
@@ -2305,9 +2303,287 @@ const IDLE = 500;   // 消失后到下一轮的空档 ms
   }
 })();`,
         },
+        {
+          id: 'needle-tick',
+          label: '指针刻度联动',
+          desc: `**指针刻度联动（引擎仪表盘·第六段）** — 指针扫过时，正对的那根刻度被顶出去并高亮成亮色，整圈刻度颜色跟着指针所在的弧段走。
+
+三层机制：
+
+1) 最近刻度定位
+指针当前屏幕角 tipRad = 135° + 270° × p（p 为 0→1 的扫过进度）；遍历 180 根刻度求角差最小者 minI。
+角差用 atan2(sin(d), cos(d)) 取绝对值 —— 这样跨 0°/360° 边界时不会算错。
+
+2) 驼峰隆起（是位置外移，不是变长）
+rank = 环形最短索引距离 min(|i - minI|, N - |i - minI|)；
+sh = rank <= 3 ? 16 - 4 × rank : 0 → 命中 16 / 12 / 8 / 4 px，第 5 根起归零。
+整根刻度沿半径外移 sh 像素：外端点半径 r + sh，内端点也 + sh，刻度长度不变，所以看起来是被"顶出去"。
+
+3) 颜色联动
+命中那根 → 当前弧段的亮色，线宽 4，线帽 butt（方头，硬）；
+其余全部 → 当前弧段的基础色，线宽 2.6，线帽 round；
+指针本体（尾摆 + 针 + 轴心）同步染成基础色。
+
+4) 中段画弧（颜色的载体）
+在指针长度的 75% 处（r = 250 × 0.75 = 187.5）画一圈 6 段弧。指针扫到哪一段，那段弧就从起点被"画"出来：
+- 生长中的段 → 亮色，线宽 10 → 20，带 drop-shadow 发光
+- 画完的段 → 回落成该段基础色，线宽回到 10，去掉发光
+- 还没到的段 → dashoffset 等于整段长，不可见
+每一段用 stroke-dasharray = 段长 + 周长、dashoffset 从 段长 → 0 实现"从无到有"。所以弧是"边扫边画"，指针尖端正好压在生长段的末端。
+
+参数沿用动画实验室第六段：起始 225°、扫过 270°、6 段弧环、180 根刻度（每 30° 一根长刻度）。
+节奏：0→1 扫满 4200ms → 停 700ms → 回到起点重来。为了看清定位，刻度只在 minI 或弧段变化时才写 DOM。
+
+未搬运的部分（需要可加）：RPM 计数（第六段左下角的 4 位数字读数）。`,
+          html: `<div class="nt-wrap">
+  <svg id="nt-svg" viewBox="0 0 750 750" xmlns="http://www.w3.org/2000/svg" aria-label="needle tick gauge">
+    <g id="nt-arc"></g>
+    <g id="nt-tick"></g>
+    <g id="nt-arc-mid"></g>
+    <g id="nt-needle"></g>
+  </svg>
+</div>`,
+          css: `html, body { height: 100%; }
+body {
+  margin: 0; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+}
+.nt-wrap { text-align: center; }
+#nt-svg { width: min(320px, 84vw, 66vh); height: auto; display: block; margin: 0 auto; }
+`,
+          js: `const NS = 'http://www.w3.org/2000/svg';
+const gArc = document.getElementById('nt-arc');
+const gTick = document.getElementById('nt-tick');
+const gArcMid = document.getElementById('nt-arc-mid');
+const gNeedle = document.getElementById('nt-needle');
+
+// ===== 几何 / 配色：沿用第六段引擎仪表盘 =====
+const CX = 375, CY = 375;
+const TICKR = 333.5, TICKCOUNT = 180, TICKSTEP = 360 / TICKCOUNT, TICKSTART = -90, TICKW = 2.6;
+const ARCR = 357.5, SEGS = 6, SWEEPSTART = 225, SWEEP = 270, NEEDLE = 250;
+const COLS = ['#9F4A76', '#6D5AA3', '#AAAAAA', '#16889A', '#539EA7', '#228963'];
+const HIS  = ['#E269A8', '#9B80E7', '#F1F1F1', '#1FC1DB', '#76E0EC', '#30C28D'];
+const SWEEP_MS = 4200, HOLD_MS = 700;
+
+function mk(name) { return document.createElementNS(NS, name); }
+
+// ===== 六段彩色弧环（静态展示，用来读出"指针现在在哪一段"） =====
+const arcC = 2 * Math.PI * ARCR;
+const segLen = arcC / SEGS;
+for (let i = 0; i < SEGS; i++) {
+  const c = mk('circle');
+  c.setAttribute('cx', CX); c.setAttribute('cy', CY); c.setAttribute('r', ARCR);
+  c.setAttribute('fill', 'none');
+  c.setAttribute('stroke', COLS[i]);
+  c.setAttribute('stroke-width', 12);
+  c.setAttribute('stroke-linecap', 'butt');
+  c.setAttribute('stroke-dasharray', segLen + ' ' + arcC);
+  c.setAttribute('stroke-dashoffset', segLen);
+  c.setAttribute('transform', 'rotate(' + (SWEEPSTART - 90 + i * (SWEEP / SEGS)) + ' ' + CX + ' ' + CY + ')');
+  gArc.appendChild(c);
+}
+
+// ===== 180 根刻度：每 30° 一根长刻度（索引间隔 15） =====
+const ticks = [];
+for (let i = 0; i < TICKCOUNT; i++) {
+  const ang = (TICKSTART + i * TICKSTEP) * Math.PI / 180;
+  const len = (i % 15 === 0) ? 40 : 30;
+  const l = mk('line');
+  l.setAttribute('x1', CX + TICKR * Math.cos(ang));
+  l.setAttribute('y1', CY + TICKR * Math.sin(ang));
+  l.setAttribute('x2', CX + (TICKR - len) * Math.cos(ang));
+  l.setAttribute('y2', CY + (TICKR - len) * Math.sin(ang));
+  l.setAttribute('stroke', COLS[0]);
+  l.setAttribute('stroke-width', TICKW);
+  l.setAttribute('stroke-linecap', 'round');
+  gTick.appendChild(l);
+  ticks.push({ el: l, ang: ang, len: len });
+}
+
+// ===== 中段画弧：半径 = 指针长度 × 0.75，6 段，随指针进度逐段"画出来" =====
+const MIDR = NEEDLE * 0.75;
+const midC = 2 * Math.PI * MIDR;
+const midLen = midC * (SWEEP / SEGS) / 360;
+const midSegs = [];
+for (let i = 0; i < SEGS; i++) {
+  const c = mk('circle');
+  c.setAttribute('cx', CX); c.setAttribute('cy', CY); c.setAttribute('r', MIDR);
+  c.setAttribute('fill', 'none');
+  c.setAttribute('stroke', COLS[i]);
+  c.setAttribute('stroke-width', 10);
+  c.setAttribute('stroke-linecap', 'butt');
+  c.setAttribute('stroke-dasharray', midLen + ' ' + midC);
+  c.setAttribute('stroke-dashoffset', midLen);
+  c.setAttribute('transform', 'rotate(' + (SWEEPSTART - 90 + i * (SWEEP / SEGS)) + ' ' + CX + ' ' + CY + ')');
+  c.style.transition = 'stroke-width .4s ease';
+  gArcMid.appendChild(c);
+  midSegs.push(c);
+}
+
+// ===== 指针：尾摆 + 针 + 轴心
+const needle = mk('g');
+const tail = mk('line');
+tail.setAttribute('x1', 0); tail.setAttribute('y1', 0);
+tail.setAttribute('x2', 0); tail.setAttribute('y2', 42);
+tail.setAttribute('stroke-width', 3); tail.setAttribute('stroke-linecap', 'round');
+tail.style.opacity = '0.45';
+needle.appendChild(tail);
+const pin = mk('line');
+pin.setAttribute('x1', 0); pin.setAttribute('y1', 0);
+pin.setAttribute('x2', 0); pin.setAttribute('y2', -NEEDLE);
+pin.setAttribute('stroke-width', 3.5); pin.setAttribute('stroke-linecap', 'round');
+needle.appendChild(pin);
+const hub = mk('circle');
+hub.setAttribute('r', 9); hub.setAttribute('fill', '#1F1E1C'); hub.setAttribute('stroke-width', 2.5);
+needle.appendChild(hub);
+gNeedle.appendChild(needle);
+const nParts = [tail, pin, hub];
+
+// ===== 主循环：0→1 扫 270°，停一拍后回到起点 =====
+const t0 = performance.now();
+let lastKey = '';
+
+function frame(now) {
+  const tt = (now - t0) % (SWEEP_MS + HOLD_MS);
+  const p = tt < SWEEP_MS ? tt / SWEEP_MS : 1;
+  const seg = Math.min(Math.floor(p * SEGS), SEGS - 1);
+  const col = COLS[seg], hi = HIS[seg];
+
+  // 指针角度：旋转角 = 225 + 270p，指向的屏幕角 = 该旋转角 - 90
+  needle.setAttribute('transform', 'translate(' + CX + ' ' + CY + ') rotate(' + (SWEEPSTART + SWEEP * p) + ')');
+  pin.style.filter = 'drop-shadow(0 0 8px ' + col + ')';
+  for (let i = 0; i < nParts.length; i++) nParts[i].setAttribute('stroke', col);
+
+  // 中段画弧：正在生长的段用亮色加粗发光，画完的段回落基础色，未到的段隐藏
+  for (let i = 0; i < midSegs.length; i++) {
+    const sp = Math.min(Math.max(p * SEGS - i, 0), 1);
+    const mc = midSegs[i];
+    if (sp <= 0) {
+      mc.setAttribute('stroke-dashoffset', midLen);
+      mc.setAttribute('stroke', COLS[i]);
+      mc.setAttribute('stroke-width', 10);
+      mc.style.filter = '';
+    } else if (sp >= 1) {
+      mc.setAttribute('stroke-dashoffset', 0);
+      mc.setAttribute('stroke', COLS[i]);
+      mc.setAttribute('stroke-width', 10);
+      mc.style.filter = '';
+    } else {
+      mc.setAttribute('stroke-dashoffset', midLen * (1 - sp));
+      mc.setAttribute('stroke', HIS[i]);
+      mc.setAttribute('stroke-width', 20);
+      mc.style.filter = 'drop-shadow(0 0 8px ' + HIS[i] + ')';
+    }
+  }
+
+  // 最近刻度：环形角差最小
+  const tipRad = (SWEEPSTART - 90 + SWEEP * p) * Math.PI / 180;
+  let minI = 0, minD = 1e9;
+  for (let i = 0; i < ticks.length; i++) {
+    const d = Math.abs(Math.atan2(Math.sin(ticks[i].ang - tipRad), Math.cos(ticks[i].ang - tipRad)));
+    if (d < minD) { minD = d; minI = i; }
+  }
+
+  // 只在命中项或弧段变化时写 DOM（180 根 × 4 个属性，每帧写太浪费）
+  const key = minI + '/' + seg;
+  if (key !== lastKey) {
+    lastKey = key;
+    for (let i = 0; i < ticks.length; i++) {
+      const tk = ticks[i];
+      const rank = Math.min(Math.abs(i - minI), ticks.length - Math.abs(i - minI));
+      const sh = rank <= 3 ? (16 - 4 * rank) : 0;
+      tk.el.setAttribute('x1', CX + (TICKR + sh) * Math.cos(tk.ang));
+      tk.el.setAttribute('y1', CY + (TICKR + sh) * Math.sin(tk.ang));
+      tk.el.setAttribute('x2', CX + (TICKR - tk.len + sh) * Math.cos(tk.ang));
+      tk.el.setAttribute('y2', CY + (TICKR - tk.len + sh) * Math.sin(tk.ang));
+      if (i === minI) {
+        tk.el.setAttribute('stroke', hi);
+        tk.el.setAttribute('stroke-width', 4);
+        tk.el.setAttribute('stroke-linecap', 'butt');
+      } else {
+        tk.el.setAttribute('stroke', col);
+        tk.el.setAttribute('stroke-width', TICKW);
+        tk.el.setAttribute('stroke-linecap', 'round');
+      }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+        },
+        {
+          id: 'sphere-ellipse',
+          label: '3D 球体错觉',
+          desc: `**3D 球体错觉** — 20 条扁椭圆叠成一个球。不是画球，是用"纬线投影"骗眼睛。
+
+三条关键公式（i = 0~19，t = (i - 9.5) / 9.5 → -1 ~ 1）
+- 长轴半径 rx = 57.5 + 201.25 × (1 - t²) —— 中间最宽 258.75（球赤道）、两端收窄到 57.5（球两极），这条抛物线就是纬度分布
+- 圆心沿 y = x 对角线错开：cx = cy = 375 + (i - 9.5) × 12 + 48t
+- 扁度 0.2（ry = rx × 0.2），整条再 rotate(-45°) 绕自身圆心 —— 纬线斜置，立体感就出来了
+
+每条是一条完整椭圆 path（两段 A 半弧），20 条常显、不参与绘制动画 —— 加载出来就是完整球面。
+
+呼吸浮动：每条沿对角线 ±8px 浮动，相位差 i × 0.35 rad、周期 3s —— 波浪从第一条传到最后一条，不会 20 条一起动。
+
+（原页 动画馆 01 圆弧动画·第三段 是滚轮驱动 + 逐条"画-保持-擦除"的波浪式绘制；要用那种版本时把 drawP 三态加回来即可。）`,
+          html: `<div class="sphere-wrap">
+  <svg id="sphere-svg" viewBox="110 110 530 530" xmlns="http://www.w3.org/2000/svg" aria-label="3D sphere ellipse illusion"></svg>
+</div>`,
+          css: `html, body { height: 100%; }
+body {
+  margin: 0; background: #252423;
+  display: flex; align-items: center; justify-content: center;
+}
+.sphere-wrap { text-align: center; }
+#sphere-svg { width: min(320px, 84vw, 66vh); height: auto; display: block; margin: 0 auto; }
+`,
+          js: `const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('sphere-svg');
+
+// ===== 几何：20 条扁椭圆 → 球面纬线投影 =====
+const CX = 375, CY = 375;
+const N = 20, MID = (N - 1) / 2;
+const COLOR = '#228963';
+
+const items = [];
+for (let i = 0; i < N; i++) {
+  const t = (i - MID) / MID;                       // -1 ~ 1
+  const rx = 57.5 + 201.25 * (1 - t * t);          // 中间最宽、两端收窄
+  const ry = Math.round(rx * 0.2);                 // 扁度 0.2
+  const shift = 48 * (i - MID) / MID;              // 沿对角线整体错开
+  const cx = CX + (i - MID) * 12 + shift;
+  const cy = CY + (i - MID) * 12 + shift;
+  const rot = 'rotate(-45 ' + cx + ' ' + cy + ')';
+
+  const p = document.createElementNS(NS, 'path');
+  p.setAttribute('d', 'M ' + (cx - rx) + ' ' + cy +
+    ' A ' + rx + ' ' + ry + ' 0 1 0 ' + (cx + rx) + ' ' + cy +
+    ' A ' + rx + ' ' + ry + ' 0 1 0 ' + (cx - rx) + ' ' + cy);
+  p.setAttribute('fill', 'none');
+  p.setAttribute('stroke', COLOR);
+  p.setAttribute('stroke-width', 3.6);
+  p.setAttribute('stroke-linecap', 'round');
+  p.setAttribute('transform', rot);
+  p.style.filter = 'brightness(1.42) drop-shadow(0 0 6px ' + COLOR + ')';
+  svg.appendChild(p);
+  // 常显：不画、不擦，整条椭圆一直完整可见
+  items.push({ path: p, rot: rot });
+}
+
+// ===== 呼吸浮动：每条沿对角线 ±8px，相位差 i×0.35 → 传递式波浪 =====
+function frame(now) {
+  const bt = now / 1000;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const f = Math.sin(bt * 2 * Math.PI / 3 + i * 0.35) * 8 * 0.707;
+    it.path.setAttribute('transform', 'translate(' + f + ' ' + f + ') ' + it.rot);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+        },
         ],
       },
     ],
   },
-  ...hollowKnightTopics,
 ];
