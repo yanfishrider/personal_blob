@@ -7,133 +7,278 @@ export interface Props {
 }
 
 const { postCount, tagCount, categoryCount, recentPosts } = Astro.props;
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const href = (p: string) => `${base}${p}`;
 ---
 
-<aside class="w-full md:w-[12%] md:min-w-[170px] shrink-0 md:relative">
-  <div class="md:sticky md:top-[18%] space-y-4">
-    <!-- 个人信息卡片 -->
-    <div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm space-y-5">
-      <div class="text-center">
-        <div class="avatar-ring mx-auto relative w-24 h-24 rounded-full bg-[#252423] shadow-lg mb-3 overflow-hidden">
-          <svg viewBox="0 0 200 200" class="absolute inset-0 w-full h-full">
-            <circle class="track" cx="100" cy="100" r="70"
-              fill="none" stroke="#3a3a3a" stroke-width="8" />
-            <circle class="progress" cx="100" cy="100" r="30"
-              fill="none" stroke="#ff7b42" stroke-width="8"
-              stroke-linecap="round"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-            <circle class="progress-1" cx="100" cy="100" r="40"
-              fill="none" stroke="#AAAAAA" stroke-width="10"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-            <circle class="progress-2" cx="100" cy="100" r="50"
-              fill="none" stroke="#C5FCE7" stroke-width="10"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-            <circle class="progress-3" cx="100" cy="100" r="60"
-              fill="none" stroke="#B7D8FE" stroke-width="10"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-            <circle class="progress-4" cx="100" cy="100" r="70"
-              fill="none" stroke="#92C41E" stroke-width="10"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-            <circle class="progress-5" cx="100" cy="100" r="90"
-              fill="none" stroke="#E9E9E9" stroke-width="10"
-              pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
-          </svg>
-        </div>
-        <h2 class="text-lg font-bold text-gray-800">摸鱼骑士</h2>
-        <p id="motto-text" class="text-xs text-gray-500 mt-1">闲来垂钓碧溪上,忽复乘舟梦日边</p>
-        <button id="motto-btn" type="button"
-          class="inline-flex items-center text-[11px] text-gray-600 border border-gray-300 rounded-full px-3 py-0.5 mt-1.5 transition-colors duration-300 cursor-pointer select-none tracking-widest hover:text-[#49B1F5] hover:border-[#49B1F5]"
-          title="切换个性签名">文本改变</button>
-        <p class="text-xs text-gray-400 mt-0.5">软件开发</p>
-      </div>
-
-      <hr class="border-gray-200" />
-
-      <div class="grid grid-cols-3 text-center">
-        <a href={base} class="group py-1 rounded-lg hover:bg-gray-100 transition-colors">
-          <div class="text-lg font-bold text-gray-800">{postCount}</div>
-          <div class="text-xs text-gray-400 mt-0.5">文章</div>
-        </a>
-        <a href={`${base}/tags`} class="group py-1 rounded-lg hover:bg-gray-100 transition-colors">
-          <div class="text-lg font-bold text-gray-800">{tagCount}</div>
-          <div class="text-xs text-gray-400 mt-0.5">标签</div>
-        </a>
-        <a href={`${base}/categories`} class="group py-1 rounded-lg hover:bg-gray-100 transition-colors">
-          <div class="text-lg font-bold text-gray-800">{categoryCount}</div>
-          <div class="text-xs text-gray-400 mt-0.5">分类</div>
-        </a>
-      </div>
+<aside class="profile">
+  <div class="rail-card profile__id">
+    <div class="avatar-ring">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="track" cx="100" cy="100" r="72" fill="none" stroke="var(--rule)" stroke-width="1" />
+        <circle class="progress" cx="100" cy="100" r="34" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+        <circle class="progress-1" cx="100" cy="100" r="44" fill="none" stroke="var(--accent-soft)" stroke-width="1.5" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+        <circle class="progress-2" cx="100" cy="100" r="54" fill="none" stroke="var(--ink-4)" stroke-width="1.5" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+        <circle class="progress-3" cx="100" cy="100" r="64" fill="none" stroke="var(--ink-3)" stroke-width="1" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" />
+      </svg>
+      <span class="avatar-ring__monogram">摸</span>
     </div>
 
-    <!-- 目录卡片 -->
-    <div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm">
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">目录</h3>
-      <ul class="space-y-1.5">
-        {recentPosts.slice(0, 8).map((p) => (
+    <h2 class="profile__name">摸鱼骑士</h2>
+    <p id="motto-text" class="profile__motto">闲来垂钓碧溪上，忽复乘舟梦日边</p>
+    <button id="motto-btn" type="button" class="profile__motto-btn" title="换一句">
+      换一句
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3h-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <p class="profile__role">软件开发 · 折腾动画</p>
+
+    <div class="profile__stats">
+      <a href={base || '/'} class="profile__stat">
+        <span class="profile__stat-num">{postCount}</span>
+        <span class="profile__stat-label">文章</span>
+      </a>
+      <a href={href('/tags')} class="profile__stat">
+        <span class="profile__stat-num">{tagCount}</span>
+        <span class="profile__stat-label">标签</span>
+      </a>
+      <a href={href('/categories')} class="profile__stat">
+        <span class="profile__stat-num">{categoryCount}</span>
+        <span class="profile__stat-label">分类</span>
+      </a>
+    </div>
+
+    <a
+      href="https://github.com/yanfishrider"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn profile__github"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+      </svg>
+      GitHub
+    </a>
+  </div>
+
+  <div class="rail-card">
+    <div class="rail-title">
+      <span>最近文章</span>
+      <a href={href('/archive')} class="rail-title__link">全部</a>
+    </div>
+    <ul class="profile__recent">
+      {
+        recentPosts.map((p) => (
           <li>
-            <a href={`${base}/posts/${p.slug}`}
-               class="block text-xs text-gray-500 hover:text-blue-600 transition-colors truncate py-0.5">
-              {p.title}
+            <a href={`${base}/posts/${p.slug}`} class="profile__recent-link">
+              <span>{p.title}</span>
             </a>
           </li>
-        ))}
-      </ul>
-    </div>
-
-    <!-- Follow Me -->
-    <a href="https://github.com/yanfishrider" target="_blank" rel="noopener noreferrer"
-       class="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#49B1F5] hover:bg-[#BEE9D9] hover:text-gray-800 text-white text-sm font-medium rounded-xl transition-colors shadow-sm">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-      </svg>
-      Follow Me
-    </a>
+        ))
+      }
+    </ul>
   </div>
 </aside>
 
 <style is:global>
-  .avatar-ring .progress-1 { transform: rotate(130deg); transform-origin: 100px 100px; }
-  .avatar-ring .progress-2 { transform: rotate(270deg); transform-origin: 100px 100px; }
-  .avatar-ring .progress-3 { transform: rotate(20deg); transform-origin: 100px 100px; }
-  .avatar-ring .progress-4 { transform: rotate(-50deg); transform-origin: 100px 100px; }
-  .avatar-ring .progress-5 { transform: rotate(160deg); transform-origin: 100px 100px; }
+  .profile {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .profile__id {
+    text-align: center;
+    padding: 22px 18px 18px;
+  }
+
+  .avatar-ring {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    margin: 0 auto 14px;
+  }
+  .avatar-ring svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .avatar-ring__monogram {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-serif);
+    font-size: 34px;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+  }
+
+  .profile__name {
+    font-size: 1.18rem;
+    letter-spacing: 0.04em;
+  }
+  .profile__motto {
+    margin-top: 8px;
+    min-height: 2.6em;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    letter-spacing: 0.02em;
+  }
+  .profile__motto-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 2px 9px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--ink-4);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: 99px;
+    cursor: pointer;
+    transition: color 0.25s ease, border-color 0.25s ease;
+  }
+  .profile__motto-btn:hover {
+    color: var(--accent-deep);
+    border-color: var(--accent-soft);
+  }
+  .profile__role {
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--ink-4);
+    text-transform: uppercase;
+  }
+
+  .profile__stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin: 16px 0 14px;
+    padding: 12px 0;
+    border-top: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .profile__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    transition: color 0.2s ease;
+  }
+  .profile__stat + .profile__stat {
+    border-left: 1px solid var(--rule-soft);
+  }
+  .profile__stat-num {
+    font-family: var(--font-serif);
+    font-size: 1.18rem;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .profile__stat-label {
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--ink-4);
+  }
+  .profile__stat:hover .profile__stat-num {
+    color: var(--accent-deep);
+  }
+
+  .profile__github {
+    width: 100%;
+    font-size: 12px;
+  }
+
+  .rail-title__link {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--ink-4);
+    transition: color 0.2s ease;
+  }
+  .rail-title__link:hover {
+    color: var(--accent-deep);
+  }
+
+  .profile__recent {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .profile__recent-link {
+    display: block;
+    padding: 5px 0 5px 11px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    border-left: 1px solid var(--rule-soft);
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .profile__recent-link span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .profile__recent-link:hover {
+    color: var(--accent-deep);
+    border-left-color: var(--accent-soft);
+  }
 </style>
 
 <script>
-  import { animate, scrambleText } from 'https://esm.sh/animejs@4.4.1';
+  import { animate, scrambleText } from 'animejs';
 
-  // 头像卡片：点击「文本改变」轮换个性签名（scrambleText 乱码切换）
   const mottoEl = document.getElementById('motto-text');
   const mottoBtn = document.getElementById('motto-btn');
+  const mottoes = [
+    '闲来垂钓碧溪上，忽复乘舟梦日边',
+    '长风破浪会有时，直挂云帆济沧海',
+    '行到水穷处，坐看云起时',
+    '竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生',
+    '此心安处是吾乡',
+  ];
+
   if (mottoEl && mottoBtn) {
-    const mottoes = [
-      '闲来垂钓碧溪上,忽复乘舟梦日边',
-      '长风破浪会有时,直挂云帆济沧海',
-      '行到水穷处,坐看云起时',
-      '竹杖芒鞋轻胜马,谁怕?一蓑烟雨任平生',
-      '此心安处是吾乡',
-    ];
-    let mottoIdx = 0;
+    let idx = 0;
     mottoBtn.addEventListener('click', () => {
-      mottoIdx = (mottoIdx + 1) % mottoes.length;
-      animate(mottoEl, {
-        innerHTML: scrambleText({ text: mottoes[mottoIdx] }),
-      });
+      idx = (idx + 1) % mottoes.length;
+      animate(mottoEl, { innerHTML: scrambleText({ text: mottoes[idx] }) });
     });
   }
 
-  const avatars = document.querySelectorAll('.avatar-ring');
-  if (avatars.length) {
-    // 6 层描边动画
-    ['progress', 'progress-1', 'progress-2', 'progress-3', 'progress-4', 'progress-5'].forEach(cls => {
+  const rings = document.querySelectorAll('.avatar-ring');
+  if (rings.length) {
+    ['progress', 'progress-1', 'progress-2', 'progress-3'].forEach((cls, i) => {
       animate(`circle.${cls}`, {
         strokeDashoffset: 0,
-        duration: 2000,
+        duration: 1800 + i * 220,
         easing: 'easeInOutQuad',
         loop: true,
         direction: 'alternate',
+        delay: i * 120,
       });
     });
   }
 </script>
+
+<style is:global>
+  .avatar-ring .progress-1 {
+    transform: rotate(130deg);
+    transform-origin: 100px 100px;
+  }
+  .avatar-ring .progress-2 {
+    transform: rotate(270deg);
+    transform-origin: 100px 100px;
+  }
+  .avatar-ring .progress-3 {
+    transform: rotate(20deg);
+    transform-origin: 100px 100px;
+  }
+</style>

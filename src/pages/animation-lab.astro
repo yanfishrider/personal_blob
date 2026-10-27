@@ -1,35 +1,37 @@
 ---
 // animation-lab.astro — 动画展示馆壳页面：左侧菜单 + 右侧 iframe（DIY 展示）
-// 内容页：lab-arc.astro（圆弧动画）/ lab-nier.astro（NieR 加载动画）/ lab-p3re.astro（P3RE 风格动画）/ lab-zipper.astro（拉链幕布）
-// 菜单项在 MENU 数组注册即可扩展；hash（#arc/#nier/#p3re）记忆当前选中，刷新恢复
+// 新增动画只需在 MENU 里加一项，菜单和数据自动同步
 import BaseLayout from '../layouts/BaseLayout.astro';
-const base = import.meta.env.BASE_URL;
+
+const MENU = [
+  { key: 'arc', page: 'lab-arc', label: '圆弧动画' },
+  { key: 'nier', page: 'lab-nier', label: 'NieR 加载动画' },
+  { key: 'p3re', page: 'lab-p3re', label: 'P3RE 风格动画' },
+  { key: 'login', page: 'login-demo/index.html', label: '互动登录' },
+  { key: 'zipper', page: 'lab-zipper', label: '拉链幕布' },
+  { key: 'standby', page: 'standby/index.html', label: '叶扇展开' },
+  { key: 'ink', page: 'lab-ink/index.html', label: '湖面' },
+];
 ---
-<BaseLayout title="动画展示馆" description="动画 DIY 展示：圆弧动画 / NieR / P3RE / 拉链幕布">
+
+<BaseLayout theme="dark" title="动画展示馆 - 摸鱼骑士 知识库" description="把喜欢的游戏 UI 拆开重做：圆弧、NieR、P3RE、拉链幕布。">
   <div id="lab-shell" class="lab-shell">
-    <nav id="lab-menu" class="lab-menu">
+    <nav id="lab-menu" class="lab-menu" aria-label="动画列表">
       <div class="lab-menu-head">
         <span class="lab-menu-title">动画馆</span>
-        <span class="lab-menu-sub">ANIMATION<br/>GALLERY</span>
+        <span class="lab-menu-sub">ANIMATION<br />GALLERY</span>
       </div>
       <div class="lab-menu-list">
-        <button class="lab-menu-item" data-key="arc" data-num="01">
-          <span class="lm-num">01</span><span class="lm-name">圆弧动画</span>
-        </button>
-        <button class="lab-menu-item" data-key="nier" data-num="02">
-          <span class="lm-num">02</span><span class="lm-name">NieR 加载动画</span>
-        </button>
-        <button class="lab-menu-item" data-key="p3re" data-num="03">
-          <span class="lm-num">03</span><span class="lm-name">P3RE 风格动画</span>
-        </button>
-        <button class="lab-menu-item" data-key="login" data-num="04">
-          <span class="lm-num">04</span><span class="lm-name">互动登录</span>
-        </button>
-        <button class="lab-menu-item" data-key="zipper" data-num="05">
-          <span class="lm-num">05</span><span class="lm-name">拉链幕布</span>
-        </button>
+        {
+          MENU.map((item, i) => (
+            <button class="lab-menu-item" data-key={item.key} data-page={item.page} type="button">
+              <span class="lm-num">{String(i + 1).padStart(2, '0')}</span>
+              <span class="lm-name">{item.label}</span>
+            </button>
+          ))
+        }
       </div>
-      <div class="lab-menu-foot">滚轮/点击驱动各动画<br/>以 iframe 独立运行</div>
+      <div class="lab-menu-foot">滚轮 / 点击驱动各动画<br />以 iframe 独立运行</div>
     </nav>
     <div class="lab-frame-wrap">
       <iframe id="lab-frame" class="lab-frame" title="动画展示" loading="eager"></iframe>
@@ -38,34 +40,32 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <script>
-  // ===== 菜单注册表：加新动画只需加一项 =====
-  var MENU = [
-    { key: 'arc',  page: 'lab-arc',  label: '圆弧动画' },
-    { key: 'nier', page: 'lab-nier', label: 'NieR 加载动画' },
-    { key: 'p3re', page: 'lab-p3re', label: 'P3RE 风格动画' },
-    { key: 'login', page: 'login-demo/index.html', label: '互动登录' },
-    { key: 'zipper', page: 'lab-zipper', label: '拉链幕布' },
-  ];
   var base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-  var frame = document.getElementById('lab-frame');
+  var frame = document.getElementById('lab-frame') as HTMLIFrameElement | null;
   var items = Array.prototype.slice.call(document.querySelectorAll('.lab-menu-item'));
+  var pages: Record<string, string> = {};
+  var labels: Record<string, string> = {};
+  items.forEach(function (btn) {
+    pages[btn.getAttribute('data-key')] = btn.getAttribute('data-page');
+    labels[btn.getAttribute('data-key')] = btn.getAttribute('data-key');
+  });
 
-  function select(key, pushHash) {
-    var found = null;
-    for (var i = 0; i < MENU.length; i++) if (MENU[i].key === key) found = MENU[i];
-    if (!found) return;
-    // 高亮菜单
-    for (var j = 0; j < items.length; j++) items[j].classList.toggle('active', items[j].getAttribute('data-key') === key);
-    // 切换 iframe（不同页面才换 src，避免重复加载）
-    var target = base + '/' + found.page;
+  function select(key: string, pushHash: boolean) {
+    if (!pages[key] || !frame) return;
+    for (var j = 0; j < items.length; j++) {
+      items[j].classList.toggle('active', items[j].getAttribute('data-key') === key);
+    }
+    var target = base + '/' + pages[key];
     if (frame.getAttribute('src') !== target) frame.setAttribute('src', target);
-    // 更新 hash
     if (pushHash && window.location.hash !== '#' + key) {
-      try { history.replaceState(null, '', '#' + key); } catch (e) { window.location.hash = key; }
+      try {
+        history.replaceState(null, '', '#' + key);
+      } catch (e) {
+        window.location.hash = key;
+      }
     }
   }
 
-  // 菜单点击
   for (var k = 0; k < items.length; k++) {
     (function (btn) {
       btn.addEventListener('click', function () {
@@ -74,39 +74,30 @@ const base = import.meta.env.BASE_URL;
     })(items[k]);
   }
 
-  // 初始化：hash 优先（#arc/#nier/#p3re），默认 arc
   var initial = (window.location.hash || '').replace('#', '');
-  var ok = false;
-  for (var m = 0; m < MENU.length; m++) if (MENU[m].key === initial) ok = true;
-  if (!ok) initial = 'arc';
+  if (!pages[initial]) initial = 'arc';
   select(initial, false);
 </script>
 
 <style is:global>
-  /* 壳页面布局：左侧菜单固定宽，右侧 iframe 填满 */
-  html, body {
-    height: 100%;
-    margin: 0;
-  }
-  header ~ main.max-w-2xl {
-    max-width: none !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+  .page-main {
+    max-width: none;
+    padding: 0;
+    height: calc(100vh - var(--header-h));
   }
   .lab-shell {
     display: flex;
-    height: 100vh;
-    background: #252423;
-    color: #22D3EE;
-    font-family: 'Courier New', 'Consolas', monospace;
+    height: 100%;
+    background: #23211e;
+    color: #22d3ee;
+    font-family: var(--font-mono);
   }
-  /* 左侧菜单 */
   .lab-menu {
     width: 210px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: #1C1814;
+    background: #1a1815;
     border-right: 1px solid rgba(34, 211, 238, 0.15);
     box-sizing: border-box;
   }
@@ -119,7 +110,7 @@ const base = import.meta.env.BASE_URL;
     font-size: 20px;
     font-weight: bold;
     letter-spacing: 0.3em;
-    color: #7FF3FF;
+    color: #7ff3ff;
     text-shadow: 0 0 8px rgba(34, 211, 238, 0.55), 0 0 20px rgba(34, 211, 238, 0.25);
   }
   .lab-menu-sub {
@@ -141,7 +132,7 @@ const base = import.meta.env.BASE_URL;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 12px;
+    padding: 12px;
     border: 1px solid transparent;
     border-radius: 8px;
     background: transparent;
@@ -151,7 +142,7 @@ const base = import.meta.env.BASE_URL;
     letter-spacing: 0.08em;
     text-align: left;
     cursor: pointer;
-    transition: all .2s ease;
+    transition: all 0.2s ease;
   }
   .lab-menu-item .lm-num {
     font-size: 11px;
@@ -160,18 +151,18 @@ const base = import.meta.env.BASE_URL;
     min-width: 20px;
   }
   .lab-menu-item:hover {
-    color: #7FF3FF;
+    color: #7ff3ff;
     background: rgba(34, 211, 238, 0.08);
     border-color: rgba(34, 211, 238, 0.25);
   }
   .lab-menu-item.active {
-    color: #7FF3FF;
+    color: #7ff3ff;
     background: rgba(34, 211, 238, 0.15);
     border-color: rgba(34, 211, 238, 0.5);
     box-shadow: 0 0 10px rgba(34, 211, 238, 0.15);
   }
   .lab-menu-item.active .lm-num {
-    color: #22D3EE;
+    color: #22d3ee;
   }
   .lab-menu-foot {
     padding: 14px 18px;
@@ -181,18 +172,35 @@ const base = import.meta.env.BASE_URL;
     color: rgba(34, 211, 238, 0.35);
     border-top: 1px solid rgba(34, 211, 238, 0.12);
   }
-  /* 右侧 iframe */
   .lab-frame-wrap {
     flex: 1;
     min-width: 0;
     position: relative;
-    background: #252423;
+    background: #23211e;
   }
   .lab-frame {
     width: 100%;
     height: 100%;
     border: 0;
     display: block;
-    background: #252423;
+    background: #23211e;
+  }
+
+  @media (max-width: 700px) {
+    .lab-menu {
+      width: 132px;
+    }
+    .lab-menu-title {
+      font-size: 15px;
+      letter-spacing: 0.2em;
+    }
+    .lab-menu-sub,
+    .lab-menu-foot {
+      display: none;
+    }
+    .lab-menu-item {
+      font-size: 11.5px;
+      padding: 10px 8px;
+    }
   }
 </style>

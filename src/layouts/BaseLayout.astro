@@ -7,11 +7,43 @@ import '../styles/global.css';
 export interface Props {
   title: string;
   description?: string;
+  /** 用于 og:type，文章页传 article */
+  type?: 'website' | 'article';
+  /** 文章页传入所在分类 */
+  section?: string;
+  /** 页面主题：默认纸面；dark 用于笔记/动画馆/游戏这类深色应用页 */
+  theme?: 'paper' | 'dark';
 }
 
-const { title, description } = Astro.props;
+const { title, description, type = 'website', section, theme = 'paper' } = Astro.props;
+
 const hasSidebar = Astro.slots.has('sidebar');
 const hasRightSidebar = Astro.slots.has('rightSidebar');
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const url = (p: string) => (p === '/' ? base || '/' : `${base}${p}`);
+
+const pathname = Astro.url.pathname.replace(base, '') || '/';
+const isActive = (href: string) =>
+  href === '/' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
+
+const primaryNav = [
+  { href: '/', label: '首页' },
+  { href: '/notes', label: '笔记' },
+  { href: '/animation-lab', label: '动画' },
+  { href: '/archive', label: '归档' },
+  { href: '/categories', label: '分类' },
+  { href: '/tags', label: '标签' },
+];
+const moreNav = [
+  { href: '/game', label: '打靶游戏' },
+  { href: '/ascii-converter', label: '图片转 ASCII' },
+  { href: '/about', label: '关于' },
+];
+
+const pageDescription =
+  description || '摸鱼骑士的知识库：前端、动画、以及一些奇怪想法的实现记录。';
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <!doctype html>
@@ -19,63 +51,145 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content={description || title} />
-    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}/favicon.svg`} />
     <title>{title}</title>
+    <meta name="description" content={pageDescription} />
+    <meta name="author" content="摸鱼骑士" />
+    <meta name="theme-color" content="#e4e0d4" />
+    <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />
+    <link rel="canonical" href={canonical} />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="摸鱼骑士 知识库" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={pageDescription} />
+    {section && <meta property="article:section" content={section} />}
+
     <!-- 不蒜子站点统计 -->
     <script is:inline async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <script is:inline>
+      // 早于首帧决定是否启用自定义光标 / 点击特效
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('reduce-motion');
+      }
+    </script>
   </head>
-  <body class="min-h-screen" style="background: #e0e0e0; font-family: 'Georgia', 'Noto Serif SC', serif; color: #333;">
+  <body class:list={[{ 'theme-dark': theme === 'dark' }]}>
     <LoadingScreen />
     <LabLoading />
-    <!-- 导航 -->
-    <header id="site-header" class="fixed top-0 left-0 right-0 z-50" style="background:transparent;transform:translateY(-8px);transition:all .6s cubic-bezier(.34,1.56,.64,1);">
-      <nav class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-        <a href={import.meta.env.BASE_URL} id="brand" class="font-bold text-lg transition-colors duration-500" style="color:rgba(80,120,125,0.8);">
-          <span id="logo-text-3d" class="logo-text-3d">摸鱼骑士 知识库</span>
+
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <header id="site-header" class="site-header">
+      <div class="site-header__inner">
+        <a href={url('/')} id="brand" class="site-brand">
+          <span id="logo-text-3d" class="logo-text-3d">摸鱼骑士</span>
+          <span class="site-brand__sub">知识库</span>
         </a>
-        <div class="flex gap-4 text-sm" id="nav-links">
-          <a href={import.meta.env.BASE_URL} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">首页</a>
-          <a href={`${import.meta.env.BASE_URL}/notes`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">笔记</a>
-          <a href={`${import.meta.env.BASE_URL}/animation-lab`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">动画</a>
-          <a href={`${import.meta.env.BASE_URL}/archive`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">归档</a>
-          <a href={`${import.meta.env.BASE_URL}/categories`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">分类</a>
-          <a href={`${import.meta.env.BASE_URL}/tags`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">标签</a>
-          <a href={`${import.meta.env.BASE_URL}/game`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">游戏</a>
-          <a href={`${import.meta.env.BASE_URL}/about`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">关于</a>
-          <a href={`${import.meta.env.BASE_URL}/ascii-converter`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">转换</a>
-          <a href={`${import.meta.env.BASE_URL}/search`} class="transition-colors text-[#50787d]/60 hover:text-[#49B1F5]">搜索</a>
-        </div>
-      </nav>
+
+        <nav id="nav-links" class="site-nav" aria-label="主导航">
+          {
+            primaryNav.map((item) => (
+              <a
+                href={url(item.href)}
+                class:list={['site-nav__link', { 'is-active': isActive(item.href) }]}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+              >
+                {item.label}
+              </a>
+            ))
+          }
+          <div class="site-nav__more">
+            <button
+              type="button"
+              class="site-nav__link site-nav__morebtn"
+              aria-expanded="false"
+              aria-haspopup="true"
+            >
+              更多
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <div class="site-nav__menu">
+              {
+                moreNav.map((item) => (
+                  <a
+                    href={url(item.href)}
+                    class:list={['site-nav__menuitem', { 'is-active': isActive(item.href) }]}
+                  >
+                    {item.label}
+                  </a>
+                ))
+              }
+            </div>
+          </div>
+          <a
+            href={url('/search')}
+            class:list={['site-nav__search', { 'is-active': isActive('/search') }]}
+            aria-label="搜索"
+          >
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="8.8" cy="8.8" r="5.6" stroke="currentColor" stroke-width="1.6" />
+              <path d="m13.2 13.2 3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="site-nav__search-label">搜索</span>
+          </a>
+        </nav>
+
+        <button
+          id="nav-toggle"
+          type="button"
+          class="nav-toggle"
+          aria-label="打开菜单"
+          aria-expanded="false"
+          aria-controls="nav-links"
+        >
+          <span></span><span></span>
+        </button>
+      </div>
     </header>
 
-    <script src={`${import.meta.env.BASE_URL}/scripts/site-header.js`}></script>
-
-    <!-- 内容区域 -->
     {
       hasSidebar ? (
-        <div class="max-w-6xl mx-auto px-5 mt-[10vh] pb-10 flex flex-col md:flex-row gap-4 items-start">
-          <slot name="sidebar" />
-          <main class="flex-1 min-w-0 relative" style="position:sticky;">
+        <div class="site-shell" id="site-shell">
+          <aside class="shell-left">
+            <slot name="sidebar" />
+          </aside>
+          <main class="shell-main" id="main-content">
             <slot />
           </main>
-          {hasRightSidebar && <slot name="rightSidebar" />}
+          {hasRightSidebar && (
+            <aside class="shell-right">
+              <div class="shell-right__inner" id="rail-content">
+                <slot name="rightSidebar" />
+              </div>
+            </aside>
+          )}
         </div>
       ) : (
-        <main class="max-w-2xl mx-auto px-5 pt-14 pb-10">
+        <main class="page-main" id="main-content">
           <slot />
         </main>
       )
     }
 
-    <!-- 页脚 -->
-    <footer class="border-t border-gray-200 py-8 text-center text-sm text-gray-400">
-      <p>&copy; {new Date().getFullYear()} 摸鱼骑士 · Built with Astro</p>
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>© {new Date().getFullYear()} 摸鱼骑士</span>
+        <span class="site-footer__dot"></span>
+        <span>Built with Astro</span>
+        <span class="site-footer__dot"></span>
+        <span class="site-footer__motto">用纸与墨记下折腾</span>
+      </div>
     </footer>
 
     <SideToolbar />
 
-    <!-- 导航栏 Logo 3D 翻转文字（splitText） -->
+    <!-- ============ 导航栏 Logo 3D 翻转文字 ============ -->
     <style is:global>
       #logo-text-3d {
         display: inline-block;
@@ -103,13 +217,14 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
         transform: rotateX(-90deg);
       }
     </style>
-    <script is:inline>
-      // 导航栏 Logo 3D 翻转：splitText 拆字 + 平滑往返（0 → -90 → 0，终点=起点，loop 无跳变）
+    <script>
+      // 导航栏 Logo 3D 翻转：splitText 拆字 + 平滑往返
       (async function () {
         const el = document.getElementById('logo-text-3d');
         if (!el) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         try {
-          const { animate, stagger, splitText } = await import('https://esm.sh/animejs@4.4.1');
+          const { animate, stagger, splitText } = await import('animejs');
           splitText(el, {
             chars: `<span class="char-3d word-{i}">
   <em class="face face-top">{value}</em>
@@ -118,7 +233,6 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
 </span>`,
           });
           const charsStagger = stagger(100, { start: 0 });
-          // 每个关键帧 750ms，出 + 回 = 一个循环；4 组动画同步，终点=起点
           animate('.char-3d', {
             rotateX: [
               { to: -90, duration: 750, ease: 'out(3)' },
@@ -127,29 +241,21 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
             delay: charsStagger,
             loop: true,
           });
-          animate('.char-3d .face-top', {
-            opacity: [
-              { to: 0, duration: 750, ease: 'out(3)' },
-              { to: 0.5, duration: 750, ease: 'in(3)' },
-            ],
-            delay: charsStagger,
-            loop: true,
-          });
-          animate('.char-3d .face-front', {
-            opacity: [
-              { to: 0.5, duration: 750, ease: 'out(3)' },
-              { to: 1, duration: 750, ease: 'in(3)' },
-            ],
-            delay: charsStagger,
-            loop: true,
-          });
-          animate('.char-3d .face-bottom', {
-            opacity: [
-              { to: 1, duration: 750, ease: 'out(3)' },
-              { to: 0.5, duration: 750, ease: 'in(3)' },
-            ],
-            delay: charsStagger,
-            loop: true,
+          // 每个面按 750ms 两段关键帧循环；三面相位差正好拼出翻转效果
+          const faces = [
+            { selector: '.char-3d .face-top', keys: [0, 0.5] },
+            { selector: '.char-3d .face-front', keys: [0.5, 1] },
+            { selector: '.char-3d .face-bottom', keys: [1, 0.5] },
+          ];
+          faces.forEach(({ selector, keys }) => {
+            animate(selector, {
+              opacity: [
+                { to: keys[0], duration: 750, ease: 'out(3)' },
+                { to: keys[1], duration: 750, ease: 'in(3)' },
+              ],
+              delay: charsStagger,
+              loop: true,
+            });
           });
         } catch (err) {
           console.error('logo 3D init failed:', err);
@@ -157,211 +263,266 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
       })();
     </script>
 
-    <!-- 全局自定义光标：24×24 上下双环+黑线，垂直无旋转，白色轮廓（game 页独立实现转向版） -->
+    <!-- ============ 全局自定义光标 ============ -->
     <style is:global>
-      html, body, body * { cursor: none !important; }
+      .custom-cursor-on,
+      .custom-cursor-on * {
+        cursor: none !important;
+      }
+      .custom-cursor-on input,
+      .custom-cursor-on textarea,
+      .custom-cursor-on [contenteditable] {
+        cursor: text !important;
+      }
+
       #custom-cursor {
-        position: fixed; top: 0; left: 0; z-index: 99999;
-        width: 24px; height: 24px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 99999;
+        width: 24px;
+        height: 24px;
         pointer-events: none;
         transform: translate(-100px, -100px);
         will-change: transform;
         opacity: 0;
         transition: opacity 0.2s;
       }
-      #custom-cursor .cursor-svg { width: 100%; height: 100%; }
-      #custom-cursor .cursor-svg svg { display: block; width: 100%; height: 100%; }
+      #custom-cursor .cursor-svg {
+        width: 100%;
+        height: 100%;
+      }
+      #custom-cursor .cursor-svg svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
 
-      /* ── 加载中状态：徽章隐藏，圆环轨迹旋转 + 填充呼吸 ── */
-      #custom-cursor.loading .cursor-svg { display: none; }
-      #custom-cursor .cursor-loading { display: none; width: 100%; height: 100%; }
-      #custom-cursor.loading .cursor-loading { display: block; }
-      #custom-cursor .cursor-loading svg { display: block; width: 100%; height: 100%; }
+      #custom-cursor.loading .cursor-svg {
+        display: none;
+      }
+      #custom-cursor .cursor-loading {
+        display: none;
+        width: 100%;
+        height: 100%;
+      }
+      #custom-cursor.loading .cursor-loading {
+        display: block;
+      }
+      #custom-cursor .cursor-loading svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
       #custom-cursor.loading .cursor-ring {
         animation: cursor-spin 1s linear infinite;
         transform-origin: 12px 12px;
         transform-box: view-box;
       }
-      @keyframes cursor-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes cursor-spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-      /* ── 全局点击绽开特效层 ── */
       #global-burst {
-        position: fixed; inset: 0;
-        z-index: 99998;           /* 低于光标 99999 */
-        pointer-events: none;     /* 不拦截任何点击 */
+        position: fixed;
+        inset: 0;
+        z-index: 99998;
+        pointer-events: none;
         overflow: hidden;
       }
       #global-burst .gb-el {
         position: absolute;
-        left: 0; top: 0;
+        left: 0;
+        top: 0;
         will-change: transform, opacity;
       }
       #global-burst .gb-ring {
         border-radius: 50%;
-        border: 2.5px solid #A37C17;
+        border: 2.5px solid #a37c17;
         box-sizing: border-box;
         filter: brightness(1.5);
       }
-      #global-burst .gb-dot {
-        border-radius: 50%;
-        filter: brightness(1.3);
-      }
-      #global-burst .gb-square {
+      #global-burst .gb-dot,
+      #global-burst .gb-square,
+      #global-burst .gb-diamond {
         filter: brightness(1.3);
       }
       #global-burst .gb-diamond {
-        filter: brightness(1.3);
         border-radius: 2px;
       }
     </style>
-    <!-- 全局点击绽开特效层：fixed 全屏，点击任意处绽开彩色几何图形 + 圆环（pointer-events none 不挡交互） -->
+
     <div id="global-burst" aria-hidden="true"></div>
 
     <div id="custom-cursor" aria-hidden="true">
-      <div class="cursor-svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+      <div class="cursor-svg">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
           <g transform="translate(0,448) scale(0.1,-0.1)" fill="#000000" stroke="none">
-          <path d="M2191 4363 c-10 -21 -152 -324 -316 -673 -164 -349 -315 -673 -337 -720 -22 -47 -123 -263 -225 -480 -102 -217 -222 -471 -267 -565 l-81 -170 -3 -244 -3 -245 598 -598 c329 -329 600 -598 603 -598 30 1 31 21 36 516 4 274 7 500 8 501 0 0 12 3 26 5 l25 3 3 -499 c2 -496 4 -526 36 -526 6 0 277 267 603 592 l593 593 0 248 0 248 -402 857 c-220 471 -434 927 -473 1012 -233 499 -354 751 -365 765 -20 24 -38 18 -59 -22z m141 -291 c54 -114 188 -400 298 -637 111 -236 280 -597 376 -800 96 -204 174 -376 174 -383 0 -10 -488 -264 -597 -310 -32 -14 -34 -13 -79 27 -63 55 -139 83 -245 89 -130 7 -220 -24 -311 -106 l-38 -34 -317 162 c-175 89 -319 164 -321 165 -2 2 34 81 79 176 45 96 115 245 155 332 279 596 567 1210 639 1362 31 66 61 130 66 143 5 12 12 22 16 22 5 0 52 -93 105 -208z m-811 -2141 l314 -159 6 -74 c7 -84 17 -113 61 -175 36 -50 130 -117 189 -134 l39 -12 0 -359 c0 -197 -3 -358 -7 -358 -13 0 -1083 1074 -1083 1087 0 16 153 343 160 343 4 0 148 -72 321 -159z m1822 -16 l79 -168 -546 -546 -546 -546 0 363 c0 338 1 362 18 362 34 0 142 60 185 102 65 66 99 142 99 226 l1 68 306 157 c168 86 310 155 316 153 5 -1 44 -78 88 -171z m-1223 -1535 l0 -175 -539 540 -540 540 -3 177 -3 178 543 -542 542 -543 0 -175z m756 361 l-544 -544 -1 177 -2 176 543 543 543 543 3 -175 2 -175 -544 -545z" />
-          <path d="M740 781 c-16 -30 -14 -612 3 -634 11 -16 36 -17 272 -15 l260 3 3 319 c2 227 -1 323 -9 332 -9 11 -63 14 -265 14 -240 0 -254 -1 -264 -19z m476 -188 l-1 -138 -207 -3 -208 -2 0 140 0 140 209 0 208 0 -1 -137z m-6 -308 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
-          <path d="M3192 792 c-9 -7 -12 -80 -10 -333 l3 -324 265 0 265 0 3 319 c2 227 -1 323 -9 332 -9 11 -61 14 -258 14 -135 0 -252 -4 -259 -8z m468 -202 l0 -140 -210 0 -210 0 0 140 0 140 210 0 210 0 0 -140z m-10 -305 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+            <path d="M2191 4363 c-10 -21 -152 -324 -316 -673 -164 -349 -315 -673 -337 -720 -22 -47 -123 -263 -225 -480 -102 -217 -222 -471 -267 -565 l-81 -170 -3 -244 -3 -245 598 -598 c329 -329 600 -598 603 -598 30 1 31 21 36 516 4 274 7 500 8 501 0 0 12 3 26 5 l25 3 3 -499 c2 -496 4 -526 36 -526 6 0 277 267 603 592 l593 593 0 248 0 248 -402 857 c-220 471 -434 927 -473 1012 -233 499 -354 751 -365 765 -20 24 -38 18 -59 -22z m141 -291 c54 -114 188 -400 298 -637 111 -236 280 -597 376 -800 96 -204 174 -376 174 -383 0 -10 -488 -264 -597 -310 -32 -14 -34 -13 -79 27 -63 55 -139 83 -245 89 -130 7 -220 -24 -311 -106 l-38 -34 -317 162 c-175 89 -319 164 -321 165 -2 2 34 81 79 176 45 96 115 245 155 332 279 596 567 1210 639 1362 31 66 61 130 66 143 5 12 12 22 16 22 5 0 52 -93 105 -208z m-811 -2141 l314 -159 6 -74 c7 -84 17 -113 61 -175 36 -50 130 -117 189 -134 l39 -12 0 -359 c0 -197 -3 -358 -7 -358 -13 0 -1083 1074 -1083 1087 0 16 153 343 160 343 4 0 148 -72 321 -159z m1822 -16 l79 -168 -546 -546 -546 -546 0 363 c0 338 1 362 18 362 34 0 142 60 185 102 65 66 99 142 99 226 l1 68 306 157 c168 86 310 155 316 153 5 -1 44 -78 88 -171z m-1223 -1535 l0 -175 -539 540 -540 540 -3 177 -3 178 543 -542 542 -543 0 -175z m756 361 l-544 -544 -1 177 -2 176 543 543 543 543 3 -175 2 -175 -544 -545z" />
+            <path d="M740 781 c-16 -30 -14 -612 3 -634 11 -16 36 -17 272 -15 l260 3 3 319 c2 227 -1 323 -9 332 -9 11 -63 14 -265 14 -240 0 -254 -1 -264 -19z m476 -188 l-1 -138 -207 -3 -208 -2 0 140 0 140 209 0 208 0 -1 -137z m-6 -308 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
+            <path d="M3192 792 c-9 -7 -12 -80 -10 -333 l3 -324 265 0 265 0 3 319 c2 227 -1 323 -9 332 -9 11 -61 14 -258 14 -135 0 -252 -4 -259 -8z m468 -202 l0 -140 -210 0 -210 0 0 140 0 140 210 0 210 0 0 -140z m-10 -305 l0 -85 -200 0 -200 0 0 85 0 85 200 0 200 0 0 -85z" />
           </g>
-          <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 108.10634,559.58773 v -10.99386 h 26.38528 26.38527 v 10.99386 10.99387 h -26.38527 -26.38528 z" transform="scale(0.75)" />
-          <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 433.52474,559.58773 v -10.99386 h 26.38528 26.38528 v 10.99386 10.99387 h -26.38528 -26.38528 z" transform="scale(0.75)" />
-          <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 311.12638,547.12522 v -23.08713 l 71.71206,-71.70925 71.71206,-71.70926 0.48099,6.77622 c 0.26454,3.72692 0.48098,13.89968 0.48098,22.60612 v 15.82991 l -72.19304,72.19026 -72.19305,72.19025 z" transform="scale(0.75)" />
-          <path style="fill:#898d7f;fill-opacity:1;stroke-width:0.732924" d="m 210.71575,497.18285 -71.46013,-71.96266 -0.43543,-22.41623 c -0.23949,-12.32893 -0.39034,-22.48526 -0.33523,-22.56962 0.0551,-0.0844 32.49545,32.2431 72.08963,71.83881 l 71.98942,71.99221 -0.19407,22.54007 -0.19407,22.54009 z" transform="scale(0.75)" />
-          <path style="fill:#ffffff;stroke-width:1.46585" d="m 211.81513,318.65389 c -22.17096,-11.35106 -40.52555,-20.84394 -40.78797,-21.09527 -0.26243,-0.25135 17.08686,-37.95124 38.55396,-83.77755 21.46711,-45.82629 49.71617,-106.22862 62.77571,-134.227396 13.05953,-27.998772 24.13311,-50.920981 24.60796,-50.938242 0.47484,-0.01726 23.84488,48.946286 51.93343,108.807878 74.38772,158.53321 74.28128,158.29661 72.15042,160.39132 -2.8505,2.80216 -76.57576,40.06349 -79.26962,40.06349 -1.32532,0 -5.35023,-2.24457 -8.94424,-4.98793 -9.74341,-7.43732 -19.63475,-10.26317 -36.00042,-10.28494 -11.88646,-0.0158 -15.1159,0.53247 -22.05462,3.74431 -4.47098,2.06955 -10.49475,5.83994 -13.38615,8.37861 -2.89141,2.53869 -6.15947,4.60414 -7.26236,4.58991 -1.10289,-0.0142 -20.14514,-9.31312 -42.3161,-20.66419 z" transform="scale(0.75)" />
-          <path style="fill:#ffffff;stroke-width:1.46585" d="m 311.49284,461.38485 v -45.78756 l 9.39619,-4.26044 c 10.97764,-4.9775 21.81963,-14.42833 26.18031,-22.82106 1.91753,-3.69056 3.3929,-10.00674 3.90753,-16.72847 l 0.82681,-10.79918 40.31084,-20.28876 c 22.17096,-11.15882 40.66092,-20.31637 41.08879,-20.35011 0.83376,-0.0657 9.08432,16.09118 16.88432,33.06424 l 4.78159,10.40493 -71.68819,71.67699 -71.68819,71.677 z" transform="scale(0.75)" />
-          <path style="fill:#ffffff;stroke-width:1.46585" d="m 210.60351,436.24753 c -38.83823,-39.01486 -70.61496,-71.55399 -70.61496,-72.30918 0,-2.79956 19.4622,-43.65042 20.79597,-43.65042 0.76152,0 19.73478,9.24171 42.1628,20.53712 l 40.77821,20.53712 1.02938,9.87924 c 0.56616,5.43359 2.20739,12.57674 3.64719,15.87367 4.45947,10.21158 17.57304,21.41484 29.74269,25.40996 l 5.49693,1.80457 -0.17343,42.02947 c -0.0954,23.11621 -0.64062,44.00836 -1.21163,46.42701 -1.01931,4.31759 -2.3223,3.10759 -71.65315,-66.53856 z" transform="scale(0.75)" />
-          <path style="fill:#ffffff;stroke-width:1.46585" d="m 433.15828,518.91043 v -18.32311 h 27.1182 27.1182 v 18.32311 18.32311 h -27.1182 -27.1182 z" transform="scale(0.75)" />
-          <path style="fill:#ffffff;stroke-width:1.46585" d="m 107.73988,519.1224 v -18.53508 h 27.1182 27.1182 v 17.59019 17.59018 l -17.22372,0.0104 c -9.47305,0.006 -21.67624,0.43093 -27.1182,0.94489 l -9.89448,0.93448 z" transform="scale(0.75)" />
-          </svg></div>
-      <!-- 加载中圆环：外环旋转轨迹 + 内环静止（默认隐藏，由 .loading 类控制显示） -->
+          <path style="fill:#898d7f" d="m 108.10634,559.58773 v -10.99386 h 26.38528 26.38527 v 10.99386 10.99387 h -26.38527 -26.38528 z" transform="scale(0.75)" />
+          <path style="fill:#898d7f" d="m 433.52474,559.58773 v -10.99386 h 26.38528 26.38528 v 10.99386 10.99387 h -26.38528 -26.38528 z" transform="scale(0.75)" />
+          <path style="fill:#898d7f" d="m 311.12638,547.12522 v -23.08713 l 71.71206,-71.70925 71.71206,-71.70926 0.48099,6.77622 c 0.26454,3.72692 0.48098,13.89968 0.48098,22.60612 v 15.82991 l -72.19304,72.19026 -72.19305,72.19025 z" transform="scale(0.75)" />
+          <path style="fill:#898d7f" d="m 210.71575,497.18285 -71.46013,-71.96266 -0.43543,-22.41623 c -0.23949,-12.32893 -0.39034,-22.48526 -0.33523,-22.56962 0.0551,-0.0844 32.49545,32.2431 72.08963,71.83881 l 71.98942,71.99221 -0.19407,22.54007 -0.19407,22.54009 z" transform="scale(0.75)" />
+          <path style="fill:#ffffff" d="m 211.81513,318.65389 c -22.17096,-11.35106 -40.52555,-20.84394 -40.78797,-21.09527 -0.26243,-0.25135 17.08686,-37.95124 38.55396,-83.77755 21.46711,-45.82629 49.71617,-106.22862 62.77571,-134.227396 13.05953,-27.998772 24.13311,-50.920981 24.60796,-50.938242 0.47484,-0.01726 23.84488,48.946286 51.93343,108.807878 74.38772,158.53321 74.28128,158.29661 72.15042,160.39132 -2.8505,2.80216 -76.57576,40.06349 -79.26962,40.06349 -1.32532,0 -5.35023,-2.24457 -8.94424,-4.98793 -9.74341,-7.43732 -19.63475,-10.26317 -36.00042,-10.28494 -11.88646,-0.0158 -15.1159,0.53247 -22.05462,3.74431 -4.47098,2.06955 -10.49475,5.83994 -13.38615,8.37861 -2.89141,2.53869 -6.15947,4.60414 -7.26236,4.58991 -1.10289,-0.0142 -20.14514,-9.31312 -42.3161,-20.66419 z" transform="scale(0.75)" />
+          <path style="fill:#ffffff" d="m 311.49284,461.38485 v -45.78756 l 9.39619,-4.26044 c 10.97764,-4.9775 21.81963,-14.42833 26.18031,-22.82106 1.91753,-3.69056 3.3929,-10.00674 3.90753,-16.72847 l 0.82681,-10.79918 40.31084,-20.28876 c 22.17096,-11.15882 40.66092,-20.31637 41.08879,-20.35011 0.83376,-0.0657 9.08432,16.09118 16.88432,33.06424 l 4.78159,10.40493 -71.68819,71.67699 -71.68819,71.677 z" transform="scale(0.75)" />
+          <path style="fill:#ffffff" d="m 210.60351,436.24753 c -38.83823,-39.01486 -70.61496,-71.55399 -70.61496,-72.30918 0,-2.79956 19.4622,-43.65042 20.79597,-43.65042 0.76152,0 19.73478,9.24171 42.1628,20.53712 l 40.77821,20.53712 1.02938,9.87924 c 0.56616,5.43359 2.20739,12.57674 3.64719,15.87367 4.45947,10.21158 17.57304,21.41484 29.74269,25.40996 l 5.49693,1.80457 -0.17343,42.02947 c -0.0954,23.11621 -0.64062,44.00836 -1.21163,46.42701 -1.01931,4.31759 -2.3223,3.10759 -71.65315,-66.53856 z" transform="scale(0.75)" />
+          <path style="fill:#ffffff" d="m 433.15828,518.91043 v -18.32311 h 27.1182 27.1182 v 18.32311 18.32311 h -27.1182 -27.1182 z" transform="scale(0.75)" />
+          <path style="fill:#ffffff" d="m 107.73988,519.1224 v -18.53508 h 27.1182 27.1182 v 17.59019 17.59018 l -17.22372,0.0104 c -9.47305,0.006 -21.67624,0.43093 -27.1182,0.94489 l -9.89448,0.93448 z" transform="scale(0.75)" />
+        </svg>
+      </div>
       <div class="cursor-loading">
         <svg viewBox="0 0 24 24" width="100%" height="100%">
           <circle class="cursor-ring" cx="12" cy="12" r="9.5" fill="none" stroke="#646155" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="36 23.7" />
-          <circle class="cursor-ring-outer" cx="12" cy="12" r="4" fill="none" stroke="#CCC7AF" stroke-width="2" />
+          <circle class="cursor-ring-outer" cx="12" cy="12" r="4" fill="none" stroke="#ccc7af" stroke-width="2" />
         </svg>
       </div>
     </div>
 
     <script>
+      // @ts-nocheck — 纯 DOM 交互脚本，刻意不参与严格类型检查
       // 全局自定义光标：默认菱形徽章 -30°，loading 时切换双环动画
-      // 支持状态切换：window.setCursorState('default' | 'loading')
-      // 热点 = SVG 顶部中心 (12,0)：meet 缩放后图形顶部贴容器顶边，水平居中
       (function () {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         var cursor = document.getElementById('custom-cursor');
         if (!cursor) return;
-        var HOT_X = 12, HOT_Y = 0;
+
+        document.documentElement.classList.add('custom-cursor-on');
+
+        var HOT_X = 12,
+          HOT_Y = 0;
         cursor.style.transformOrigin = HOT_X + 'px ' + HOT_Y + 'px';
         var shown = false;
         var loading = false;
 
         function applyState() {
           cursor.classList.toggle('loading', loading);
-          // 仅默认徽章旋转 -30°（顶部朝左）；loading 圆环自身旋转
           var rotate = loading ? '' : ' rotate(-30deg)';
           cursor.style.transform =
             'translate(' + (cursor._x - HOT_X) + 'px,' + (cursor._y - HOT_Y) + 'px)' + rotate;
         }
 
         window.setCursorState = function (state) {
-          loading = (state === 'loading');
+          loading = state === 'loading';
           cursor.classList.toggle('loading', loading);
           if (cursor._x !== undefined) applyState();
         };
 
-        // —— 状态切换：进入 iframe（预览区）时延迟关闭父光标 ——
-        // iframe 是独立文档，父页面 mousemove 不会进入；用 100ms 定时器延迟关闭，
-        // 给 iframe 内光标（mouseenter 立即启动）接管留出时间，避免瞬间切换闪烁/盲区
         var iframeHideTimer = null;
 
-        // 判断鼠标坐标是否落在任一 iframe 区域内（跨边界时父文档仍会收到零星 mousemove，
-        // 必须用坐标判定，否则 mousemove 会无条件取消隐藏定时器导致父光标不隐藏）
         function isInsideIframe(e) {
           var frames = document.querySelectorAll('iframe');
           for (var i = 0; i < frames.length; i++) {
             var r = frames[i].getBoundingClientRect();
-            if (e.clientX >= r.left && e.clientX <= r.right &&
-                e.clientY >= r.top && e.clientY <= r.bottom) {
+            if (
+              e.clientX >= r.left &&
+              e.clientX <= r.right &&
+              e.clientY >= r.top &&
+              e.clientY <= r.bottom
+            ) {
               return true;
             }
           }
           return false;
         }
 
-        document.addEventListener('mousemove', function (e) {
-          if (isInsideIframe(e)) {
-            // 鼠标在 iframe 区域内：保持父光标隐藏（由 iframe 内光标接管）
-            clearTimeout(iframeHideTimer);
-            cursor.style.transition = 'none';
-            cursor.style.opacity = 0; shown = false;
-            return;
-          }
-          // 鼠标在带 data-native-cursor 的元素上（如可拖拽圆球）：隐藏父光标，交还系统光标（grab/grabbing）
-          var nt = e.target;
-          if (nt && nt.closest && nt.closest('[data-native-cursor]')) {
-            clearTimeout(iframeHideTimer);
-            cursor.style.transition = 'none';
-            cursor.style.opacity = 0; shown = false;
-            return;
-          }
-          // 在 iframe 外：取消隐藏定时器 + 正常跟随显示
-          if (iframeHideTimer) { console.log('[cursor] mousemove 取消 iframe 隐藏'); }
-          clearTimeout(iframeHideTimer);
-          // 恢复过渡（iframe 隐藏时被置 none）
-          cursor.style.transition = '';
-          if (!shown) { cursor.style.opacity = 1; shown = true; }
-          cursor._x = e.clientX;
-          cursor._y = e.clientY;
-          applyState();
-        });
-        document.addEventListener('mouseover', function (e) {
-          var t = e.target;
-          while (t && t !== document) {
-            if (t.tagName === 'IFRAME') {
-              console.log('[cursor] mouseover 进入 iframe，100ms 后隐藏父光标');
+        document.addEventListener(
+          'mousemove',
+          function (e) {
+            if (isInsideIframe(e)) {
               clearTimeout(iframeHideTimer);
-              iframeHideTimer = setTimeout(function () {
-                console.log('[cursor] 父光标已隐藏');
-                cursor.style.transition = 'none';
-                cursor.style.opacity = 0; shown = false;
-              }, 100);
+              cursor.style.transition = 'none';
+              cursor.style.opacity = 0;
+              shown = false;
               return;
             }
-            t = t.parentNode;
-          }
-        }, true);
+            var nt = e.target;
+            if (nt && nt.closest && nt.closest('[data-native-cursor]')) {
+              clearTimeout(iframeHideTimer);
+              cursor.style.transition = 'none';
+              cursor.style.opacity = 0;
+              shown = false;
+              return;
+            }
+            clearTimeout(iframeHideTimer);
+            cursor.style.transition = '';
+            if (!shown) {
+              cursor.style.opacity = 1;
+              shown = true;
+            }
+            cursor._x = e.clientX;
+            cursor._y = e.clientY;
+            applyState();
+          },
+          { passive: true }
+        );
+
+        document.addEventListener(
+          'mouseover',
+          function (e) {
+            var t = e.target;
+            while (t && t !== document) {
+              if (t.tagName === 'IFRAME') {
+                clearTimeout(iframeHideTimer);
+                iframeHideTimer = setTimeout(function () {
+                  cursor.style.transition = 'none';
+                  cursor.style.opacity = 0;
+                  shown = false;
+                }, 100);
+                return;
+              }
+              t = t.parentNode;
+            }
+          },
+          true
+        );
+
         document.addEventListener('mouseleave', function () {
-          cursor.style.opacity = 0; shown = false;
+          cursor.style.opacity = 0;
+          shown = false;
         });
       })();
     </script>
 
+    <!-- ============ 全局点击绽开特效 ============ -->
     <script is:inline>
-      // 全局点击绽开特效：点击页面任意处 → 圆环扩散 + 彩色几何图形（圆/三角/方形/菱形）向四周飞散
-      // 独立 rAF 驱动，特效结束自动清理；pointer-events none 容器不拦截点击
+      // @ts-nocheck — 纯 DOM 交互脚本，刻意不参与严格类型检查
+      // 点击绽开：圆环 + 彩色几何图形。rAF 仅在存在存活元素时运行，空闲即停。
       (function () {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         var host = document.getElementById('global-burst');
         if (!host) return;
-        var els = [];   // 存活特效元素 {el, kind, t0, ang, dist, r, shape, baseX, baseY}
+        var els = [];
+        var rafId = 0;
         var CFG = {
           duration: 1100,
           dots: 16,
           ringMaxR: 160,
           dotMaxDist: 220,
-          dotMinR: 12, dotMaxR: 20,  // 粒子基准半径范围（用户 2026-08-13：中间的图形再大一些 8~13 → 12~20）
+          dotMinR: 12,
+          dotMaxR: 20,
           colors: ['#FF5C5C', '#4CAF50', '#3B82F6', '#FFD54F', '#A37C17'],
           shapes: ['circle', 'triangle', 'square', 'diamond'],
         };
-        // 创建元素（HTML div）：圆环用 border，几何图形用 CSS 裁剪
+
         function makeEl(type, color, size, x, y) {
           var d = document.createElement('div');
           d.className = 'gb-el';
           if (type === 'ring') {
             d.className += ' gb-ring';
-            d.style.width = '0px'; d.style.height = '0px';
+            d.style.width = '0px';
+            d.style.height = '0px';
           } else {
             var base = Math.max(1, size * 2);
-            d.style.width = base + 'px'; d.style.height = base + 'px';
+            d.style.width = base + 'px';
+            d.style.height = base + 'px';
             if (type === 'circle') {
               d.className += ' gb-dot';
               d.style.background = color;
@@ -372,9 +533,10 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
             } else if (type === 'diamond') {
               d.className += ' gb-diamond';
               d.style.background = color;
-              d.style.transform = 'rotate(45deg)';   // 位置由 left/top 控制，transform 只旋转
-            } else { // triangle
-              d.style.width = '0px'; d.style.height = '0px';
+              d.style.transform = 'rotate(45deg)';
+            } else {
+              d.style.width = '0px';
+              d.style.height = '0px';
               d.style.borderLeft = base / 2 + 'px solid transparent';
               d.style.borderRight = base / 2 + 'px solid transparent';
               d.style.borderBottom = base + 'px solid ' + color;
@@ -386,23 +548,7 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
           host.appendChild(d);
           return d;
         }
-        function fire(e) {
-          var x = e.clientX, y = e.clientY;
-          var now = performance.now();
-          // 圆环
-          var ring = makeEl('ring', CFG.colors[4], 0, x, y);
-          els.push({ el: ring, kind: 'ring', t0: now, baseX: x, baseY: y });
-          // 粒子
-          for (var i = 0; i < CFG.dots; i++) {
-            var ang = Math.random() * Math.PI * 2;
-            var dist = 30 + Math.random() * (CFG.dotMaxDist - 30);
-            var r = CFG.dotMinR + Math.random() * (CFG.dotMaxR - CFG.dotMinR);
-            var color = CFG.colors[Math.floor(Math.random() * CFG.colors.length)];
-            var shape = CFG.shapes[Math.floor(Math.random() * CFG.shapes.length)];
-            var dot = makeEl(shape, color, r, x, y);
-            els.push({ el: dot, kind: 'dot', t0: now, ang: ang, dist: dist, r: r, shape: shape, baseX: x, baseY: y });
-          }
-        }
+
         function loop(t) {
           for (var i = els.length - 1; i >= 0; i--) {
             var b = els[i];
@@ -415,11 +561,11 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
             var ease = 1 - Math.pow(1 - p, 2);
             if (b.kind === 'ring') {
               var rr = CFG.ringMaxR * p;
-              var d = rr * 2;
-              b.el.style.width = d + 'px';
-              b.el.style.height = d + 'px';
-              b.el.style.left = (b.baseX - rr) + 'px';
-              b.el.style.top = (b.baseY - rr) + 'px';
+              var dd0 = rr * 2;
+              b.el.style.width = dd0 + 'px';
+              b.el.style.height = dd0 + 'px';
+              b.el.style.left = b.baseX - rr + 'px';
+              b.el.style.top = b.baseY - rr + 'px';
               b.el.style.opacity = p < 0.6 ? '1' : String(Math.max(0, 1 - (p - 0.6) / 0.4));
             } else {
               var dd = b.dist * ease;
@@ -434,23 +580,125 @@ const hasRightSidebar = Astro.slots.has('rightSidebar');
                 b.el.style.borderLeftWidth = base / 2 + 'px';
                 b.el.style.borderRightWidth = base / 2 + 'px';
               } else if (b.shape === 'diamond') {
-                b.el.style.left = (px - base / 2) + 'px';
-                b.el.style.top = (py - base / 2) + 'px';
+                b.el.style.left = px - base / 2 + 'px';
+                b.el.style.top = py - base / 2 + 'px';
                 b.el.style.width = base + 'px';
                 b.el.style.height = base + 'px';
               } else {
-                b.el.style.left = (px - base / 2) + 'px';
-                b.el.style.top = (py - base / 2) + 'px';
+                b.el.style.left = px - base / 2 + 'px';
+                b.el.style.top = py - base / 2 + 'px';
                 b.el.style.width = base + 'px';
                 b.el.style.height = base + 'px';
               }
               b.el.style.opacity = String(Math.max(0, 1 - p));
             }
           }
-          requestAnimationFrame(loop);
+          if (els.length) {
+            rafId = requestAnimationFrame(loop);
+          } else {
+            rafId = 0;
+          }
         }
+
+        function fire(e) {
+          var x = e.clientX,
+            y = e.clientY;
+          var now = performance.now();
+          els.push({
+            el: makeEl('ring', CFG.colors[4], 0, x, y),
+            kind: 'ring',
+            t0: now,
+            baseX: x,
+            baseY: y,
+          });
+          for (var i = 0; i < CFG.dots; i++) {
+            var ang = Math.random() * Math.PI * 2;
+            var dist = 30 + Math.random() * (CFG.dotMaxDist - 30);
+            var r = CFG.dotMinR + Math.random() * (CFG.dotMaxR - CFG.dotMinR);
+            var color = CFG.colors[Math.floor(Math.random() * CFG.colors.length)];
+            var shape = CFG.shapes[Math.floor(Math.random() * CFG.shapes.length)];
+            els.push({
+              el: makeEl(shape, color, r, x, y),
+              kind: 'dot',
+              t0: now,
+              ang: ang,
+              dist: dist,
+              r: r,
+              shape: shape,
+              baseX: x,
+              baseY: y,
+            });
+          }
+          if (!rafId) rafId = requestAnimationFrame(loop);
+        }
+
         document.addEventListener('click', fire);
-        requestAnimationFrame(loop);
+      })();
+    </script>
+
+    <!-- ============ 导航交互 ============ -->
+    <script>
+      (function () {
+        const headerNode = document.getElementById('site-header');
+        if (!headerNode) return;
+        const header = headerNode;
+
+        const toggle = document.getElementById('nav-toggle');
+        const nav = document.getElementById('nav-links');
+        const more = document.querySelector<HTMLElement>('.site-nav__more');
+        const moreBtn = more?.querySelector<HTMLButtonElement>('.site-nav__morebtn') ?? null;
+
+        // 滚动后给导航栏加纸底 + 分隔线
+        let ticking = false;
+        function onScroll() {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            header.classList.toggle('is-scrolled', window.scrollY > 8);
+            ticking = false;
+          });
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+
+        // 移动端菜单
+        if (toggle) {
+          toggle.addEventListener('click', () => {
+            const open = header.classList.toggle('is-open');
+            toggle.setAttribute('aria-expanded', String(open));
+            toggle.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+          });
+
+          nav?.addEventListener('click', (e) => {
+            const link = (e.target as Element | null)?.closest('a');
+            if (link && header.classList.contains('is-open')) {
+              header.classList.remove('is-open');
+              toggle.setAttribute('aria-expanded', 'false');
+            }
+          });
+        }
+
+        // 更多菜单
+        if (more && moreBtn) {
+          moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = more.classList.toggle('is-open');
+            moreBtn.setAttribute('aria-expanded', String(open));
+          });
+
+          document.addEventListener('click', () => {
+            more.classList.remove('is-open');
+            moreBtn.setAttribute('aria-expanded', 'false');
+          });
+
+          document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+              more.classList.remove('is-open');
+              moreBtn.setAttribute('aria-expanded', 'false');
+              header.classList.remove('is-open');
+            }
+          });
+        }
       })();
     </script>
   </body>

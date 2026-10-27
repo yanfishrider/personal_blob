@@ -1,76 +1,204 @@
 ---
 export interface Props {
+  /** YYYY-MM-DD 列表 */
   postDates: string[];
 }
 
 const { postDates } = Astro.props;
-const postDateSet = new Set(postDates);
-
-const now = new Date();
-const year = now.getFullYear();
-const month = now.getMonth(); // 0-indexed
-
-const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-const daysInMonth = new Date(year, month + 1, 0).getDate();
-const today = now.getDate();
-
-// 日历格子：补齐前面的空白 + 当月日期
-const cells: { day: number; isToday: boolean; hasPost: boolean; isWeekend: boolean }[] = [];
-for (let i = 0; i < firstDay; i++) cells.push({ day: 0, isToday: false, hasPost: false, isWeekend: false });
-for (let d = 1; d <= daysInMonth; d++) {
-  const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const dow = (firstDay + d - 1) % 7; // 0=Sun
-  cells.push({ day: d, isToday: d === today, hasPost: postDateSet.has(ds), isWeekend: dow === 0 || dow === 6 });
-}
-
-const weekHeaders = ['日', '一', '二', '三', '四', '五', '六'];
-const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 ---
 
-<div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm">
-  <h3 class="text-sm font-semibold text-gray-700 mb-3">{year} 年 {monthNames[month]}</h3>
-
-  <!-- 星期头 -->
-  <div class="grid grid-cols-7 text-center mb-1">
-    {weekHeaders.map((w, i) => (
-      <span class={`text-xs py-1 ${i === 0 || i === 6 ? 'text-rose-400' : 'text-gray-400'}`}>{w}</span>
-    ))}
+<div class="rail-card" id="blog-calendar">
+  <div class="rail-title">
+    <span>日历</span>
+    <div class="cal-nav">
+      <button type="button" data-cal="prev" aria-label="上个月">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button type="button" data-cal="next" aria-label="下个月">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
   </div>
 
-  <!-- 日期格 -->
-  <div class="grid grid-cols-7 text-center">
-    {cells.map((c) =>
-      c.day === 0 ? (
-        <div class="h-6" />
-      ) : (
-        <div class="relative flex items-center justify-center h-6">
-          <span
-            class={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] leading-none transition-colors duration-150
-              ${c.isToday
-                ? 'bg-[#49B1F5] text-white font-bold shadow-sm'
-                : c.hasPost
-                  ? 'text-blue-600 font-semibold hover:bg-blue-100'
-                  : c.isWeekend
-                    ? 'text-gray-400 hover:bg-gray-100'
-                    : 'text-gray-600 hover:bg-gray-100'}`}
-          >
-            {c.day}
-          </span>
-          {c.hasPost && !c.isToday && (
-            <span class="absolute bottom-0 left-1/2 -translate-x-1/2 h-[3px] w-[3px] rounded-full bg-blue-500"></span>
-          )}
-        </div>
-      ),
-    )}
+  <p class="cal-month" id="cal-month"></p>
+  <div class="cal-week" aria-hidden="true">
+    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
   </div>
-
-  <!-- 图例 -->
-  <div class="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-gray-100">
-    <span class="inline-flex items-center gap-1 text-[10px] text-gray-400">
-      <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#49B1F5]"></span>今日
-    </span>
-    <span class="inline-flex items-center gap-1 text-[10px] text-gray-400">
-      <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>有文章
-    </span>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-legend">
+    <span><i class="cal-dot cal-dot--today"></i>今天</span>
+    <span><i class="cal-dot"></i>有文章</span>
   </div>
 </div>
+
+<script type="application/json" id="cal-dates" set:html={JSON.stringify(postDates)}></script>
+
+<script>
+  (function () {
+    const host = document.getElementById('blog-calendar') as HTMLElement;
+    const grid = document.getElementById('cal-grid') as HTMLElement;
+    const monthEl = document.getElementById('cal-month') as HTMLElement;
+    const dataEl = document.getElementById('cal-dates') as HTMLElement;
+    if (!host || !grid || !monthEl || !dataEl) return;
+
+    const dates = new Set<string>(JSON.parse(dataEl.textContent || '[]'));
+    const now = new Date();
+    let view = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const key = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+    function render() {
+      const year = view.getFullYear();
+      const month = view.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const todayKey = key(now.getFullYear(), now.getMonth(), now.getDate());
+
+      monthEl.textContent = `${year} / ${pad(month + 1)}`;
+
+      let html = '';
+      for (let i = 0; i < firstDay; i++) html += '<span class="cal-cell cal-cell--empty"></span>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const k = key(year, month, d);
+        const classes = ['cal-cell'];
+        if (k === todayKey) classes.push('is-today');
+        if (dates.has(k)) classes.push('has-post');
+        html += `<span class="${classes.join(' ')}" title="${k}">${d}</span>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    host.querySelectorAll<HTMLButtonElement>('[data-cal]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const step = btn.dataset.cal === 'prev' ? -1 : 1;
+        view = new Date(view.getFullYear(), view.getMonth() + step, 1);
+        render();
+      });
+    });
+
+    render();
+  })();
+</script>
+
+<style>
+  .cal-nav {
+    display: flex;
+    gap: 2px;
+  }
+  .cal-nav button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--ink-4);
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+  .cal-nav button:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+
+  .cal-month {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+  }
+
+  .cal-week,
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    gap: 1px;
+  }
+  .cal-week {
+    margin-bottom: 4px;
+  }
+  .cal-week span {
+    font-size: 10px;
+    color: var(--ink-4);
+    padding: 2px 0;
+  }
+  .cal-week span:first-child,
+  .cal-week span:last-child {
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .cal-cell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+    border-radius: 5px;
+  }
+  .cal-cell--empty {
+    visibility: hidden;
+  }
+  .cal-cell.has-post {
+    color: var(--accent-deep);
+    font-weight: 600;
+    background: var(--accent-wash);
+  }
+  .cal-cell.has-post::after {
+    content: "";
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    width: 2.5px;
+    height: 2.5px;
+    margin-left: -1.25px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .cal-cell.is-today {
+    color: var(--surface);
+    background: var(--ink);
+    font-weight: 600;
+  }
+  .cal-cell.is-today.has-post::after {
+    background: var(--accent-soft);
+  }
+
+  .cal-legend {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule-soft);
+    font-size: 10px;
+    color: var(--ink-4);
+  }
+  .cal-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .cal-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+  .cal-dot--today {
+    background: var(--ink);
+  }
+</style>

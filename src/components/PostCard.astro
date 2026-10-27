@@ -1,0 +1,51 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { formatDate, isoDate, readingTime } from '../lib/blog-data';
+
+export interface Props {
+  post: CollectionEntry<'posts'>;
+  /** 左侧日期栏（归档/筛选页用） */
+  showDateRail?: boolean;
+}
+
+const { post, showDateRail = false } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const minutes = readingTime(post.body);
+const date = isoDate(post.data.date);
+---
+
+<a href={`${base}/posts/${post.slug}`} class:list={['post-card', { 'post-card--rail': showDateRail }]}>
+  {
+    showDateRail && (
+      <time class="post-card__rail" datetime={date}>
+        <span class="post-card__rail-md">{date.slice(5).replace('-', '/')}</span>
+        <span class="post-card__rail-y">{post.data.date.getUTCFullYear()}</span>
+      </time>
+    )
+  }
+  <div class="post-card__body">
+    <div class="post-card__meta">
+      {!showDateRail && <time datetime={date}>{formatDate(post.data.date)}</time>}
+      {
+        post.data.category && (
+          <>
+            {!showDateRail && <span aria-hidden="true">/</span>}
+            <span class="post-card__cat">{post.data.category}</span>
+          </>
+        )
+      }
+      <span class="post-card__mins">{minutes} 分钟</span>
+    </div>
+    <h3 class="post-card__title">{post.data.title}</h3>
+    {post.data.description && <p class="post-card__desc">{post.data.description}</p>}
+    {
+      post.data.tags && post.data.tags.length > 0 && (
+        <div class="flex flex-wrap gap-1.5 pt-1">
+          {post.data.tags.map((tag) => (
+            <span class="tag-chip">{tag}</span>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</a>

@@ -1,11 +1,48 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title="404 - 摸鱼骑士 知识库">
-  <div class="text-center py-20">
-    <h1 class="text-6xl font-bold text-gray-300 mb-4">404</h1>
-    <p class="text-gray-500 mb-8">你来到了没有知识的荒原</p>
-    <a href={import.meta.env.BASE_URL} class="text-sm text-[#49B1F5] hover:underline">← 返回首页</a>
+<BaseLayout title="404 - 摸鱼骑士 知识库" description="页面不存在。">
+  <div class="nf">
+    <span class="nf__code">404</span>
+    <h1 class="nf__title">这一页不在档案里</h1>
+    <p class="nf__desc">链接可能已经失效，或者它从来就没被写下来过。</p>
+    <div class="nf__actions">
+      <a href={base || '/'} class="btn btn--solid">回到首页</a>
+      <a href={`${base}/archive`} class="btn">翻翻归档</a>
+    </div>
   </div>
 </BaseLayout>
+
+<style>
+  .nf {
+    text-align: center;
+    padding: 72px 0 48px;
+  }
+  .nf__code {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: clamp(4.5rem, 16vw, 8rem);
+    line-height: 0.9;
+    color: var(--rule);
+    letter-spacing: -0.04em;
+    user-select: none;
+  }
+  .nf__title {
+    margin-top: 18px;
+    font-size: 1.35rem;
+  }
+  .nf__desc {
+    margin-top: 10px;
+    font-size: 13.5px;
+    color: var(--ink-3);
+  }
+  .nf__actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+</style>

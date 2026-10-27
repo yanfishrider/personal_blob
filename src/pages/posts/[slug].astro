@@ -1,17 +1,24 @@
 ---
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
 import BlogPost from '../../layouts/BlogPost.astro';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('posts');
-  return posts.map((post) => ({
+  // 草稿不生成页面（与列表页保持一致，避免草稿被直接访问 / 进 sitemap）
+  const posts = await getCollection('posts', ({ data }) => !data.draft);
+  posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+  return posts.map((post, i) => ({
     params: { slug: post.slug },
-    props: { post },
+    props: {
+      post,
+      // posts 按时间倒序：i+1 更旧（上一篇），i-1 更新（下一篇）
+      prev: posts[i + 1] ?? null,
+      next: posts[i - 1] ?? null,
+    },
   }));
 }
 
-type Props = { post: CollectionEntry<'posts'> };
-const { post } = Astro.props;
+const { post, prev, next } = Astro.props;
 ---
 
-<BlogPost post={post} />
+<BlogPost post={post} prev={prev} next={next} />

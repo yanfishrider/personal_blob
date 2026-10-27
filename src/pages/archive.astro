@@ -1,35 +1,143 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProfileSidebar from '../components/ProfileSidebar.astro';
+import { getBlogData, isoDate } from '../lib/blog-data';
 
-const allPosts = await getCollection('posts', ({ data }) => !data.draft);
-const sorted = allPosts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 
-const grouped: Record<string, typeof sorted> = {};
-sorted.forEach(p => {
-  const year = p.data.date.getFullYear().toString();
-  if (!grouped[year]) grouped[year] = [];
-  grouped[year].push(p);
-});
+const groups = new Map<string, typeof posts>();
+for (const post of posts) {
+  const year = String(post.data.date.getUTCFullYear());
+  if (!groups.has(year)) groups.set(year, []);
+  groups.get(year)!.push(post);
+}
+
+const years = [...groups.entries()];
+const { postCount, tagCount, categoryCount, recentPosts } = await getBlogData();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title="归档 - 摸鱼骑士 知识库">
-  <h1 class="text-3xl font-bold mb-8">归档</h1>
-  {
-    Object.entries(grouped).map(([year, posts]) => (
-      <section class="mb-8">
-        <h2 class="text-xl font-bold text-gray-400 mb-4">{year}</h2>
-        <ul class="space-y-3">
-          {posts.map(p => (
-            <li class="flex items-baseline gap-4">
-              <span class="text-sm text-gray-400 shrink-0 w-16">{p.data.date.toISOString().slice(5, 10)}</span>
-              <a href={`${import.meta.env.BASE_URL}/posts/${p.slug}`} class="text-gray-700 hover:text-blue-600 transition-colors">
-                {p.data.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-    ))
-  }
+<BaseLayout title="归档 - 摸鱼骑士 知识库" description="按时间倒序浏览全部文章。">
+  <ProfileSidebar
+    slot="sidebar"
+    postCount={postCount}
+    tagCount={tagCount}
+    categoryCount={categoryCount}
+    recentPosts={recentPosts}
+  />
+
+  <div>
+    <header class="page-head">
+      <span class="page-head__eyebrow">Archive</span>
+      <h1 class="page-head__title">归档</h1>
+      <p class="page-head__lead">{postCount} 篇文章，按时间倒序。</p>
+    </header>
+
+    <div class="archive">
+      {
+        years.map(([year, items]) => (
+          <section class="archive__group">
+            <h2 class="archive__year">
+              <span>{year}</span>
+              <i />
+              <em>{items.length}</em>
+            </h2>
+            <ul class="archive__list">
+              {items.map((post) => (
+                <li>
+                  <a href={`${base}/posts/${post.slug}`} class="archive__row">
+                    <time class="archive__date" datetime={isoDate(post.data.date)}>
+                      {isoDate(post.data.date).slice(5).replace('-', '/')}
+                    </time>
+                    <span class="archive__title">{post.data.title}</span>
+                    {post.data.category && <span class="archive__cat">{post.data.category}</span>}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      }
+    </div>
+  </div>
 </BaseLayout>
+
+<style>
+  .archive {
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+  }
+  .archive__year {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    color: var(--ink-2);
+    margin-bottom: 12px;
+  }
+  .archive__year i {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .archive__year em {
+    font-family: var(--font-mono);
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--ink-4);
+  }
+
+  .archive__list {
+    display: flex;
+    flex-direction: column;
+  }
+  .archive__row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 9px 6px 9px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    transition: padding-left 0.25s ease, background 0.25s ease;
+  }
+  .archive__row:hover {
+    padding-left: 8px;
+    background: var(--surface);
+  }
+  .archive__date {
+    flex: none;
+    width: 46px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-4);
+    font-variant-numeric: tabular-nums;
+  }
+  .archive__title {
+    font-size: 14px;
+    color: var(--ink-2);
+    transition: color 0.2s ease;
+  }
+  .archive__row:hover .archive__title {
+    color: var(--accent-deep);
+  }
+  .archive__cat {
+    margin-left: auto;
+    flex: none;
+    font-size: 10.5px;
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+  }
+
+  @media (max-width: 560px) {
+    .archive__cat {
+      display: none;
+    }
+    .archive__title {
+      font-size: 13.5px;
+    }
+  }
+</style>

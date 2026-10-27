@@ -2,55 +2,162 @@
 import type { CollectionEntry } from 'astro:content';
 import BaseLayout from './BaseLayout.astro';
 import ProfileSidebar from '../components/ProfileSidebar.astro';
-import SiteStats from '../components/SiteStats.astro';
-import BlogCalendar from '../components/BlogCalendar.astro';
-import { getBlogData } from '../lib/blog-data';
+import { getBlogData, formatDate, isoDate, readingTime, type Post } from '../lib/blog-data';
 
 export interface Props {
   post: CollectionEntry<'posts'>;
+  prev?: Post | null;
+  next?: Post | null;
 }
 
-const { post } = Astro.props;
-const { Content } = await post.render();
-// 与首页同构的三栏数据：SPA 原地加载与整页刷新（F5）布局一致，左右栏不消失
-const { postCount, tagCount, categoryCount, recentPosts, postDates, lastUpdate } = await getBlogData();
+const { post, prev = null, next = null } = Astro.props;
+const { Content, headings } = await post.render();
+const { postCount, tagCount, categoryCount, recentPosts } = await getBlogData();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const minutes = readingTime(post.body);
 ---
 
-<BaseLayout title={`${post.data.title} - 摸鱼骑士 知识库`} description={post.data.description}>
-  <ProfileSidebar slot="sidebar" postCount={postCount} tagCount={tagCount} categoryCount={categoryCount} recentPosts={recentPosts} />
+<BaseLayout
+  title={`${post.data.title} - 摸鱼骑士 知识库`}
+  description={post.data.description}
+  type="article"
+  section={post.data.category}
+>
+  <ProfileSidebar
+    slot="sidebar"
+    postCount={postCount}
+    tagCount={tagCount}
+    categoryCount={categoryCount}
+    recentPosts={recentPosts}
+  />
 
-  <article id="post-article" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-    <!-- 返回列表：整页刷新时是真实链接（回首页）；SPA 原地加载时由 spa-loader 接管为 history.back -->
-    <a id="back-to-list" href={import.meta.env.BASE_URL}
-       class="flex items-center gap-1 text-sm text-gray-400 hover:text-[#49B1F5] transition-colors mb-6">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+  <div id="post-article">
+    <a id="back-to-list" href={base || '/'} class="post-back">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13 8H3m4-4L3 8l4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
       返回列表
     </a>
-    <header class="mb-10">
-      <h1 class="text-3xl font-bold text-gray-900 mb-3">{post.data.title}</h1>
-      <div class="flex items-center gap-4 text-sm text-gray-400">
-        <time datetime={post.data.date.toISOString()}>
-          {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </time>
+
+    <article class="surface post-sheet">
+      <header class="post-head">
+        <div class="post-head__meta">
+          <time datetime={isoDate(post.data.date)}>{formatDate(post.data.date)}</time>
+          <span class="post-head__sep">/</span>
+          {post.data.category && (
+            <>
+              <a href={`${base}/categories`} class="post-head__cat">{post.data.category}</a>
+              <span class="post-head__sep">/</span>
+            </>
+          )}
+          <span>{minutes} 分钟阅读</span>
+        </div>
+        <h1 class="post-head__title">{post.data.title}</h1>
+        {post.data.description && <p class="post-head__desc">{post.data.description}</p>}
         {
           post.data.tags && post.data.tags.length > 0 && (
-            <div class="flex gap-2">
-              {post.data.tags.map((tag: string) => (
-                <span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-xs">{tag}</span>
+            <div class="post-head__tags">
+              {post.data.tags.map((tag) => (
+                <span class="tag-chip">{tag}</span>
               ))}
             </div>
           )
         }
+      </header>
+
+      <div class="prose-article">
+        <Content />
       </div>
-    </header>
 
-    <Content />
-  </article>
+      <footer class="post-foot">
+        <span class="post-foot__end" aria-hidden="true">·</span>
+        <p class="post-foot__note">写于 {formatDate(post.data.date)} · 由 Astro 构建</p>
+        <a href="#main-content" class="post-foot__top">回到顶部 ↑</a>
+      </footer>
+    </article>
 
-  <aside slot="rightSidebar" class="w-full md:w-[14%] md:min-w-[150px] shrink-0 md:relative">
-    <div class="md:sticky md:top-[18%] space-y-4">
-      <SiteStats postCount={postCount} lastUpdate={lastUpdate} />
-      <BlogCalendar postDates={postDates} />
+    {
+      (prev || next) && (
+        <nav class:list={['post-nav', { 'post-nav--single': !prev || !next }]} aria-label="上下篇">
+          {prev ? (
+            <a href={`${base}/posts/${prev.slug}`} class="post-nav__item">
+              <span class="post-nav__label">← 上一篇</span>
+              <span class="post-nav__title">{prev.data.title}</span>
+            </a>
+          ) : (
+            <span />
+          )}
+          {next ? (
+            <a href={`${base}/posts/${next.slug}`} class="post-nav__item post-nav__item--next">
+              <span class="post-nav__label">下一篇 →</span>
+              <span class="post-nav__title">{next.data.title}</span>
+            </a>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )
+    }
+  </div>
+
+  <div slot="rightSidebar" class="flex flex-col gap-3">
+    {
+      toc.length > 0 ? (
+        <nav class="rail-card toc" aria-label="目录" id="post-toc" data-toc>
+          <div class="rail-title">
+            <span>目录</span>
+            <span class="toc__count">{toc.length}</span>
+          </div>
+          {toc.map((h) => (
+            <a href={`#${h.slug}`} data-depth={h.depth}>
+              {h.text}
+            </a>
+          ))}
+        </nav>
+      ) : (
+        <div class="rail-card">
+          <div class="rail-title"><span>目录</span></div>
+          <p class="toc__empty">这篇没有分节标题</p>
+        </div>
+      )
+    }
+    <div class="rail-card toc__meta">
+      <div class="rail-title"><span>本文</span></div>
+      <p><span>字数</span><b>{post.body?.replace(/\s/g, '').length ?? 0}</b></p>
+      <p><span>阅读</span><b>约 {minutes} 分钟</b></p>
     </div>
-  </aside>
+  </div>
 </BaseLayout>
+
+<script>
+  // 目录滚动高亮：IntersectionObserver 跟随当前小节
+  function initTOC() {
+    const toc = document.querySelector('[data-toc]');
+    if (!toc) return;
+    const links = Array.from(toc.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
+    const targets = links
+      .map((a) => document.getElementById(decodeURIComponent(a.hash.slice(1))))
+      .filter((el): el is HTMLElement => Boolean(el));
+    if (!targets.length) return;
+
+    const setActive = (id: string) => {
+      links.forEach((a) => a.classList.toggle('is-active', a.hash.slice(1) === id));
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length) setActive(visible[0].target.id);
+      },
+      { rootMargin: '-30% 0px -60% 0px', threshold: 0 }
+    );
+    targets.forEach((t) => observer.observe(t));
+  }
+
+  initTOC();
+  document.addEventListener('astro:spa-navigate', initTOC);
+</script>

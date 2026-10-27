@@ -1,4 +1,23 @@
+# dependencies
 node_modules/
+
+# build output
 dist/
 .astro/
-.hermes/db-backup/
+
+# agent / local workspace scratch — 不要进仓库
+.hermes/
+
+# logs & os files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# local env
+.env
+.env.*

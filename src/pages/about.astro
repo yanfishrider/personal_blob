@@ -1,10 +1,182 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const stack = [
+  { name: 'Astro', note: '静态站点框架，内容集合 + 零 JS 默认输出' },
+  { name: 'Tailwind CSS', note: '布局与设计令牌，配合一层自定义 CSS 组件' },
+  { name: 'anime.js', note: '开屏动画、文字拆解、描边与缓动' },
+  { name: 'CodeMirror 6', note: '笔记页的实时编辑器' },
+  { name: 'GitHub Pages', note: '构建与部署，Actions 全自动' },
+];
+
+const sections = [
+  { title: '笔记', href: '/notes', desc: 'anime.js 的交互式学习台，左边目录、中间写、右边立刻看到效果。' },
+  { title: '动画', href: '/animation-lab', desc: '把喜欢的游戏 UI——NieR、P3RE——拆开重做的实验场。' },
+  { title: '工具', href: '/ascii-converter', desc: '图片转 ASCII 的小工具，本地处理，不上传。' },
+  { title: '游戏', href: '/game', desc: '一个用 Canvas 写的打靶游戏，光标会自己转向最近的柱子。' },
+];
 ---
 
-<BaseLayout title="关于 - 我的博客">
-  <div class="prose">
-    <h1 class="text-3xl font-bold text-gray-900 mb-6">关于</h1>
-    <p>这里是关于页，可以写写你是谁、这个博客是干什么的。</p>
+<BaseLayout title="关于 - 摸鱼骑士 知识库" description="关于这个站点，以及它用什么搭起来的。">
+  <div class="about">
+    <header class="page-head">
+      <span class="page-head__eyebrow">About</span>
+      <h1 class="page-head__title">关于</h1>
+      <p class="page-head__lead">
+        这里记下我在前端、动画和一些奇怪想法上的折腾过程——大多以「先做出来，再想为什么」的方式推进。
+      </p>
+    </header>
+
+    <section class="about__section">
+      <h2 class="about__title">这个站是什么</h2>
+      <p>
+        一个个人知识库。写下来的东西大致分三类：做到一半的技术复盘、把游戏 UI 拆开重做的动画实验、
+        以及一些没有明确用途但挺好玩的小工具。文章里的代码基本都是站点上真实跑着的那一份。
+      </p>
+    </section>
+
+    <section class="about__section">
+      <h2 class="about__title">里面有什么</h2>
+      <div class="about__links">
+        {
+          sections.map((s) => (
+            <a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}${s.href}`} class="about__link">
+              <span class="about__link-title">{s.title}</span>
+              <span class="about__link-desc">{s.desc}</span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="about__section">
+      <h2 class="about__title">用什么搭的</h2>
+      <dl class="about__stack">
+        {
+          stack.map((item) => (
+            <div class="about__stack-row">
+              <dt>{item.name}</dt>
+              <dd>{item.note}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section class="about__section">
+      <h2 class="about__title">找到我</h2>
+      <p>
+        代码在
+        <a href="https://github.com/yanfishrider" target="_blank" rel="noopener noreferrer">GitHub</a>
+        ，站点仓库是
+        <a href="https://github.com/yanfishrider/personal_blob" target="_blank" rel="noopener noreferrer">personal_blob</a>。
+      </p>
+    </section>
   </div>
 </BaseLayout>
+
+<style>
+  .about {
+    max-width: 720px;
+  }
+  .about__section {
+    margin-top: 36px;
+  }
+  .about__section:first-of-type {
+    margin-top: 0;
+  }
+  .about__title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+  }
+  .about__title::before {
+    content: "";
+    width: 18px;
+    height: 1px;
+    background: var(--accent);
+    flex: none;
+  }
+  .about p {
+    font-size: 14.5px;
+    line-height: 1.9;
+    color: var(--ink-2);
+  }
+  .about p + p {
+    margin-top: 12px;
+  }
+  .about a {
+    color: var(--accent-deep);
+    text-decoration: underline;
+    text-decoration-color: var(--accent-soft);
+    text-underline-offset: 3px;
+  }
+  .about a:hover {
+    text-decoration-color: var(--accent);
+  }
+
+  .about__links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  .about__link {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    transition: border-color 0.25s ease, transform 0.25s ease;
+  }
+  .about__link:hover {
+    border-color: var(--accent-soft);
+    transform: translateY(-2px);
+  }
+  .about__link-title {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    color: var(--ink);
+  }
+  .about__link-desc {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-3);
+  }
+
+  .about__stack {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--rule);
+  }
+  .about__stack-row {
+    display: flex;
+    gap: 18px;
+    padding: 11px 2px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .about__stack-row dt {
+    flex: none;
+    width: 120px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent-deep);
+  }
+  .about__stack-row dd {
+    font-size: 13px;
+    color: var(--ink-3);
+  }
+
+  @media (max-width: 520px) {
+    .about__stack-row {
+      flex-direction: column;
+      gap: 2px;
+    }
+    .about__stack-row dt {
+      width: auto;
+    }
+  }
+</style>

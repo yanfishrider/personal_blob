@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>湖面</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #fcfbf6;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* 右下角落速调节器 */
+  .ctrl {
+    position: fixed;
+    right: 15px;
+    bottom: 13px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 12px;
+    background: rgba(252, 251, 246, 0.72);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(54, 66, 66, 0.13);
+    border-radius: 8px;
+    font: 11px/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    letter-spacing: 0.1em;
+    color: rgba(54, 66, 66, 0.5);
+    cursor: default;
+    user-select: none;
+  }
+  .ctrl input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 92px;
+    height: 14px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .ctrl input[type="range"]::-webkit-slider-runnable-track {
+    height: 1px;
+    background: rgba(54, 66, 66, 0.26);
+  }
+  .ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 8px;
+    height: 8px;
+    margin-top: -3.5px;
+    border-radius: 50%;
+    background: #46585a;
+  }
+  .ctrl input[type="range"]::-moz-range-track {
+    height: 1px;
+    background: rgba(54, 66, 66, 0.26);
+  }
+  .ctrl input[type="range"]::-moz-range-thumb {
+    width: 8px;
+    height: 8px;
+    border: 0;
+    border-radius: 50%;
+    background: #46585a;
+  }
+  .ctrl__val {
+    min-width: 34px;
+    text-align: right;
+    color: rgba(54, 66, 66, 0.78);
+    font-variant-numeric: tabular-nums;
+  }
+  .ctrl__sep {
+    width: 1px;
+    height: 12px;
+    background: rgba(54, 66, 66, 0.16);
+    margin: 0 2px;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="ctrl">
+  <span>落速</span>
+  <input id="speed" type="range" min="0.15" max="2.6" step="0.05" value="1" aria-label="雨滴下落速度" />
+  <span class="ctrl__val" id="speedVal">1.0×</span>
+
+  <span class="ctrl__sep"></span>
+
+  <span>雨量</span>
+  <input id="density" type="range" min="0.2" max="2.5" step="0.05" value="1" aria-label="雨滴数量" />
+  <span class="ctrl__val" id="densityVal">1.0×</span>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  const cvs = document.getElementById('c');
+  const ctx = cvs.getContext('2d');
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  let W = 0, H = 0;
+  let waterY = 0;
+  let staticCvs = null;
+
+  const ripples = [];
+  const rings = [];
+  const rains = [];
+  const craters = [];
+  const crowns = [];
+  const splashes = [];
+
+  const INK = '54, 66, 66';
+  const shoreY = (x) =>
+    waterY + Math.sin(x * 0.0016) * 3 + Math.sin(x * 0.0047 + 2.1) * 1.5 + Math.sin(x * 0.0131 + 0.6) * 0.7;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  /* ============================================================
+     静态层（只在 resize 时生成一次）
+     水墨的关键是浓淡与洇开，所以这里大量使用模糊：
+     先把形体画硬，再整体化开，比一层层调透明度更像墨。
+     ============================================================ */
+  function buildStatic() {
+    staticCvs = document.createElement('canvas');
+    staticCvs.width = Math.round(W * DPR);
+    staticCvs.height = Math.round(H * DPR);
+    const g = staticCvs.getContext('2d');
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    const span = H - waterY;
+
+    // 纸
+    g.fillStyle = '#fcfbf6';
+    g.fillRect(0, 0, W, H);
+
+    // 纸纹
+    for (let i = 0, n = Math.round((W * H) / 800); i < n; i++) {
+      g.fillStyle = Math.random() > 0.5
+        ? 'rgba(120, 110, 88, 0.03)'
+        : 'rgba(255, 255, 255, 0.05)';
+      g.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+    }
+
+    /* ---------- 远岸：一条晕开的墨带 ---------- */
+    g.filter = 'blur(3px)';
+    g.beginPath();
+    g.moveTo(0, waterY + 3);
+    for (let x = 0; x <= W; x += 10) {
+      g.lineTo(x, shoreY(x));
+    }
+    g.lineTo(W, waterY - 26);
+    g.lineTo(0, waterY - 26);
+    g.closePath();
+    const bankG = g.createLinearGradient(0, waterY - 26, 0, waterY + 4);
+    bankG.addColorStop(0, `rgba(${INK}, 0)`);
+    bankG.addColorStop(0.7, `rgba(${INK}, 0.07)`);
+    bankG.addColorStop(1, `rgba(${INK}, 0.30)`);
+    g.fillStyle = bankG;
+    g.fill();
+
+    /* ---------- 水色底：整片压深一层，越远越浓 ---------- */
+    g.filter = 'none';
+    const wg = g.createLinearGradient(0, waterY, 0, H);
+    wg.addColorStop(0, 'rgba(56, 76, 80, 0.56)');
+    wg.addColorStop(0.30, 'rgba(72, 92, 96, 0.38)');
+    wg.addColorStop(0.62, 'rgba(96, 112, 114, 0.23)');
+    wg.addColorStop(0.85, 'rgba(118, 130, 128, 0.12)');
+    wg.addColorStop(1, 'rgba(140, 150, 144, 0.06)');
+    g.fillStyle = wg;
+    g.fillRect(0, waterY, W, span);
+
+    /* ---------- 水面：十几道横向淡墨，越近越稀 ---------- */
+    g.filter = 'blur(10px)';
+    for (let i = 0; i < 15; i++) {
+      const t = Math.pow(Math.random(), 1.25);           // 0 远 / 1 近
+      const y = waterY + span * Math.pow(t, 1.55);
+      const h = span * (0.012 + 0.055 * t) * rand(0.6, 1.4);
+      const w = W * rand(0.28, 1.05);
+      const x = Math.random() * W - w / 2;
+      const a = (0.075 - 0.045 * t) * rand(0.6, 1.4);
+      g.fillStyle = `rgba(${INK}, ${a})`;
+      g.fillRect(x, y, w, h);
+    }
+
+    // 水岸正下方压一道浓一点的，像远岸的倒影压在水上
+    g.fillStyle = `rgba(${INK}, 0.18)`;
+    g.fillRect(-W * 0.05, waterY + 2, W * 1.1, span * 0.055);
+
+    /* ---------- 倒影：成组的竖向墨痕，长短浓淡都错开 ---------- */
+    g.filter = 'blur(6px)';
+    let cx = -W * 0.05;
+    while (cx < W * 1.05) {
+      // 一组倒影聚在一起，中间厚两边薄
+      const groupW = rand(60, 260);
+      const groupA = rand(0.5, 1.4);
+      const cluster = 2 + Math.floor(Math.random() * 5);
+
+      for (let i = 0; i < cluster; i++) {
+        const x = cx + rand(0, groupW);
+        const w = rand(8, 46);
+        const len = span * rand(0.10, 0.62) * groupA;
+        const a = rand(0.018, 0.075) * groupA;
+        const y0 = waterY + rand(0, span * 0.05);
+
+        const vg = g.createLinearGradient(0, y0, 0, y0 + len);
+        vg.addColorStop(0, `rgba(${INK}, ${a})`);
+        vg.addColorStop(0.45, `rgba(${INK}, ${a * 0.45})`);
+        vg.addColorStop(1, `rgba(${INK}, 0)`);
+        g.fillStyle = vg;
+        g.fillRect(x - w / 2, y0, w, len);
+      }
+      cx += groupW + rand(40, 200);
+    }
+
+    // 岸下一道横的倒影揉搓：让远岸的墨在水里摊开
+    g.filter = 'blur(16px)';
+    for (let i = 0; i < 7; i++) {
+      const w = W * rand(0.12, 0.45);
+      const x = Math.random() * W - w / 2;
+      const h = span * rand(0.03, 0.09);
+      g.fillStyle = `rgba(${INK}, ${rand(0.02, 0.055)})`;
+      g.fillRect(x, waterY + rand(0, span * 0.04), w, h);
+    }
+
+    /* ---------- 岸线本身：细而柔的一笔 ---------- */
+    g.filter = 'blur(1.1px)';
+    // 拆成若干段，浓淡粗细都不一样 —— 一笔画到底会假
+    for (let s = 0; s < 9; s++) {
+      const xa = (W / 9) * s - 20;
+      const xb = (W / 9) * (s + 1) + 20;
+      g.beginPath();
+      for (let x = xa; x <= xb; x += 4) {
+        g.lineTo(x, shoreY(x));
+      }
+      g.strokeStyle = `rgba(${INK}, ${rand(0.12, 0.42)})`;
+      g.lineWidth = rand(0.7, 2.3);
+      g.lineCap = 'round';
+      g.stroke();
+    }
+
+    /* ---------- 岸上极淡的墨点：远树 / 芦苇，只给暗示 ---------- */
+    g.filter = 'blur(3px)';
+    for (let i = 0; i < 20; i++) {
+      const x = Math.random() * W;
+      const r = rand(2, 7);
+      const a = rand(0.02, 0.07);
+      const y = waterY - rand(2, 16);
+      g.beginPath();
+      g.ellipse(x, y, r, r * 0.6, 0, 0, Math.PI * 2);
+      g.fillStyle = `rgba(${INK}, ${a})`;
+      g.fill();
+    }
+
+    g.filter = 'none';
+  }
+
+  /* ============================================================
+     水纹：近景的细笔。行距按透视压向远岸
+     ============================================================ */
+  function buildRipples() {
+    ripples.length = 0;
+    const span = H - waterY;
+
+    for (let i = 0; i < 120; i++) {
+      const t = Math.pow(Math.random(), 0.85);     // 越靠近观者越多
+      const y = waterY + span * Math.pow(t, 1.45) + rand(-3, 3);
+
+      ripples.push({
+        x: rand(-W * 0.35, W * 1.05),
+        y,
+        t,
+        len: (30 + 300 * t) * rand(0.4, 1.2),
+        amp: (0.5 + 3.4 * t) * rand(0.4, 1.3),
+        thick: 0.5 + 1.3 * t,
+        alpha: (0.035 + 0.16 * t) * rand(0.5, 1.4),
+        phase: rand(0, 6.283),
+        drift: rand(-7, 7) * (0.3 + t),
+        wob: rand(0.6, 1.6),
+      });
+    }
+    ripples.sort((a, b) => a.t - b.t);
+  }
+
+  /* ============================================================
+     击水：一滴雨落下去，按真实物理分四拍
+     凹陷(0–160ms) → 水冠(60–450ms) → 涟漪(120ms–2s) → 飞溅(0–600ms)
+     ============================================================ */
+  function impact(px, py, power = 1) {
+    if (py < waterY + 4) py = waterY + 4;
+    const t = Math.min(1, (py - waterY) / (H - waterY));
+    const flat = 0.22 + 0.26 * t;
+
+    // 凹陷：落点被砸下去的那一下
+    craters.push({ x: px, y: py, t: 0, dur: 0.18, r: (7 + 15 * t) * power, a: 0.62 * power, flat });
+
+    // 水冠：一圈快速外扩的墨环，比涟漪快得多也淡得多
+    crowns.push({ x: px, y: py, t: 0, dur: 0.42 + 0.26 * t, r: 1, grow: (60 + 155 * t) * power, flat, a: 0.26 * power, gap: rand(0, 6.283), span: rand(4.0, 5.9) });
+
+    // 涟漪：两道，第二道稍晚起步
+    for (let i = 0; i < 2; i++) {
+      rings.push({
+        x: px, y: py,
+        r: 2 + i * 3,
+        flat,
+        grow: (26 + 92 * t) * power * (1 - i * 0.2),
+        life: -i * 0.17,
+        dur: 2.1 + 1.2 * t,
+        gap: rand(0, 6.283),
+        span: rand(2.4, 4.3),
+        a: (0.16 - i * 0.045) * (0.5 + 0.5 * power),
+      });
+    }
+
+    // 飞溅的小水珠
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      splashes.push({
+        x: px, y: py,
+        vx: rand(-58, 58) * (0.45 + t),
+        vy: -rand(70, 200) * (0.4 + t),
+        land: py,
+        t: 0,
+        dur: rand(0.3, 0.6),
+        size: 0.7 + 1.6 * t,
+        flat,
+      });
+    }
+  }
+
+  /* ============================================================
+     雨滴：三档景深，远处细密、近处长促
+     ============================================================ */
+  const WIND = 0.38;        // 横 / 纵 比 ≈ 21°
+  let speedMul = 1;         // 右下角滑杆控制的下落速度倍率
+  let rainMul = 1;          // 雨量倍率
+
+  function spawnRain() {
+    const r = Math.random();
+    const layer = r < 0.45 ? 0 : r < 0.8 ? 1 : 2;
+
+    const yImp = waterY + (H - waterY) * Math.pow(Math.random(), 1.15);
+    const landX = rand(W * 0.06, W * 0.94);
+    const v = [200, 450, 780][layer] * rand(0.9, 1.1);
+    const wind = WIND * rand(0.85, 1.15);
+
+    // 落差至少 170px，保证每一滴都有「看得见的下落段」
+    const gap = rand(170, 560);
+
+    rains.push({
+      x: landX - gap * wind,
+      y: yImp - gap,
+      landX,
+      yImp,
+      wind,
+      layer,
+      v,
+      age: 0,
+      // 远景也留出可见的长度和浓度，否则纯白纸上看不见
+      len: [14, 24, 44][layer] * rand(0.85, 1.2),
+      w: [0.7, 1.05, 1.5][layer],
+      a: [0.14, 0.20, 0.28][layer] * rand(0.85, 1.15),
+      heavy: Math.random() < 0.12,
+    });
+  }
+
+  /* ============ 绘制一帧 ============ */
+  function render(dt, time) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    ctx.drawImage(staticCvs, 0, 0, W, H);
+
+    // 水纹：一笔拆几段，粗细浓淡沿笔势变化
+    for (const r of ripples) {
+      const x0 = r.x;
+      const x1 = r.x + r.len;
+      const pts = [];
+      for (let x = x0; x <= x1; x += 8) {
+        const y = r.y + Math.sin((x - x0) * 0.019 * r.wob + r.phase + time * 0.45) * r.amp;
+        pts.push([x, y]);
+      }
+      const n = pts.length;
+      if (n < 2) continue;
+
+      // 洇开的气
+      if (r.t > 0.45) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < n; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.strokeStyle = `rgba(${INK}, ${r.alpha * 0.20})`;
+        ctx.lineWidth = r.thick * 4.5;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+
+      // 笔身
+      const segs = n > 26 ? 5 : 3;
+      for (let s = 0; s < segs; s++) {
+        const a0 = Math.floor((s / segs) * (n - 1));
+        const a1 = Math.floor(((s + 1) / segs) * (n - 1));
+        if (a1 <= a0) continue;
+        const env = Math.sin(((s + 0.5) / segs) * Math.PI);
+
+        ctx.beginPath();
+        ctx.moveTo(pts[a0][0], pts[a0][1]);
+        for (let i = a0 + 1; i <= a1; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.strokeStyle = `rgba(${INK}, ${r.alpha * (0.4 + 0.6 * env)})`;
+        ctx.lineWidth = r.thick * (0.45 + 0.7 * env);
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    // 雨滴倒影这一层暂时去掉（以后单独做一个页面，专门展示倒影）
+
+    // —— 凹陷 ——
+    for (let i = craters.length - 1; i >= 0; i--) {
+      const c = craters[i];
+      c.t += dt;
+      const u = c.t / c.dur;
+      if (u >= 1) { craters.splice(i, 1); continue; }
+
+      const r = c.r * (0.45 + u * 0.85);
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.scale(1, c.flat * 2.2);
+      const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      cg.addColorStop(0, `rgba(${INK}, ${c.a * (1 - u)})`);
+      cg.addColorStop(0.55, `rgba(${INK}, ${c.a * 0.35 * (1 - u)})`);
+      cg.addColorStop(1, `rgba(${INK}, 0)`);
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // —— 水冠：一圈快速外扩的墨环 ——
+    for (let i = crowns.length - 1; i >= 0; i--) {
+      const c = crowns[i];
+      c.t += dt;
+      const u = c.t / c.dur;
+      if (u >= 1) { crowns.splice(i, 1); continue; }
+
+      // 前段几乎不可见，中段冲到最亮，然后迅速散掉
+      const env = Math.sin(Math.min(1, u * 1.5) * Math.PI * 0.9);
+      const r = 1 + c.grow * (1 - Math.pow(1 - u, 2.2));
+
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, r, Math.max(0.7, r * c.flat), 0, c.gap, c.gap + c.span);
+      ctx.strokeStyle = `rgba(${INK}, ${c.a * env * 0.55})`;
+      ctx.lineWidth = 2.4 * env + 0.4;
+      ctx.stroke();
+    }
+
+    // —— 涟漪（life 初始为负：错峰起步）——
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const g = rings[i];
+      g.life += dt;
+      if (g.life < 0) continue;
+
+      const u = g.life / g.dur;
+      if (u >= 1) { rings.splice(i, 1); continue; }
+
+      g.r += g.grow * dt * (1 - u * 0.7);
+      const a = g.a * (1 - u) * (1 - u);
+
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y, g.r, Math.max(0.8, g.r * g.flat), 0, g.gap, g.gap + g.span);
+      ctx.strokeStyle = `rgba(${INK}, ${a * 0.5})`;
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y, g.r, Math.max(0.8, g.r * g.flat), 0, g.gap, g.gap + g.span);
+      ctx.strokeStyle = `rgba(${INK}, ${a})`;
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+    }
+
+    // —— 飞溅的小水珠，落回水面再起一个小圈 ——
+    for (let i = splashes.length - 1; i >= 0; i--) {
+      const s = splashes[i];
+      s.t += dt;
+      s.vy += 820 * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      const u = s.t / s.dur;
+      if (u >= 1 || (s.vy > 0 && s.y >= s.land)) {
+        // 落回水面：一个小涟漪
+        rings.push({
+          x: s.x, y: s.y, r: 1, flat: s.flat,
+          grow: 12, life: 0, dur: 1.1, a: 0.09, gap: rand(0, 6.283), span: rand(3.2, 4.8),
+        });
+        splashes.splice(i, 1);
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.size, s.size * 1.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${INK}, ${0.42 * (1 - u)})`;
+      ctx.fill();
+    }
+
+    // —— 雨丝：本体 + 一段更实的笔头 ——
+    for (let i = rains.length - 1; i >= 0; i--) {
+      const d = rains[i];
+      d.y += d.v * speedMul * dt;
+      d.x += d.v * d.wind * speedMul * dt;
+      d.age += dt;
+
+      // 淡入：雨滴不是「啪」地冒出来，而是在 0.15s 内长出来
+      const fade = Math.min(1, d.age / 0.15);
+      const tilt = d.len * d.wind;
+
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y - d.len);
+      ctx.lineTo(d.x + tilt, d.y);
+      ctx.strokeStyle = `rgba(${INK}, ${d.a * fade})`;
+      ctx.lineWidth = d.w;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(d.x + tilt * 0.5, d.y - d.len * 0.4);
+      ctx.lineTo(d.x + tilt, d.y);
+      ctx.strokeStyle = `rgba(${INK}, ${d.a * 1.45 * fade})`;
+      ctx.lineWidth = d.w * 0.85;
+      ctx.stroke();
+
+      if (d.y >= d.yImp) {
+        impact(d.landX, d.yImp, d.heavy ? 1.7 : 1);
+        rains.splice(i, 1);
+      }
+    }
+
+    // 水纹缓慢漂移
+    for (const r of ripples) {
+      r.x += r.drift * dt;
+      if (r.x > W * 1.1) r.x = -W * 0.1 - r.len;
+      if (r.x + r.len < -W * 0.1) r.x = W * 1.05;
+    }
+  }
+
+  /* ============ 尺寸 ============ */
+  function resize() {
+    W = cvs.clientWidth;
+    H = cvs.clientHeight;
+    cvs.width = Math.round(W * DPR);
+    cvs.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // 上方留白占 60%，水面压到下方 40%
+    waterY = H * 0.60;
+
+    buildStatic();
+    buildRipples();
+  }
+
+  window.addEventListener('resize', () => {
+    clearTimeout(resize._t);
+    resize._t = setTimeout(resize, 200);
+  });
+
+  /* ============ 循环 ============ */
+  let last = 0;
+  let time = 0;
+  let nextRain = 0.5;
+
+  function frame(now) {
+    if (!last) last = now;
+    let dt = now - last;
+    last = now;
+    if (dt > 100) dt = 100;
+    dt /= 1000;
+    time += dt;
+
+    // 毛毛雨：每秒 5–8 滴
+    if (time > nextRain) {
+      spawnRain();
+      nextRain = time + rand(0.13, 0.26) / rainMul;
+    }
+
+    render(dt, time);
+    requestAnimationFrame(frame);
+  }
+
+  cvs.addEventListener('pointerdown', (e) => {
+    const r = cvs.getBoundingClientRect();
+    impact(e.clientX - r.left, e.clientY - r.top, 1.4);
+  });
+
+  /* ============ 落速调节 ============ */
+  const speedEl = document.getElementById('speed');
+  const speedVal = document.getElementById('speedVal');
+  speedEl.addEventListener('input', () => {
+    speedMul = parseFloat(speedEl.value) || 1;
+    speedVal.textContent = speedMul.toFixed(1) + '×';
+  });
+
+  const densityEl = document.getElementById('density');
+  const densityVal = document.getElementById('densityVal');
+  densityEl.addEventListener('input', () => {
+    rainMul = parseFloat(densityEl.value) || 1;
+    densityVal.textContent = rainMul.toFixed(1) + '×';
+  });
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

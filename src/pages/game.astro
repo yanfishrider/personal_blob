@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="打靶游戏 · 摸鱼骑士">
+<BaseLayout theme="dark" title="打靶游戏 · 摸鱼骑士">
   <div id="app" data-base={import.meta.env.BASE_URL}></div>
   <canvas id="game-canvas"></canvas>
 
@@ -34,12 +34,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   <style is:global>
     html, body { overflow: hidden !important; height: 100vh !important; }
-    body { background: #252423 !important; }
-    footer, #side-toolbar { display: none !important; }
-    #site-header { transform: translateY(0) !important; background: #1a1a1a !important; position: fixed !important; }
-    #site-header #brand { color: #ffffff !important; }
-    #site-header #nav-links a { color: rgba(255,255,255,0.7) !important; }
-    #site-header #nav-links a:hover { color: #ff7b42 !important; }
+    .page-main { max-width: none !important; padding: 0 !important; }
+    #side-toolbar { display: none !important; }
     /* 隐藏 BaseLayout 的 16×16 静态光标，本页使用转向版 */
     #custom-cursor { display: none !important; }
 
@@ -67,6 +63,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   </style>
 
   <script>
+    // @ts-nocheck — 纯浏览器 Canvas 脚本，不参与严格类型检查
     (function () {
       'use strict';
 

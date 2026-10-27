@@ -1,56 +1,259 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { isoDate } from '../lib/blog-data';
 
-const allPosts = await getCollection('posts', ({ data }) => !data.draft);
-const posts = allPosts.map(p => ({
+const all = await getCollection('posts', ({ data }) => !data.draft);
+const posts = all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+/** 去掉 markdown 语法，留纯文本用于全文检索 */
+function plain(body = '') {
+  return body
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/[>*_`~|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const index = posts.map((p) => ({
   slug: p.slug,
   title: p.data.title,
   description: p.data.description || '',
   tags: p.data.tags || [],
-  date: p.data.date.toISOString().slice(0, 10),
+  category: p.data.category || '',
+  date: isoDate(p.data.date),
+  text: plain(p.body).slice(0, 4000),
 }));
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title="搜索 - 摸鱼骑士 知识库">
-  <script type="application/json" id="post-data" data-base={import.meta.env.BASE_URL}>{JSON.stringify(posts)}</script>
-  <h1 class="text-3xl font-bold mb-8">搜索</h1>
-  <div class="max-w-md">
-    <input
-      type="text"
-      id="search-input"
-      placeholder="输入关键词搜索文章…"
-      class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-      autofocus
-    />
+<BaseLayout title="搜索 - 摸鱼骑士 知识库" description="搜索站内全部文章。">
+  <div class="search-wrap">
+    <header class="page-head">
+      <span class="page-head__eyebrow">Search</span>
+      <h1 class="page-head__title">搜索</h1>
+      <p class="page-head__lead">在 {posts.length} 篇文章的标题、摘要、标签与正文里查找。</p>
+    </header>
+
+    <div class="search-box">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <circle cx="8.8" cy="8.8" r="5.6" stroke="currentColor" stroke-width="1.6" />
+        <path d="m13.2 13.2 3.4 3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </svg>
+      <input
+        type="search"
+        id="search-input"
+        placeholder="输入关键词，支持中文与代码片段"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="搜索文章"
+      />
+      <kbd>/</kbd>
+    </div>
+
+    <p class="search-hint" id="search-hint"></p>
+    <div id="search-results" class="search-results" aria-live="polite"></div>
   </div>
-  <div id="search-results" class="mt-8 space-y-4"></div>
 </BaseLayout>
 
-<script>
-  var postData = JSON.parse(document.getElementById('post-data').textContent);
-  var input = document.getElementById('search-input');
-  var results = document.getElementById('search-results');
-  var baseUrl = document.querySelector('#post-data').getAttribute('data-base') || '/astro-blog';
+<script
+  type="application/json"
+  id="search-data"
+  data-base={base}
+  set:html={JSON.stringify(index).replace(/</g, '\\u003c')}
+></script>
 
-  var timer = null;
-  input && input.addEventListener('input', function() {
+<script>
+  const base = document.getElementById('search-data')?.dataset.base ?? '';
+  const raw = document.getElementById('search-data')?.textContent || '[]';
+  const posts: Array<{
+    slug: string;
+    title: string;
+    description: string;
+    tags: string[];
+    category: string;
+    date: string;
+    text: string;
+  }> = JSON.parse(raw);
+
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const results = document.getElementById('search-results') as HTMLElement;
+  const hint = document.getElementById('search-hint') as HTMLElement;
+  if (!input || !results || !hint) throw new Error('search elements missing');
+
+  const escapeHtml = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+  function highlight(text: string, q: string) {
+    const safe = escapeHtml(text);
+    if (!q) return safe;
+    const needle = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return safe.replace(new RegExp(needle, 'gi'), (m) => `<mark>${m}</mark>`);
+  }
+
+  function snippet(text: string, q: string) {
+    const i = text.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return text.slice(0, 90);
+    const start = Math.max(0, i - 36);
+    const end = Math.min(text.length, i + q.length + 60);
+    return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+  }
+
+  function render(q: string) {
+    if (!q) {
+      hint.textContent = '';
+      results.innerHTML = '';
+      return;
+    }
+    const needle = q.toLowerCase();
+    const hits = posts.filter(
+      (p) =>
+        p.title.toLowerCase().includes(needle) ||
+        p.description.toLowerCase().includes(needle) ||
+        p.category.toLowerCase().includes(needle) ||
+        p.tags.some((t) => t.toLowerCase().includes(needle)) ||
+        p.text.toLowerCase().includes(needle)
+    );
+
+    hint.innerHTML = hits.length
+      ? `找到 <b>${hits.length}</b> 篇`
+      : `没有找到与「${escapeHtml(q)}」相关的文章`;
+
+    results.innerHTML = hits
+      .map(
+        (p) => `
+        <a class="search-item" href="${base}/posts/${p.slug}">
+          <div class="search-item__meta">
+            <time>${p.date}</time>${p.category ? `<span>/</span><span>${escapeHtml(p.category)}</span>` : ''}
+          </div>
+          <h3 class="search-item__title">${highlight(p.title, q)}</h3>
+          <p class="search-item__desc">${highlight(p.description || snippet(p.text, q), q)}</p>
+        </a>`
+      )
+      .join('');
+  }
+
+  let timer: number | undefined;
+  input.addEventListener('input', () => {
     clearTimeout(timer);
-    timer = setTimeout(function() {
-      var q = input.value.trim().toLowerCase();
-      if (!q) { results.innerHTML = ''; return; }
-      var filtered = postData.filter(function(p) {
-        return p.title.toLowerCase().indexOf(q) !== -1 ||
-               p.description.toLowerCase().indexOf(q) !== -1 ||
-               p.tags.some(function(t) { return t.toLowerCase().indexOf(q) !== -1; });
-      });
-      results.innerHTML = filtered.length
-        ? filtered.map(function(p) {
-            return '<a href="' + baseUrl + '/posts/' + p.slug + '" class="card block p-4 hover:shadow-md transition-shadow">' +
-              '<h3 class="font-medium text-gray-800">' + p.title + '</h3>' +
-              '<p class="text-sm text-gray-400 mt-1">' + p.date + '</p></a>';
-          }).join('')
-        : '<p class="text-gray-400">未找到相关文章</p>';
-    }, 300);
+    timer = window.setTimeout(() => render(input.value.trim()), 140);
   });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== input) {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+
+  const initial = new URLSearchParams(location.search).get('q');
+  if (initial) {
+    input.value = initial;
+    render(initial);
+  }
 </script>
+
+<style is:global>
+  .search-wrap {
+    max-width: 720px;
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    height: 48px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    color: var(--ink-4);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .search-box:focus-within {
+    border-color: var(--accent-soft);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  .search-box input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14.5px;
+    color: var(--ink);
+  }
+  .search-box input::placeholder {
+    color: var(--ink-4);
+  }
+  .search-box kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    color: var(--ink-4);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+
+  .search-hint {
+    min-height: 20px;
+    margin: 14px 0 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-4);
+  }
+  .search-hint b {
+    color: var(--accent-deep);
+  }
+
+  .search-results {
+    display: flex;
+    flex-direction: column;
+  }
+  .search-item {
+    display: block;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--rule-soft);
+    transition: padding-left 0.25s ease, background 0.25s ease;
+  }
+  .search-item:hover {
+    padding-left: 10px;
+    background: var(--surface);
+  }
+  .search-item__meta {
+    display: flex;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+  }
+  .search-item__title {
+    margin-top: 5px;
+    font-size: 15px;
+    color: var(--ink);
+    transition: color 0.2s ease;
+  }
+  .search-item:hover .search-item__title {
+    color: var(--accent-deep);
+  }
+  .search-item__desc {
+    margin-top: 4px;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--ink-3);
+  }
+  .search-item mark {
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+</style>

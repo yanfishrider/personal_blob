@@ -83,6 +83,7 @@ const base = import.meta.env.BASE_URL;
 </div>
 
 <script>
+  // @ts-nocheck — 浏览器端脚本，不参与严格类型检查
   var B = document.getElementById('p3re-loading').dataset.base;
 
   function isHomePage() {
@@ -96,6 +97,13 @@ const base = import.meta.env.BASE_URL;
   var anim = isHomePage() ? (storedAnim || 'lab') : 'none';
   // animation-lab 测试页暂不需要加载动画（测试画布阶段跳过，正式实现后可移除）
   if (window.location.pathname.indexOf('/animation-lab') !== -1) {
+    anim = 'none';
+  }
+  // 无障碍 / 预览：系统偏好「减少动态效果」或显式 ?noloading=1 时直接跳过开场
+  if (
+    document.documentElement.classList.contains('reduce-motion') ||
+    window.location.search.indexOf('noloading') !== -1
+  ) {
     anim = 'none';
   }
   var nierWrap = document.getElementById('nier-loading');
@@ -205,11 +213,11 @@ const base = import.meta.env.BASE_URL;
       var passed = Math.round(page * 60);
       var tHi = hintVar('--ih-accent');
       var tMinor = hintVar('--ih-rule-dim');
+      var tFaint = hintVar('--ih-rule-faint');
       for (var i = 0; i < 60; i++) {
         var isMajorT = (i % 5 === 0);
-        clockTicks[i].setAttribute('stroke', i <= passed
-          ? (isMajorT ? tHi : tMinor)
-          : (isMajorT ? tHi : tMinor));
+        // 已扫过的刻度用强调色，未扫过的按主/次刻度分层
+        clockTicks[i].setAttribute('stroke', i <= passed ? tHi : isMajorT ? tMinor : tFaint);
       }
     } else if (rulerKnob) {
       rulerKnob.style.left = (page * 100) + '%';
@@ -240,8 +248,15 @@ const base = import.meta.env.BASE_URL;
   } else if (anim === 'p3re') {
     nierWrap?.remove();
     labWrap?.remove();
-    p3reEl.style.display = '';
-    runP3RE();
+    // 本次会话已经看过：直接跳过，避免每次跳页都重播 3.6s 海浪 + 两段视频
+    if (!p3reEl) {
+      // 元素缺失时无事可做
+    } else if (sessionStorage.getItem('p3re-intro-done')) {
+      p3reEl.remove();
+    } else {
+      p3reEl.style.display = '';
+      runP3RE();
+    }
   } else {
     // nier：fixed 全屏遮罩（同 P3RE：播放 → 点击任意位置进入 → 淡出移除）
     p3reEl?.remove();
@@ -273,6 +288,11 @@ const base = import.meta.env.BASE_URL;
     var v1 = document.getElementById('p3re-video1');
     var v2 = document.getElementById('p3re-video2');
     var waves = document.getElementById('p3re-startwaves');
+
+    if (!p3reEl || !v1 || !v2 || !waves) {
+      p3reEl?.remove();
+      return;
+    }
 
     // 海浪幕布下滑
     waves.style.animation = 'p3re-down 3s ease-out 1s forwards';
@@ -314,7 +334,7 @@ const base = import.meta.env.BASE_URL;
     p3reEl.addEventListener('click', function() {
       p3reEl.style.transition = 'opacity 0.6s ease-out';
       p3reEl.style.opacity = '0';
-      sessionStorage.setItem('nier-intro-done', '1');
+      sessionStorage.setItem('p3re-intro-done', '1');
       setTimeout(function() { p3reEl.remove(); }, 600);
     });
   }

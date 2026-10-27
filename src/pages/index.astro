@@ -1,57 +1,68 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProfileSidebar from '../components/ProfileSidebar.astro';
+import PostCard from '../components/PostCard.astro';
 import SiteStats from '../components/SiteStats.astro';
 import BlogCalendar from '../components/BlogCalendar.astro';
-import { getBlogData } from '../lib/blog-data';
+import { getBlogData, formatDate, isoDate } from '../lib/blog-data';
 
-const { posts, postCount, tagCount, categoryCount, recentPosts, postDates, lastUpdate } = await getBlogData();
+const { posts, postCount, tagCount, categoryCount, recentPosts, postDates, lastUpdate } =
+  await getBlogData();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
-<BaseLayout title="摸鱼骑士 知识库" description="摸鱼骑士的个人学习记录">
-  <ProfileSidebar slot="sidebar" postCount={postCount} tagCount={tagCount} categoryCount={categoryCount} recentPosts={recentPosts} />
+<BaseLayout
+  title="摸鱼骑士 知识库"
+  description="前端、动画与一些奇怪想法的实现记录。"
+>
+  <ProfileSidebar
+    slot="sidebar"
+    postCount={postCount}
+    tagCount={tagCount}
+    categoryCount={categoryCount}
+    recentPosts={recentPosts}
+  />
 
-  <div id="center-view" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-    <h2 class="section-header text-sm font-medium text-gray-400 uppercase tracking-wider mb-6">最新文章</h2>
+  <div id="center-view">
+    <header class="page-head">
+      <span class="page-head__eyebrow">Field Notes</span>
+      <h1 class="page-head__title">最新文章</h1>
+      <p class="page-head__lead">
+        前端、动画，以及一些奇怪想法的实现记录。共 {postCount} 篇，最近更新于
+        <time datetime={isoDate(lastUpdate)} class="whitespace-nowrap">{formatDate(lastUpdate)}</time>。
+      </p>
+    </header>
 
     {
       posts.length === 0 ? (
-        <p class="text-gray-400 text-center py-20">还没有文章。</p>
+        <p class="empty-state">还没有文章。</p>
       ) : (
-        <div class="post-grid grid gap-5 grid-cols-1 md:grid-cols-2">
+        <div class="flex flex-col gap-3">
           {posts.map((post) => (
-            <a href={`${import.meta.env.BASE_URL}/posts/${post.slug}`}
-               class="post-card group block bg-gray-50 rounded-xl border border-gray-200 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-              <time class="text-xs text-gray-400">
-                {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
-              </time>
-              <h3 class="text-base font-semibold text-gray-800 group-hover:text-blue-600 transition-colors mt-2 mb-1.5 line-clamp-2">
-                {post.data.title}
-              </h3>
-              {post.data.description && (
-                <p class="text-sm text-gray-500 line-clamp-2 mb-3">{post.data.description}</p>
-              )}
-              <div class="flex items-center gap-2 flex-wrap">
-                {post.data.category && (
-                  <span class="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600 font-medium">{post.data.category}</span>
-                )}
-                {post.data.tags?.map((tag: string) => (
-                  <span class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-500">{tag}</span>
-                ))}
-              </div>
-            </a>
+            <PostCard post={post} />
           ))}
+        </div>
+      )
+    }
+
+    {
+      posts.length > 6 && (
+        <div class="mt-8 text-center">
+          <a href={`${base}/archive`} class="btn">
+            查看全部归档
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </a>
         </div>
       )
     }
   </div>
 
-  <aside slot="rightSidebar" class="w-full md:w-[19%] md:min-w-[180px] shrink-0 md:relative">
-    <div class="md:sticky md:top-[18%] space-y-4">
-      <SiteStats postCount={postCount} lastUpdate={lastUpdate} />
-      <BlogCalendar postDates={postDates} />
-    </div>
-  </aside>
+  <div slot="rightSidebar" class="flex flex-col gap-3">
+    <SiteStats postCount={postCount} lastUpdate={lastUpdate} />
+    <BlogCalendar postDates={postDates} />
+  </div>
 </BaseLayout>
 
-<script src={`${import.meta.env.BASE_URL}/scripts/spa-loader.js`}></script>
+<script src={`${base}/scripts/spa-loader.js`}></script>

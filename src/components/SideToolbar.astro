@@ -78,16 +78,35 @@ const ANIMATIONS = [
 </div>
 
 <script>
+  const btn = document.getElementById('btn-switch');
+  const menu = document.getElementById('switch-menu');
+  const indBtn = document.getElementById('btn-indicator');
+  const indMenu = document.getElementById('indicator-menu');
+
   function currentKey() {
     return localStorage.getItem('loading-animation') || 'nier';
+  }
+  function currentIndicator() {
+    return localStorage.getItem('scroll-indicator-style') || 'ruler';
   }
 
   function updateDots() {
     const cur = currentKey();
-    document.querySelectorAll('.switch-dot').forEach((el) => {
-      var key = el.dataset.key;
-      el.textContent = key === cur ? '●' : '○';
+    document.querySelectorAll<HTMLElement>('.switch-dot').forEach((el) => {
+      el.textContent = el.dataset.key === cur ? '●' : '○';
     });
+  }
+
+  function updateIndicatorDots() {
+    const cur = currentIndicator();
+    document.querySelectorAll<HTMLElement>('.indicator-dot').forEach((el) => {
+      el.textContent = el.dataset.indicator === cur ? '●' : '○';
+    });
+  }
+
+  function closeMenus() {
+    menu?.classList.add('hidden');
+    indMenu?.classList.add('hidden');
   }
 
   // 回到顶部
@@ -95,64 +114,45 @@ const ANIMATIONS = [
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
-  // 下拉菜单
-  const btn = document.getElementById('btn-switch');
-  const menu = document.getElementById('switch-menu');
+  // 重播开场动画：清掉本次会话的「已看过」标记后重载
+  document.getElementById('btn-replay')?.addEventListener('click', () => {
+    sessionStorage.removeItem('nier-intro-done');
+    sessionStorage.removeItem('p3re-intro-done');
+    location.reload();
+  });
 
   btn?.addEventListener('click', (e) => {
     e.stopPropagation();
     updateDots();
+    indMenu?.classList.add('hidden');
     menu?.classList.toggle('hidden');
   });
 
-  document.addEventListener('click', () => {
+  indBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    updateIndicatorDots();
     menu?.classList.add('hidden');
-    indMenu?.classList.add('hidden');
+    indMenu?.classList.toggle('hidden');
   });
 
-  // 选择动画
-  menu?.querySelectorAll('button[data-key]').forEach((b) => {
+  document.addEventListener('click', closeMenus);
+
+  menu?.querySelectorAll<HTMLButtonElement>('button[data-key]').forEach((b) => {
     b.addEventListener('click', () => {
-      var key = b.dataset.key;
+      const key = b.dataset.key;
+      if (!key) return;
       localStorage.setItem('loading-animation', key);
-      menu?.classList.add('hidden');
       sessionStorage.removeItem('nier-intro-done');
       sessionStorage.removeItem('p3re-intro-done');
       location.reload();
     });
   });
 
-  // 重播加载动画：快速定位到页面顶部动画位置（首屏常驻，无需 reload）
-  document.getElementById('btn-replay')?.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  // 指示器样式菜单
-  function currentIndicator() {
-    return localStorage.getItem('scroll-indicator-style') || 'ruler';
-  }
-
-  function updateIndicatorDots() {
-    const cur = currentIndicator();
-    document.querySelectorAll('.indicator-dot').forEach((el) => {
-      el.textContent = el.dataset.indicator === cur ? '●' : '○';
-    });
-  }
-
-  const indBtn = document.getElementById('btn-indicator');
-  const indMenu = document.getElementById('indicator-menu');
-
-  indBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    updateIndicatorDots();
-    indMenu?.classList.toggle('hidden');
-  });
-
-  // 选择指示器样式：存 localStorage 后刷新（LoadingScreen 读取生效）
-  indMenu?.querySelectorAll('button[data-indicator]').forEach((b) => {
+  indMenu?.querySelectorAll<HTMLButtonElement>('button[data-indicator]').forEach((b) => {
     b.addEventListener('click', () => {
-      localStorage.setItem('scroll-indicator-style', b.dataset.indicator);
-      indMenu.classList.add('hidden');
+      const style = b.dataset.indicator;
+      if (!style) return;
+      localStorage.setItem('scroll-indicator-style', style);
       location.reload();
     });
   });

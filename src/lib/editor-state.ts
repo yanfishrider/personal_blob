@@ -28,7 +28,11 @@ const PREVIEW_CURSOR_CSS = `html, body, body * { cursor: none !important; }
   opacity: 0;
   transition: opacity 0.2s;
 }
-#preview-cursor svg { display: block; width: 100%; height: 100%; }`;
+#preview-cursor svg { display: block; width: 100%; height: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  html, body, body * { cursor: auto !important; }
+  #preview-cursor { display: none !important; }
+}`;
 
 const PREVIEW_CURSOR_HTML = `<div id="preview-cursor" aria-hidden="true">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="72.9 8.1 299 432.9" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
@@ -68,22 +72,18 @@ const PREVIEW_CURSOR_JS = `(function () {
   // 解决「进入 iframe 后必须等第一次 mousemove 才有光标」的无光标盲区
   document.addEventListener('mouseenter', function (e) {
     clearTimeout(hideTimer);
-    console.log('[preview-cursor] mouseenter 进入 iframe，立即显示 (' + e.clientX + ',' + e.clientY + ')');
     moveCursor(e);
   });
 
   // 2. 鼠标移动跟随
   document.addEventListener('mousemove', function (e) {
-    if (!shown) console.log('[preview-cursor] 首次 mousemove，显示光标');
     moveCursor(e);
   });
 
   // 3. 离开 iframe 时延迟隐藏（与父页面光标切换衔接，避免瞬间消失闪烁）
   document.addEventListener('mouseleave', function () {
-    console.log('[preview-cursor] mouseleave 离开 iframe，100ms 后隐藏');
     clearTimeout(hideTimer);
     hideTimer = setTimeout(function () {
-      console.log('[preview-cursor] iframe 光标已隐藏');
       cursor.style.opacity = 0;
       shown = false;
     }, 100);

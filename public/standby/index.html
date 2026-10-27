@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>叶扇展开</title>
+<style>
+  :root {
+    /* 叶子从「收拢」到「展开」顺时针扫过的角度（90°–120°） */
+    --sweep: 110deg;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #fdf3cf;
+  }
+
+  /* ============ 舞台 ============ */
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .stage::after {
+    /* 极轻的暗角，避免大片纯色发飘 */
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    background: radial-gradient(130% 110% at 50% 32%, transparent 52%, rgba(200, 155, 70, 0.16) 100%);
+  }
+
+  /* ============ 背景：奶油黄渐变 + 两团柔光 ============ */
+  .backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(120% 95% at 22% 10%, #fffefb 0%, #fff9e2 26%, #fdeeb9 54%, #f8df99 78%, #f2d287 100%);
+  }
+  .backdrop::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    background:
+      radial-gradient(closest-side, rgba(255, 255, 255, 0.95), transparent 70%) 12% 12% / 55% 55% no-repeat,
+      radial-gradient(closest-side, rgba(255, 240, 180, 0.55), transparent 70%) 88% 82% / 45% 45% no-repeat;
+    filter: blur(6px);
+    animation: breathe 9s ease-in-out infinite alternate;
+  }
+  @keyframes breathe {
+    from { opacity: 0.75; transform: scale(1); }
+    to   { opacity: 1;    transform: scale(1.05); }
+  }
+
+  /* 背景里两片虚化的叶子，制造景深 */
+  .bokeh {
+    position: absolute;
+    width: 26vh;
+    height: 52vh;
+    opacity: 0.5;
+    filter: blur(3px);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .bokeh--tl {
+    left: -7vh;
+    top: -13vh;
+    width: 16vh;
+    height: 32vh;
+    transform: rotate(150deg);
+    transform-origin: 50% 100%;
+    opacity: 0.3;
+  }
+  .bokeh--tr {
+    right: 4vw;
+    top: -16vh;
+    width: 16vh;
+    height: 32vh;
+    transform: rotate(28deg);
+    transform-origin: 50% 100%;
+    opacity: 0.42;
+  }
+  .bokeh--br {
+    right: 2vw;
+    bottom: -26vh;
+    width: 22vh;
+    height: 44vh;
+    transform: rotate(58deg);
+    transform-origin: 50% 100%;
+    opacity: 0.3;
+  }
+
+  /* ============ 叶子 ============ */
+  /* 4 片叶子共用一个根部：窗口底部中点。叶片从这里向上、向两侧扇形展开 */
+  .leaves {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    transform-origin: 0 100%;
+    z-index: 10;
+  }
+  .is-playing .leaves {
+    animation: fan-breathe 11s ease-in-out 2.2s infinite alternate;
+  }
+  @keyframes fan-breathe {
+    from { transform: scale(1); }
+    to   { transform: scale(1.018); }
+  }
+
+  .leaf {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: calc(var(--w) * 1vh);
+    height: calc(var(--h) * 1vh);
+    /* 底部中点（叶子尾部）对齐到根部 */
+    margin-left: calc(var(--w) * -0.5vh);
+    transform-origin: 50% 100%;
+    transform: rotate(var(--rot));
+    z-index: var(--z);
+    will-change: transform;
+    filter: drop-shadow(0 10px 26px rgba(180, 130, 40, 0.18));
+  }
+  .leaf-sway {
+    width: 100%;
+    height: 100%;
+    transform-origin: 50% 100%;
+  }
+  .leaf svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 展开：顺时针扫过 --sweep，落到最终角度 */
+  .is-playing .leaf {
+    animation: unfold 1.6s cubic-bezier(0.18, 0.9, 0.28, 1.02) var(--delay) backwards;
+  }
+  @keyframes unfold {
+    from { transform: rotate(calc(var(--rot) - var(--sweep))); }
+    to   { transform: rotate(var(--rot)); }
+  }
+
+  /* 展开之后持续的轻微摆动 */
+  .is-playing .leaf-sway {
+    animation: sway var(--sd) ease-in-out calc(var(--delay) + 1.5s) infinite alternate;
+  }
+  @keyframes sway {
+    from { transform: rotate(-1.1deg); }
+    to   { transform: rotate(1.3deg); }
+  }
+
+  /* ============ 飘浮的小碎叶 ============ */
+  .motes {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .mote {
+    position: absolute;
+    width: var(--s);
+    height: var(--s);
+    border-radius: 50% 0 50% 50%;
+    background: var(--c);
+    opacity: 0;
+    animation: drift var(--t) linear var(--delay) infinite;
+  }
+  @keyframes drift {
+    0%   { opacity: 0;   transform: translate3d(0, 0, 0) rotate(0deg); }
+    12%  { opacity: 0.7; }
+    80%  { opacity: 0.55; }
+    100% { opacity: 0;   transform: translate3d(var(--dx), -46vh, 0) rotate(200deg); }
+  }
+
+  /* ============ 无障碍：偏好减少动效 ============ */
+  @media (prefers-reduced-motion: reduce) {
+    .backdrop::after,
+    .mote { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="backdrop"></div>
+
+  <!-- 背景虚化的叶子 -->
+  <svg class="bokeh bokeh--tl" viewBox="0 0 200 400" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z" fill="#bfe08a" />
+  </svg>
+  <svg class="bokeh bokeh--tr" viewBox="0 0 200 400" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z" fill="#ffd98a" />
+  </svg>
+  <svg class="bokeh bokeh--br" viewBox="0 0 200 400" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z" fill="#ffc98a" />
+  </svg>
+
+  <div class="leaves" id="leaves"></div>
+  <div class="motes" id="motes"></div>
+</div>
+
+<script>
+  /* ============================================================
+     叶子参数
+     -- 4 片共用「窗口底部中点」为根部，rotate(0) = 正上方
+     -- rot：静止角度（正数 = 顺时针，即向右倒）
+     -- 展开动画从 rot - 110° 顺时针扫到 rot
+     ============================================================ */
+  const LEAVES = [
+    // 最左：小黄叶，压在最后面（比原始尺寸大 30%）
+    { w: 36, h: 47, rot: -48, z: 1, from: '#ffe89a', to: '#f5b93c', delay: 0.62, sd: '8.4s' },
+    // 左：黄叶
+    { w: 36, h: 64, rot: -18, z: 2, from: '#ffd95e', to: '#efa22f', delay: 0.46, sd: '7.6s' },
+    // 中间：大绿叶，略过垂直
+    { w: 42, h: 82, rot: 8, z: 4, from: '#9bd45c', to: '#4f9b2c', delay: 0.30, sd: '6.8s' },
+    // 右：橙叶，压在最前面
+    { w: 38, h: 70, rot: 36, z: 3, from: '#ffc25c', to: '#ef7c2c', delay: 0.14, sd: '9.2s' },
+  ];
+
+  const LEAF_PATH =
+    'M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 ' +
+    'C136 44 172 128 173 214 C174 302 146 378 100 400Z';
+
+  const VEINS = [
+    'M100 396 C100 300 99 160 100 10',
+    'M99 332 C80 308 64 278 55 246',
+    'M100 274 C83 252 68 226 60 198',
+    'M101 218 C87 200 74 176 68 152',
+    'M102 164 C91 148 82 128 77 108',
+    'M101 332 C120 308 136 278 145 246',
+    'M100 274 C117 252 132 226 140 198',
+    'M99 218 C113 200 126 176 132 152',
+  ]
+    .map((d) => `<path d="${d}" />`)
+    .join('');
+
+  function leafSVG(leaf, i) {
+    const gid = `leaf-g${i}`;
+    const hid = `leaf-h${i}`;
+    return `
+      <svg viewBox="0 0 200 400" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="${gid}" x1="0.15" y1="1" x2="0.8" y2="0">
+            <stop offset="0" stop-color="${leaf.from}" />
+            <stop offset="1" stop-color="${leaf.to}" />
+          </linearGradient>
+          <linearGradient id="${hid}" x1="0" y1="1" x2="1" y2="0.4">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.42" />
+            <stop offset="0.55" stop-color="#ffffff" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path d="${LEAF_PATH}" fill="url(#${gid})" />
+        <path d="${LEAF_PATH}" fill="url(#${hid})" />
+        <g fill="none" stroke="#3f6b1e" stroke-opacity="0.16" stroke-width="2.4" stroke-linecap="round">
+          ${VEINS}
+        </g>
+      </svg>`;
+  }
+
+  document.getElementById('leaves').innerHTML = LEAVES.map(
+    (leaf, i) => `
+      <div class="leaf"
+           style="--w:${leaf.w}; --h:${leaf.h}; --rot:${leaf.rot}deg; --z:${leaf.z};
+                  --delay:${leaf.delay}s; --sd:${leaf.sd};">
+        <div class="leaf-sway">${leafSVG(leaf, i)}</div>
+      </div>`
+  ).join('');
+
+  /* ============ 飘浮碎叶 ============ */
+  const COLORS = ['#f7c94b', '#e98b3c', '#a8d05e', '#ffd97a'];
+  let moteHTML = '';
+  for (let i = 0; i < 16; i++) {
+    moteHTML += `<span class="mote" style="
+      left:${(Math.random() * 100).toFixed(1)}%;
+      bottom:${(-10 + Math.random() * 30).toFixed(1)}%;
+      --s:${(4 + Math.random() * 9).toFixed(0)}px;
+      --c:${COLORS[i % COLORS.length]};
+      --t:${(9 + Math.random() * 9).toFixed(1)}s;
+      --delay:${(Math.random() * 8).toFixed(1)}s;
+      --dx:${(-40 + Math.random() * 80).toFixed(0)}px;"></span>`;
+  }
+  document.getElementById('motes').innerHTML = moteHTML;
+
+  /* ============ 播放 / 重播 ============ */
+  const stage = document.getElementById('stage');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function play() {
+    if (reduceMotion) return;
+    stage.classList.remove('is-playing');
+    void stage.offsetWidth; // 强制回流，重启动画
+    stage.classList.add('is-playing');
+  }
+
+  window.addEventListener('load', play);
+  stage.addEventListener('click', play);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      play();
+    }
+  });
+</script>
+
+</body>
+</html>

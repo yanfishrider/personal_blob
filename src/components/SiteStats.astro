@@ -1,4 +1,6 @@
 ---
+import { formatDate } from '../lib/blog-data';
+
 export interface Props {
   postCount: number;
   lastUpdate: Date;
@@ -7,28 +9,67 @@ export interface Props {
 const { postCount, lastUpdate } = Astro.props;
 ---
 
-<div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
-  <h3 class="text-sm font-semibold text-gray-700">站点统计</h3>
-
-  <div class="space-y-3">
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-gray-500">文章数目</span>
-      <span class="text-sm font-bold text-gray-800">{postCount}</span>
-    </div>
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-gray-500">访客总量</span>
-      <span class="text-sm font-bold text-gray-800" id="busuanzi_value_site_uv">--</span>
-    </div>
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-gray-500">浏览数量</span>
-      <span class="text-sm font-bold text-gray-800" id="busuanzi_value_site_pv">--</span>
-    </div>
-    <hr class="border-gray-200" />
-    <div class="flex items-center justify-between">
-      <span class="text-xs text-gray-500">最后更新</span>
-      <span class="text-xs text-gray-600">
-        {lastUpdate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-      </span>
-    </div>
+<div class="rail-card">
+  <div class="rail-title">
+    <span>站点统计</span>
+    <span class="rail-title__hint">SITE</span>
   </div>
+
+  <dl class="stats">
+    <div class="stats__row">
+      <dt>文章</dt>
+      <dd>{postCount}</dd>
+    </div>
+    <div class="stats__row">
+      <dt>访客</dt>
+      <dd id="busuanzi_value_site_uv">--</dd>
+    </div>
+    <div class="stats__row">
+      <dt>浏览</dt>
+      <dd id="busuanzi_value_site_pv">--</dd>
+    </div>
+    <div class="stats__row stats__row--last">
+      <dt>最近更新</dt>
+      <dd class="stats__date">{formatDate(lastUpdate, 'short')}</dd>
+    </div>
+  </dl>
 </div>
+
+<style>
+  .rail-title__hint {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--ink-4);
+  }
+  .stats {
+    display: flex;
+    flex-direction: column;
+  }
+  .stats__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--rule-soft);
+  }
+  .stats__row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .stats dt {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .stats dd {
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats__date {
+    font-family: var(--font-mono) !important;
+    font-size: 11.5px !important;
+    color: var(--ink-2) !important;
+    letter-spacing: 0.02em;
+  }
+</style>
