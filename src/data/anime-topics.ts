@@ -1,3 +1,5 @@
+import { jsAnimTopics } from './js-anim-topics';
+
 export interface SubItem {
   id: string; label: string; desc: string; html: string; css: string; js: string;
   children?: SubItem[];
@@ -9,7 +11,7 @@ export interface Topic {
   children?: SubItem[];
 }
 
-export const topics: Topic[] = [
+const animeTopics: Topic[] = [
   {
     id: 'animejs', label: 'anime.js 学习',
     desc: `**anime.js** 交互式学习笔记。
@@ -2587,3 +2589,6 @@ requestAnimationFrame(frame);`,
     ],
   },
 ];
+
+// 「js动画学习」排在前面，其余保持原顺序
+export const topics: Topic[] = [...jsAnimTopics, ...animeTopics];
