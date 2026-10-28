@@ -24,7 +24,14 @@ export const jsAnimTopics: Topic[] = [
 
 每一章都可以直接改代码，右边实时看效果。
 
-> 全部是原生 canvas 2D，没有任何依赖。`,
+左侧目录分四组：
+
+- **一、canvas 动画基础**（9 章）—— 湖面用到的 canvas 技术
+- **二、工程化**（3 章）—— 参数面板、性能诊断、降级
+- **三、互动登录**（4 章）—— 指针跟随、rAF 合并、错误抖动、输入框状态
+- **四、叶扇展开**（4 章）—— transform-origin、CSS 变量、错峰、重播
+
+后两组没有 canvas，全是 DOM + CSS，但它们回答的是同样的问题：**怎么让变化看起来是对的**。`,
     html: `<div class="cover">
   <h1>js 动画学习</h1>
   <p>从一块 canvas 到一片湖面</p>
@@ -52,6 +59,23 @@ export const jsAnimTopics: Topic[] = [
 }`,
     js: `// 从左侧目录选一章开始。每章都是独立可运行的。`,
     children: [
+      /* ============================================================
+         一、canvas 动画基础
+         ============================================================ */
+      {
+        id: 'base',
+        label: '一、canvas 动画基础',
+        desc: `从一块空白 canvas 到一片能动的水面。
+
+九章按依赖顺序排：先有帧循环，再谈分层；先把背景画对，再谈透视和笔触；最后才是雨、涟漪和击水。
+
+全部原生 canvas 2D，没有任何依赖。`,
+        html: `<div class="cover"><h1>canvas 动画基础</h1><p>9 章 · 从零到湖面</p></div>`,
+        css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#fcfbf6; color:#35433f; font-family:system-ui,sans-serif; }
+.cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
+.cover p { margin:0; font-size:12px; color:#8a938f; letter-spacing:0.14em; }`,
+        js: `// 展开「一、canvas 动画基础」，从 01 开始看。`,
+        children: [
       /* ============================================================ */
       {
         id: 'loop',
@@ -1341,7 +1365,26 @@ function frame(now) {
 }
 requestAnimationFrame(frame);`,
       },
+        ],
+      },
 
+      /* ============================================================
+         二、工程化
+         ============================================================ */
+      {
+        id: 'eng',
+        label: '二、工程化',
+        desc: `效果做出来只是第一步。这一组讲怎么让它**可调、可测、可降级**。
+
+- 参数面板：让调整变成拖动滑杆，而不是改代码再刷新
+- 性能诊断：用 \`performance.now()\` 定位瓶颈，而不是靠猜
+- 降级与暂停：尊重系统偏好，切后台时省电`,
+        html: `<div class="cover"><h1>工程化</h1><p>3 章 · 可调 / 可测 / 可降级</p></div>`,
+        css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#fcfbf6; color:#35433f; font-family:system-ui,sans-serif; }
+.cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
+.cover p { margin:0; font-size:12px; color:#8a938f; letter-spacing:0.14em; }`,
+        js: `// 展开「二、工程化」。`,
+        children: [
       /* ============================================================ */
       {
         id: 'panel',
@@ -1839,6 +1882,902 @@ function frame(now) {
 
 raf = requestAnimationFrame(frame);`,
       },
+        ],
+      },
+
+      /* ============================================================
+         三、互动登录
+         ============================================================ */
+      {
+        id: 'login',
+        label: '三、互动登录',
+        desc: `动画馆里「互动登录」那一页的拆解。它没有 canvas，全靠 DOM + CSS + transform。
+
+四章分别对应四个问题：
+
+1. **指针跟随**——鼠标位置怎么变成眼睛的位移，而且不抖
+2. **一帧只算一次**——\`mousemove\` 一帧会触发好几次，怎么合并
+3. **错误抖动**——一次性的「拒绝」反馈怎么写才不僵硬
+4. **输入框状态**——聚焦环、浮动标签、密码可见切换
+
+这四个问题在任何带交互的页面上都会遇到，和「登录」本身关系不大。`,
+        html: `<div class="cover"><h1>互动登录</h1><p>4 章 · 指针 / 节流 / 反馈 / 状态</p></div>`,
+        css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#1b1a1f; color:#d6d2cb; font-family:system-ui,sans-serif; }
+.cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
+.cover p { margin:0; font-size:12px; color:#8a8578; letter-spacing:0.14em; }`,
+        js: `// 展开「三、互动登录」。`,
+        children: [
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lg-pointer',
+            label: '01 指针跟随',
+            desc: `鼠标位置要变成角色的动作，中间隔着三步：
+
+**① 归一化**
+直接用 \`clientX\` 没用——屏幕大小不同，位移量就不同。先换算成 0–1 的比例，再映射到 \`[-1, 1]\`：
+
+\`\`\`
+nx = (e.clientX - rect.left) / rect.width;    // 0..1
+nx = nx * 2 - 1;                              // -1..1
+\`\`\`
+
+**② 平滑**
+直接把 \`nx\` 赋给位置会「跳」，因为它来自离散的鼠标事件。用线性插值（lerp）追过去：
+
+\`\`\`
+cur += (target - cur) * 0.12;
+\`\`\`
+
+0.12 是跟随速度：越小越迟钝，越大越跟手。这个系数要**和帧率无关**，严格写法是：
+
+\`\`\`
+const k = 1 - Math.pow(1 - 0.12, dt * 60);
+cur += (target - cur) * k;
+\`\`\`
+
+**③ 衰减到 0**
+鼠标离开窗口时，目标要回到原点，而不是停在最后一次的位置。
+
+移动鼠标试试。`,
+            html: `<div class="stage">
+  <div class="face">
+    <div class="eye"><i class="pupil" id="p1"></i></div>
+    <div class="eye"><i class="pupil" id="p2"></i></div>
+  </div>
+  <div class="hud" id="hud"></div>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #f5efe2; cursor: crosshair; }
+.stage { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
+.face { display: flex; gap: 26px; }
+.eye {
+  width: 74px; height: 74px; border-radius: 50%;
+  background: #fdfbf6;
+  box-shadow: inset 0 0 0 2px rgba(84,72,50,0.22);
+  display: grid; place-items: center;
+  position: relative;
+}
+.pupil {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #3a3226;
+  transform: translate(0, 0);
+  will-change: transform;
+}
+.hud {
+  position: absolute; left: 12px; bottom: 12px;
+  font: 11px/1.7 ui-monospace, monospace; color: #8a7f68; white-space: pre;
+}`,
+            js: `const pupils = [document.getElementById('p1'), document.getElementById('p2')];
+const hud = document.getElementById('hud');
+
+// 归一化目标：-1 .. 1
+let tx = 0, ty = 0;
+// 当前值（每帧向目标靠近）
+let cx = 0, cy = 0;
+
+function onMove(e) {
+  // 以窗口中心为原点做归一化，比用元素 rect 更省一次布局查询
+  tx = (e.clientX / window.innerWidth) * 2 - 1;
+  ty = (e.clientY / window.innerHeight) * 2 - 1;
+}
+
+window.addEventListener('pointermove', onMove);
+window.addEventListener('pointerleave', () => { tx = 0; ty = 0; });
+
+let last = 0;
+
+function frame(now) {
+  if (!last) last = now;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;
+
+  // 和帧率无关的 lerp 系数
+  const k = 1 - Math.pow(1 - 0.16, dt * 60);
+  cx += (tx - cx) * k;
+  cy += (ty - cy) * k;
+
+  for (const p of pupils) {
+    p.style.transform = 'translate(' + (cx * 14).toFixed(1) + 'px,' + (cy * 12).toFixed(1) + 'px)';
+  }
+
+  hud.textContent =
+    'target  ' + tx.toFixed(2) + ' , ' + ty.toFixed(2) + '\\n' +
+    'current ' + cx.toFixed(2) + ' , ' + cy.toFixed(2) + '\\n' +
+    'lerp k = ' + k.toFixed(3);
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lg-raf',
+            label: '02 一帧只算一次',
+            desc: `\`mousemove\` 是**设备事件**：高刷新率鼠标一秒能发 1000 次，而屏幕只刷 60 次。
+
+如果你在 \`mousemove\` 里直接改样式，会有两个问题：
+
+- 同一帧里改了很多次，浏览器只认最后一次 —— 白算
+- 每次读 \`getBoundingClientRect()\` 都可能触发**强制同步布局**
+
+**做法**：事件里只存值，真正的计算放到 rAF 里。
+
+\`\`\`
+let pending = null;
+let ticking = false;
+
+function onMove(e) { pending = e; if (!ticking) { ticking = true; requestAnimationFrame(apply); } }
+
+function apply() { ticking = false; /* 用 pending 算一次 */ }
+\`\`\`
+
+下面左右两个计数器：左边是**事件次数**，右边是**实际处理次数**。开关可以对比两种写法。`,
+            html: `<canvas id="c"></canvas>
+<div class="bar">
+  <span id="info">-</span>
+  <button id="toggle">切换：合并</button>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #10151a; cursor: crosshair; }
+canvas { display: block; width: 100%; height: 100%; }
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  font: 11px/1.6 ui-monospace, monospace; color: #8fa3b5;
+}
+.bar button {
+  font: inherit; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(143,163,181,0.35);
+  background: rgba(20,28,36,0.9); color: #cfe0ee;
+}`,
+            js: `const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const info = document.getElementById('info');
+const toggle = document.getElementById('toggle');
+
+let W = 0, H = 0;
+function resize() {
+  W = cvs.clientWidth; H = cvs.clientHeight;
+  cvs.width = W; H = H; cvs.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+let merged = true;          // 是否合并
+let events = 0;             // 事件次数
+let handled = 0;            // 实际处理次数
+let evPerSec = 0, hdPerSec = 0;
+let pending = null;
+let ticking = false;
+
+let mx = W / 2, my = H / 2;   // 实际用到的坐标
+
+function apply() {
+  ticking = false;
+  if (!pending) return;
+  mx = pending.x;
+  my = pending.y;
+  pending = null;
+  handled++;
+}
+
+function onMove(e) {
+  events++;
+  if (merged) {
+    pending = { x: e.clientX, y: e.clientY };
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(apply);
+    }
+  } else {
+    // 不合并：每次事件都直接算
+    mx = e.clientX;
+    my = e.clientY;
+    handled++;
+  }
+}
+
+window.addEventListener('pointermove', onMove);
+
+toggle.addEventListener('click', () => {
+  merged = !merged;
+  toggle.textContent = '切换：' + (merged ? '合并' : '不合并');
+});
+
+let last = 0;
+let acc = 0;
+
+function frame(now) {
+  if (!last) last = now;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;
+
+  acc += dt;
+  if (acc >= 0.5) {
+    evPerSec = events / acc;
+    hdPerSec = handled / acc;
+    events = 0; handled = 0; acc = 0;
+  }
+
+  ctx.fillStyle = '#10151a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 准星跟随（只用了处理后的坐标）
+  ctx.strokeStyle = 'rgba(120,200,255,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(mx, my, 26, 0, Math.PI * 2);
+  ctx.moveTo(mx - 40, my); ctx.lineTo(mx + 40, my);
+  ctx.moveTo(mx, my - 40); ctx.lineTo(mx, my + 40);
+  ctx.stroke();
+
+  info.textContent =
+    '事件 ' + evPerSec.toFixed(0) + '/s   处理 ' + hdPerSec.toFixed(0) + '/s' +
+    '   模式：' + (merged ? '合并' : '不合并');
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lg-shake',
+            label: '03 错误抖动',
+            desc: `密码错了要「拒绝」一下。抖动比红字更直接，但做不好会很廉价。
+
+**关键点**：
+
+**① 幅度要衰减**
+等幅抖动像机器在震。真正的「拒绝」是开头重、后面轻：
+
+\`\`\`
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-9px); }
+  30%  { transform: translateX(8px); }
+  45%  { transform: translateX(-6px); }
+  60%  { transform: translateX(4px); }
+  80%  { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+\`\`\`
+
+**② 用 \`animationend\` 收尾**
+抖完要把 class 去掉，否则下次再加同一个 class 不会重新播放。
+
+**③ 别每次都抖**
+连续两次错误之间留个冷却，否则连点会让页面一直在抖。
+
+输入任意密码试试——除了 \`123\` 都会抖。`,
+            html: `<div class="wrap">
+  <div class="card" id="card">
+    <div class="label">密码</div>
+    <input id="pw" type="password" placeholder="试试 123" />
+    <button id="go">登录</button>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #14161a; }
+.wrap { display: grid; place-items: center; height: 100%; }
+.card {
+  width: 240px; padding: 22px; border-radius: 12px;
+  background: #1c1f24;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  font-family: system-ui, sans-serif;
+  color: #d8dde3;
+}
+.label { font-size: 12px; color: #7d8794; margin-bottom: 8px; }
+input {
+  width: 100%; box-sizing: border-box;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: #14171b; color: #eef2f6;
+  font-size: 14px; outline: none;
+}
+input:focus { border-color: #6ea8ff; box-shadow: 0 0 0 3px rgba(110,168,255,0.18); }
+button {
+  width: 100%; margin-top: 12px; padding: 10px;
+  border: 0; border-radius: 8px; cursor: pointer;
+  background: #6ea8ff; color: #0b1016; font-weight: 600; font-size: 14px;
+}
+.msg { height: 18px; margin-top: 10px; font-size: 12px; color: #ff7b72; }
+
+.card.shake { animation: shake 0.5s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(-9px); }
+  30%  { transform: translateX(8px); }
+  45%  { transform: translateX(-6px); }
+  60%  { transform: translateX(4px); }
+  80%  { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}`,
+            js: `const card = document.getElementById('card');
+const pw = document.getElementById('pw');
+const go = document.getElementById('go');
+const msg = document.getElementById('msg');
+
+let cooling = false;
+
+go.addEventListener('click', () => {
+  if (pw.value === '123') {
+    msg.style.color = '#67d391';
+    msg.textContent = '通过';
+    return;
+  }
+
+  // 冷却：上一次抖动还没结束就不再触发
+  if (cooling) return;
+  cooling = true;
+
+  msg.style.color = '#ff7b72';
+  msg.textContent = '密码不对';
+
+  // 先移除再添加，否则同一 class 不会重放
+  card.classList.remove('shake');
+  void card.offsetWidth;
+  card.classList.add('shake');
+
+  card.addEventListener('animationend', function done() {
+    card.classList.remove('shake');
+    card.removeEventListener('animationend', done);
+    cooling = false;
+  });
+});`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lg-input',
+            label: '04 输入框状态',
+            desc: `输入框最容易被忽略，但它决定了整个表单的手感。
+
+**① 聚焦环用 \`box-shadow\`，不用 \`outline\`**
+\`outline\` 不可控，而且方角。用 \`box-shadow: 0 0 0 3px rgba(...)\` 可以做出贴合圆角的柔和光圈。
+
+**② 浮动标签用 \`:placeholder-shown\`**
+不需要 JS 判断有没有值：
+
+\`\`\`
+input:not(:placeholder-shown) + label { transform: translateY(-18px) scale(0.82); }
+\`\`\`
+
+前提是 \`placeholder=" "\`（一个空格），否则 \`:placeholder-shown\` 永远不成立。
+
+**③ 密码可见切换**
+切换 \`type\` 会丢焦点和光标位置，正确做法是先存 \`selectionStart\`，切完再还原。
+
+\`\`\`
+const pos = input.selectionStart;
+input.type = input.type === 'password' ? 'text' : 'password';
+input.setSelectionRange(pos, pos);
+\`\`\`
+
+试试聚焦输入框、输入内容、点右侧的眼睛。`,
+            html: `<div class="wrap">
+  <div class="field">
+    <input id="pw" type="password" placeholder=" " autocomplete="off" />
+    <label for="pw">密码</label>
+    <button id="eye" type="button" aria-label="显示密码">👁</button>
+  </div>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #f6f3ec; }
+.wrap { display: grid; place-items: center; height: 100%; }
+
+.field {
+  position: relative;
+  width: 260px;
+}
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 42px 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(84, 72, 50, 0.22);
+  background: #fffdf8;
+  font-size: 15px;
+  color: #3a3226;
+  outline: none;
+  transition: box-shadow 0.18s, border-color 0.18s;
+}
+.field input:focus {
+  border-color: #b08b4a;
+  box-shadow: 0 0 0 3px rgba(176, 139, 74, 0.18);
+}
+
+.field label {
+  position: absolute;
+  left: 15px;
+  top: 15px;
+  font: 13px system-ui, sans-serif;
+  color: #9c8f76;
+  pointer-events: none;
+  transform-origin: 0 50%;
+  transition: transform 0.16s ease, color 0.16s;
+}
+
+/* 有内容 或 聚焦时，标签上浮 */
+.field input:focus + label,
+.field input:not(:placeholder-shown) + label {
+  transform: translateY(-9px) scale(0.78);
+  color: #b08b4a;
+}
+
+.field button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.field button:hover { opacity: 1; }`,
+            js: `const pw = document.getElementById('pw');
+const eye = document.getElementById('eye');
+
+eye.addEventListener('click', () => {
+  const pos = pw.selectionStart;
+  const end = pw.selectionEnd;
+
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+
+  // 切换 type 会丢光标，切完立刻还原
+  pw.focus();
+  try {
+    pw.setSelectionRange(pos, end);
+  } catch (err) {
+    // 某些浏览器对 password 类型不支持 setSelectionRange，忽略
+  }
+});`,
+          },
+        ],
+      },
+
+      /* ============================================================
+         四、叶扇展开
+         ============================================================ */
+      {
+        id: 'leaves',
+        label: '四、叶扇展开',
+        desc: `动画馆里「叶扇展开」那一页的拆解。整页没有一行 canvas，也没有 JS 动画——全是 CSS \`transform\` 和 \`@keyframes\`。
+
+四章：
+
+1. **根部对齐**——四片叶子怎么共用一个旋转中心
+2. **变量驱动**——用 \`--rot\` / \`--sweep\` 让同一份 keyframes 服务四片叶子
+3. **错峰**——\`animation-delay\` 与 \`backwards\` 的配合
+4. **重播**——一个 \`void offsetWidth\` 的经典技巧`,
+        html: `<div class="cover"><h1>叶扇展开</h1><p>4 章 · transform / 变量 / 错峰 / 重播</p></div>`,
+        css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#fdf3cf; color:#5a4718; font-family:system-ui,sans-serif; }
+.cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
+.cover p { margin:0; font-size:12px; color:#a08a52; letter-spacing:0.14em; }`,
+        js: `// 展开「四、叶扇展开」。`,
+        children: [
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lf-origin',
+            label: '01 根部对齐',
+            desc: `四片叶子看起来是**从同一点长出来**的，靠的是三件事同时做到：
+
+**① 根部是一个 0×0 的点**
+
+\`\`\`
+.leaves {
+  position: absolute;
+  left: 50%; bottom: 0;
+  width: 0; height: 0;
+}
+\`\`\`
+
+**② 每片叶子把「底部中点」对齐到这个点**
+
+\`\`\`
+.leaf {
+  position: absolute;
+  left: 0; bottom: 0;
+  margin-left: calc(var(--w) * -0.5);
+  transform-origin: 50% 100%;   /* 旋转轴 = 底部中点 */
+}
+\`\`\`
+
+\`margin-left\` 是负的半个宽度，把叶子的水平中心挪到那个点上。
+
+**③ \`transform-origin\` 必须是 \`50% 100%\`**
+
+默认是元素中心，旋转起来每片叶子会绕自己转，散成一团。改 \`transform-origin\` 试试，能立刻看出区别。`,
+            html: `<div class="stage" id="stage"></div>
+<div class="bar">
+  <label>origin <input id="o" type="range" min="0" max="100" step="5" value="100"></label>
+  <b id="ov">50% 100%</b>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fdf3cf; }
+.stage {
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 95% at 50% 20%, #fffefb, #fdeeb9 55%, #f2d287);
+}
+.leaves {
+  position: absolute; left: 50%; bottom: 0;
+  width: 0; height: 0;
+}
+.leaf {
+  position: absolute; left: 0; bottom: 0;
+  width: calc(var(--w) * 1vh);
+  height: calc(var(--h) * 1vh);
+  margin-left: calc(var(--w) * -0.5vh);
+  transform-origin: 50% var(--oy);
+  transform: rotate(var(--rot));
+  border-radius: 50% 0 50% 50%;
+  background: linear-gradient(160deg, var(--from), var(--to));
+  box-shadow: 0 10px 26px rgba(180,130,40,0.18);
+}
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  display: flex; align-items: center; gap: 10px;
+  font: 11px/1.6 ui-monospace, monospace; color: #8a7a4a;
+}
+.bar b { min-width: 70px; color: #6d5c2c; }`,
+            js: `const stage = document.getElementById('stage');
+
+const LEAVES = [
+  { w: 36, h: 47, rot: -48, from: '#ffe89a', to: '#f5b93c' },
+  { w: 36, h: 64, rot: -18, from: '#ffd95e', to: '#efa22f' },
+  { w: 42, h: 82, rot: 8,   from: '#9bd45c', to: '#4f9b2c' },
+  { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c' },
+];
+
+const wrap = document.createElement('div');
+wrap.className = 'leaves';
+stage.appendChild(wrap);
+
+for (const l of LEAVES) {
+  const el = document.createElement('div');
+  el.className = 'leaf';
+  el.style.setProperty('--w', l.w);
+  el.style.setProperty('--h', l.h);
+  el.style.setProperty('--rot', l.rot + 'deg');
+  el.style.setProperty('--oy', '100%');
+  el.style.setProperty('--from', l.from);
+  el.style.setProperty('--to', l.to);
+  wrap.appendChild(el);
+}
+
+const o = document.getElementById('o');
+const ov = document.getElementById('ov');
+
+o.addEventListener('input', () => {
+  const v = Number(o.value);
+  ov.textContent = '50% ' + v + '%';
+  for (const el of wrap.children) {
+    el.style.setProperty('--oy', v + '%');
+  }
+});`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lf-vars',
+            label: '02 变量驱动',
+            desc: `四片叶子的展开动画，如果每片写一份 \`@keyframes\`，改一个角度就要改四处。
+
+用 CSS 变量，一份 keyframes 就够：
+
+\`\`\`
+@keyframes unfold {
+  from { transform: rotate(calc(var(--rot) - var(--sweep))); }
+  to   { transform: rotate(var(--rot)); }
+}
+\`\`\`
+
+\`--rot\` 是每片叶子的**终点角度**，\`--sweep\` 是**扫过的角度**——所有叶子共用这个「扫幅」，看起来才像同一把扇子。
+
+拖动滑杆改 \`--sweep\`，再点舞台重播。`,
+            html: `<div class="stage" id="stage"></div>
+<div class="bar">
+  <label>sweep <input id="s" type="range" min="20" max="170" step="5" value="110"></label>
+  <b id="sv">110deg</b>
+  <button id="replay">重播</button>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fdf3cf; }
+.stage {
+  position: absolute; inset: 0; cursor: pointer;
+  background: radial-gradient(120% 95% at 50% 20%, #fffefb, #fdeeb9 55%, #f2d287);
+}
+.leaves { position: absolute; left: 50%; bottom: 0; width: 0; height: 0; }
+.leaf {
+  position: absolute; left: 0; bottom: 0;
+  width: calc(var(--w) * 1vh);
+  height: calc(var(--h) * 1vh);
+  margin-left: calc(var(--w) * -0.5vh);
+  transform-origin: 50% 100%;
+  transform: rotate(var(--rot));
+  border-radius: 50% 0 50% 50%;
+  background: linear-gradient(160deg, var(--from), var(--to));
+  box-shadow: 0 10px 26px rgba(180,130,40,0.18);
+}
+.stage.play .leaf {
+  animation: unfold 1.5s cubic-bezier(0.18,0.9,0.28,1.02) var(--delay) backwards;
+}
+@keyframes unfold {
+  from { transform: rotate(calc(var(--rot) - var(--sweep))); }
+  to   { transform: rotate(var(--rot)); }
+}
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  font: 11px/1.6 ui-monospace, monospace; color: #8a7a4a;
+}
+.bar b { min-width: 58px; color: #6d5c2c; }
+.bar button {
+  font: inherit; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(140,120,60,0.35); background: rgba(255,253,244,0.9); color: #6d5c2c;
+}`,
+            js: `const stage = document.getElementById('stage');
+
+const LEAVES = [
+  { w: 36, h: 47, rot: -48, from: '#ffe89a', to: '#f5b93c', delay: 0.62 },
+  { w: 36, h: 64, rot: -18, from: '#ffd95e', to: '#efa22f', delay: 0.46 },
+  { w: 42, h: 82, rot: 8,   from: '#9bd45c', to: '#4f9b2c', delay: 0.30 },
+  { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c', delay: 0.14 },
+];
+
+const wrap = document.createElement('div');
+wrap.className = 'leaves';
+stage.appendChild(wrap);
+
+for (const l of LEAVES) {
+  const el = document.createElement('div');
+  el.className = 'leaf';
+  el.style.setProperty('--w', l.w);
+  el.style.setProperty('--h', l.h);
+  el.style.setProperty('--rot', l.rot + 'deg');
+  el.style.setProperty('--delay', l.delay + 's');
+  el.style.setProperty('--sweep', '110deg');
+  el.style.setProperty('--from', l.from);
+  el.style.setProperty('--to', l.to);
+  wrap.appendChild(el);
+}
+
+const s = document.getElementById('s');
+const sv = document.getElementById('sv');
+
+s.addEventListener('input', () => {
+  sv.textContent = s.value + 'deg';
+  for (const el of wrap.children) {
+    el.style.setProperty('--sweep', s.value + 'deg');
+  }
+});
+
+function play() {
+  stage.classList.remove('play');
+  void stage.offsetWidth;   // 强制回流，让动画从头开始
+  stage.classList.add('play');
+}
+
+document.getElementById('replay').addEventListener('click', (e) => {
+  e.stopPropagation();
+  play();
+});
+stage.addEventListener('click', play);
+
+// 首帧播一次
+requestAnimationFrame(play);`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lf-stagger',
+            label: '03 错峰',
+            desc: `四片叶子同时展开会很呆。错开 0.1–0.2 秒，就有了「依次张开」的呼吸感。
+
+\`\`\`
+.leaf { animation-delay: var(--delay); }
+\`\`\`
+
+**必须配 \`animation-fill-mode: backwards\`**
+
+不加的话，在延迟期间元素会停在**最终状态**——你会先看到四片叶子全部展开，然后它们才各自跳回去重播。
+
+\`backwards\` 的意思是「延迟期间就用 from 帧的样式」。
+
+这里的顺序是**从右到左**（右叶 0.14s 最早），和真实的扇子展开方向一致。拖动滑杆看不同间隔。`,
+            html: `<div class="stage" id="stage"></div>
+<div class="bar">
+  <label>间隔 <input id="g" type="range" min="0" max="0.4" step="0.02" value="0.16"></label>
+  <b id="gv">0.16s</b>
+  <button id="replay">重播</button>
+</div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fdf3cf; }
+.stage {
+  position: absolute; inset: 0; cursor: pointer;
+  background: radial-gradient(120% 95% at 50% 20%, #fffefb, #fdeeb9 55%, #f2d287);
+}
+.leaves { position: absolute; left: 50%; bottom: 0; width: 0; height: 0; }
+.leaf {
+  position: absolute; left: 0; bottom: 0;
+  width: calc(var(--w) * 1vh);
+  height: calc(var(--h) * 1vh);
+  margin-left: calc(var(--w) * -0.5vh);
+  transform-origin: 50% 100%;
+  transform: rotate(var(--rot));
+  border-radius: 50% 0 50% 50%;
+  background: linear-gradient(160deg, var(--from), var(--to));
+  box-shadow: 0 10px 26px rgba(180,130,40,0.18);
+}
+.stage.play .leaf {
+  animation: unfold 1.4s cubic-bezier(0.18,0.9,0.28,1.02) var(--delay) backwards;
+}
+@keyframes unfold {
+  from { opacity: 0; transform: rotate(calc(var(--rot) - 110deg)) scale(0.86); }
+  to   { opacity: 1; transform: rotate(var(--rot)) scale(1); }
+}
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  font: 11px/1.6 ui-monospace, monospace; color: #8a7a4a;
+}
+.bar b { min-width: 48px; color: #6d5c2c; }
+.bar button {
+  font: inherit; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+  border: 1px solid rgba(140,120,60,0.35); background: rgba(255,253,244,0.9); color: #6d5c2c;
+}`,
+            js: `const stage = document.getElementById('stage');
+
+const LEAVES = [
+  { w: 36, h: 47, rot: -48, from: '#ffe89a', to: '#f5b93c', order: 3 },
+  { w: 36, h: 64, rot: -18, from: '#ffd95e', to: '#efa22f', order: 2 },
+  { w: 42, h: 82, rot: 8,   from: '#9bd45c', to: '#4f9b2c', order: 1 },
+  { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c', order: 0 },
+];
+
+const wrap = document.createElement('div');
+wrap.className = 'leaves';
+stage.appendChild(wrap);
+
+for (const l of LEAVES) {
+  const el = document.createElement('div');
+  el.className = 'leaf';
+  el.style.setProperty('--w', l.w);
+  el.style.setProperty('--h', l.h);
+  el.style.setProperty('--rot', l.rot + 'deg');
+  el.dataset.order = l.order;
+  el.style.setProperty('--from', l.from);
+  el.style.setProperty('--to', l.to);
+  wrap.appendChild(el);
+}
+
+const g = document.getElementById('g');
+const gv = document.getElementById('gv');
+
+function applyGap() {
+  const gap = Number(g.value);
+  gv.textContent = gap.toFixed(2) + 's';
+  for (const el of wrap.children) {
+    el.style.setProperty('--delay', (Number(el.dataset.order) * gap).toFixed(2) + 's');
+  }
+}
+
+g.addEventListener('input', () => {
+  applyGap();
+  play();
+});
+
+function play() {
+  stage.classList.remove('play');
+  void stage.offsetWidth;
+  stage.classList.add('play');
+}
+
+document.getElementById('replay').addEventListener('click', (e) => {
+  e.stopPropagation();
+  play();
+});
+stage.addEventListener('click', play);
+
+applyGap();
+requestAnimationFrame(play);`,
+          },
+
+          /* ---------------------------------------------------------- */
+          {
+            id: 'lf-replay',
+            label: '04 重播',
+            desc: `动画播完之后，想再播一次，直接再 \`add\` 一次 class 是没用的——状态没变，浏览器不会重新开始。
+
+**三种写法**：
+
+**① 强制回流（最常用）**
+
+\`\`\`
+el.classList.remove('play');
+void el.offsetWidth;      // 读一次布局，把上面的删除"落实"了
+el.classList.add('play');
+\`\`\`
+
+那行 \`void\` 看着像废话，但它强制浏览器**同步计算一次布局**，于是「移除」这件事真的生效了。去掉它，两次 class 变化会被合并在同一帧，等于没变。
+
+**② 用 \`animationend\` 自动复位**
+播完就删 class，下次自然是干净状态。
+
+**③ \`Element.animate()\`**
+Web Animations API，每次调用都是新的动画对象，天然可重播：
+
+\`\`\`
+el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, fill: 'both' });
+\`\`\`
+
+点舞台反复重播，观察是否每次都从头开始。`,
+            html: `<div class="stage" id="stage">
+  <div class="ring" id="ring"></div>
+</div>
+<div class="bar"><span id="info">点舞台重播</span></div>`,
+            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #10141a; }
+.stage { position: absolute; inset: 0; display: grid; place-items: center; cursor: pointer; }
+.ring {
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 2px solid #6ea8ff;
+  opacity: 0;
+}
+.stage.play .ring {
+  animation: pop 1.2s cubic-bezier(0.18,0.9,0.28,1.02) both;
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.2); }
+  60%  { opacity: 1; transform: scale(1.06); }
+  to   { opacity: 0.9; transform: scale(1); }
+}
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  font: 11px/1.6 ui-monospace, monospace; color: #8fa3b5; text-align: center;
+}`,
+            js: `const stage = document.getElementById('stage');
+const ring = document.getElementById('ring');
+const info = document.getElementById('info');
+
+let count = 0;
+
+function play() {
+  stage.classList.remove('play');
+
+  // 这一行是关键：强制同步布局，让「移除」真的生效
+  void stage.offsetWidth;
+
+  stage.classList.add('play');
+  count++;
+  info.textContent = '第 ' + count + ' 次播放';
+}
+
+stage.addEventListener('click', play);
+requestAnimationFrame(play);`,
+          },
+        ],
+      },
     ],
   },
 ];
+
