@@ -80,8 +80,11 @@ const MENU = [
 </script>
 
 <style is:global>
-  .page-main {
+  /* 用 main.page-main 提高一级优先级：生产构建里 global.css 可能排在本块之后，
+     同为 .page-main 时后者会赢，导致面板被压成 860px 居中 */
+  main.page-main {
     max-width: none;
+    margin: 0;
     padding: 0;
     height: calc(100vh - var(--header-h));
   }
