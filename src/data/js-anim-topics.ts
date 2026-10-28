@@ -1341,6 +1341,504 @@ function frame(now) {
 }
 requestAnimationFrame(frame);`,
       },
+
+      /* ============================================================ */
+      {
+        id: 'panel',
+        label: '10 参数面板',
+        desc: `给动画加一个能实时调的滑杆，比反复刷新看效果快十倍。
+
+**四个细节**：
+
+**① 用 \`input\` 不用 \`change\`**
+\`change\` 只在松手时触发，拖的时候没反应；\`input\` 每动一下就触发。
+
+**② 面板要在画布之上**
+\`position: fixed\` + \`z-index\`。注意：面板盖住的地方点不到画布，所以面板本身要小，别挡住交互区。
+
+**③ range 的默认样式很丑**
+Chrome 的默认滑块是一条粗条，和淡雅的设计完全不搭。要手写 \`::-webkit-slider-runnable-track\` 和 \`::-webkit-slider-thumb\`（外加 Firefox 的 \`::-moz-\` 版本）。
+
+**④ 半透明面板要配 backdrop-filter**
+\`background: rgba(255,255,255,0.7)\` + \`backdrop-filter: blur(8px)\`，底下的画面透上来一层模糊，面板才「浮」得起来。只有背景半透明而没有模糊，会显得脏。
+
+拖动下面的滑杆试试。`,
+        html: `<canvas id="c"></canvas>
+<div class="panel">
+  <label>速度<input id="spd" type="range" min="0.2" max="3" step="0.05" value="1"><b id="spdV">1.0x</b></label>
+  <label>数量<input id="num" type="range" min="10" max="200" step="1" value="70"><b id="numV">70</b></label>
+</div>`,
+        css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fcfbf6; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.panel {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: rgba(252, 251, 246, 0.72);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
+  border: 1px solid rgba(54, 66, 66, 0.13);
+  font: 11px/1 ui-monospace, monospace;
+  color: rgba(54, 66, 66, 0.62);
+  letter-spacing: 0.08em;
+  user-select: none;
+}
+.panel label { display: flex; align-items: center; gap: 8px; }
+.panel b { min-width: 34px; text-align: right; color: rgba(54, 66, 66, 0.85); font-weight: 500; }
+
+/* range 的默认样式必须覆盖 */
+.panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 88px;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.panel input[type="range"]::-webkit-slider-runnable-track {
+  height: 1px;
+  background: rgba(54, 66, 66, 0.28);
+}
+.panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 8px;
+  height: 8px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: #46585a;
+}
+.panel input[type="range"]::-moz-range-track {
+  height: 1px;
+  background: rgba(54, 66, 66, 0.28);
+}
+.panel input[type="range"]::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: #46585a;
+}`,
+        js: `const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const INK = '54,66,66';
+
+let W = 0, H = 0;
+function resize() {
+  W = cvs.clientWidth;
+  H = cvs.clientHeight;
+  cvs.width = W;
+  cvs.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+let speed = 1;
+let count = 70;
+const parts = [];
+
+function rebuild(n) {
+  parts.length = 0;
+  for (let i = 0; i < n; i++) {
+    parts.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 90,
+      vy: (Math.random() - 0.5) * 90,
+      r: 1 + Math.random() * 3,
+    });
+  }
+}
+
+// input 事件：拖动过程中就触发
+const spdEl = document.getElementById('spd');
+const spdV = document.getElementById('spdV');
+const numEl = document.getElementById('num');
+const numV = document.getElementById('numV');
+
+spdEl.addEventListener('input', () => {
+  speed = parseFloat(spdEl.value);
+  spdV.textContent = speed.toFixed(1) + 'x';
+});
+
+numEl.addEventListener('input', () => {
+  count = parseInt(numEl.value, 10);
+  numV.textContent = String(count);
+  rebuild(count);
+});
+
+rebuild(count);
+
+let last = 0;
+
+function frame(now) {
+  if (!last) last = now;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;
+
+  ctx.fillStyle = '#fcfbf6';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const p of parts) {
+    p.x += p.vx * speed * dt;
+    p.y += p.vy * speed * dt;
+    if (p.x < 0) p.x = W;
+    if (p.x > W) p.x = 0;
+    if (p.y < 0) p.y = H;
+    if (p.y > H) p.y = 0;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(' + INK + ',0.45)';
+    ctx.fill();
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+      },
+
+      /* ============================================================ */
+      {
+        id: 'perf',
+        label: '11 性能诊断',
+        desc: `**怎么知道是哪一行慢？** 不要猜，量。
+
+## 最小可用工具
+
+\`\`\`
+const t0 = performance.now();
+drawSomething();
+const cost = performance.now() - t0;
+\`\`\`
+
+单个数字会乱跳，用**指数滑动平均**看趋势：
+
+\`\`\`
+avg = avg * 0.9 + cost * 0.1;
+\`\`\`
+
+## 湖面上真实的两个坑
+
+**① \`imageSmoothingQuality\`**
+
+\`\`\`
+ctx.imageSmoothingQuality = 'high';   // 13.5 fps
+ctx.imageSmoothingQuality = 'low';    // 60 fps
+\`\`\`
+
+一行之隔，四倍多的差距。它在软件光栅下会走一条极慢的重采样路径。
+
+**② 每帧调用 \`ctx.filter\`**
+
+\`\`\`
+ctx.filter = 'blur(12px)';   // 每帧一次全屏模糊 → 帧率腰斩
+\`\`\`
+
+放在**生成背景**时用没问题（只跑一次），放在帧循环里就是灾难。
+
+下面三行画的是**同一张图、同样的缩放**，每帧各画 10 次取平均，单位是微秒：
+
+| 行 | 操作 |
+|---|---|
+| high | imageSmoothingQuality = 'high' |
+| low | imageSmoothingQuality = 'low' |
+| blur | 每帧 ctx.filter = 'blur(6px)' |
+
+在 GPU 上 high 和 low 的差距可能只有 2 倍，但 blur 那一行会明显跳上去。**绝对数字随机器变，看相对差距**。`,
+        html: `<canvas id="c"></canvas><div id="hud"></div>`,
+        css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fcfbf6; }
+canvas { display: block; width: 100%; height: 100%; }
+#hud {
+  position: fixed; left: 12px; bottom: 12px;
+  font: 11px/1.7 ui-monospace, monospace;
+  color: #6d7b78; white-space: pre;
+}`,
+        js: `const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+
+let W = 0, H = 0;
+function resize() {
+  W = cvs.clientWidth;
+  H = cvs.clientHeight;
+  cvs.width = W;
+  cvs.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 造一张有细节的源图
+const src = document.createElement('canvas');
+src.width = 640;
+src.height = 480;
+{
+  const g = src.getContext('2d');
+  g.fillStyle = '#e9e4d8';
+  g.fillRect(0, 0, 640, 480);
+  for (let i = 0; i < 5200; i++) {
+    g.fillStyle = 'rgba(54,66,66,' + (0.05 + Math.random() * 0.5) + ')';
+    g.fillRect(Math.random() * 640, Math.random() * 480, 1 + Math.random() * 5, 1 + Math.random() * 5);
+  }
+}
+
+let tHi = 0;
+let tLo = 0;
+let tBlur = 0;
+
+function label(text, x, y) {
+  ctx.font = '11px ui-monospace, monospace';
+  const w = ctx.measureText(text).width + 12;
+  ctx.fillStyle = 'rgba(252,251,246,0.78)';
+  ctx.fillRect(x - 6, y - 12, w, 17);
+  ctx.fillStyle = '#3a4a4a';
+  ctx.fillText(text, x, y);
+}
+
+function frame() {
+  ctx.fillStyle = '#fcfbf6';
+  ctx.fillRect(0, 0, W, H);
+
+  const rowH = H / 3;
+  const N = 10;
+
+  // 行 1：high quality
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, rowH);
+  ctx.clip();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const t0 = performance.now();
+  for (let i = 0; i < N; i++) ctx.drawImage(src, 0, 0, 640, 480, 0, 0, W, rowH);
+  tHi = tHi * 0.9 + ((performance.now() - t0) / N * 1000) * 0.1;
+  ctx.restore();
+
+  // 行 2：low quality
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, rowH, W, rowH);
+  ctx.clip();
+  ctx.imageSmoothingQuality = 'low';
+  const t1 = performance.now();
+  for (let i = 0; i < N; i++) ctx.drawImage(src, 0, 0, 640, 480, 0, rowH, W, rowH);
+  tLo = tLo * 0.9 + ((performance.now() - t1) / N * 1000) * 0.1;
+  ctx.restore();
+
+  // 行 3：每帧一次 blur —— 这个才是最贵的
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, rowH * 2, W, rowH);
+  ctx.clip();
+  ctx.filter = 'blur(6px)';
+  const t2 = performance.now();
+  for (let i = 0; i < N; i++) ctx.drawImage(src, 0, 0, 640, 480, 0, rowH * 2, W, rowH);
+  tBlur = tBlur * 0.9 + ((performance.now() - t2) / N * 1000) * 0.1;
+  ctx.filter = 'none';
+  ctx.restore();
+
+  // 分隔线
+  ctx.fillStyle = 'rgba(54,66,66,0.15)';
+  ctx.fillRect(0, rowH, W, 1);
+  ctx.fillRect(0, rowH * 2, W, 1);
+
+  label('high  ' + tHi.toFixed(0) + ' us', 12, rowH * 0.5 + 4);
+  label('low   ' + tLo.toFixed(0) + ' us', 12, rowH * 1.5 + 4);
+  label('filter blur  ' + tBlur.toFixed(0) + ' us', 12, rowH * 2.5 + 4);
+
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);`,
+      },
+
+      /* ============================================================ */
+      {
+        id: 'reduced',
+        label: '12 降级与暂停',
+        desc: `## 尊重系统偏好
+
+有些人在系统里开了「减少动态效果」，可能是晕动症，也可能是省电。用 \`matchMedia\` 读这个偏好：
+
+\`\`\`
+const mq = matchMedia('(prefers-reduced-motion: reduce)');
+let calm = mq.matches;
+mq.addEventListener('change', e => { calm = e.matches; });
+\`\`\`
+
+**注意**：必须监听 \`change\`。用户在设置里改了，页面不能还跑着原来的。
+
+## 降级不是关掉
+
+直接把动画停掉太粗暴。合理的做法是**减量**：
+
+- 粒子数减半
+- 去掉位移，只留透明度变化
+- 速度降到 1/3
+
+## 切到后台要停
+
+\`requestAnimationFrame\` 在后台标签页会被浏览器节流，但不会完全停。手动停更省电：
+
+\`\`\`
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) cancelAnimationFrame(raf);
+  else { last = 0; raf = requestAnimationFrame(frame); }
+});
+\`\`\`
+
+恢复时记得把 \`last\` 清零，否则第一帧的 \`dt\` 会是切走的那段时间。
+
+下面可以手动切换「完整 / 降级」看差别。`,
+        html: `<canvas id="c"></canvas>
+<div class="bar">
+  <span id="mq">系统偏好：读取中</span>
+  <button id="toggle">切换降级</button>
+</div>`,
+        css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #fcfbf6; }
+canvas { display: block; width: 100%; height: 100%; }
+.bar {
+  position: fixed; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font: 10px/1.6 ui-monospace, monospace;
+  color: #6d7b78;
+}
+.bar button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid rgba(54, 66, 66, 0.25);
+  border-radius: 5px;
+  background: rgba(252, 251, 246, 0.8);
+  color: rgba(54, 66, 66, 0.8);
+  cursor: pointer;
+}
+.bar button:hover { background: #fff; }`,
+        js: `const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const mqEl = document.getElementById('mq');
+const toggle = document.getElementById('toggle');
+const INK = '54,66,66';
+
+let W = 0, H = 0;
+function resize() {
+  W = cvs.clientWidth;
+  H = cvs.clientHeight;
+  cvs.width = W;
+  cvs.height = H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// 读系统偏好，并且监听变化
+const mq = matchMedia('(prefers-reduced-motion: reduce)');
+let systemCalm = mq.matches;
+let manualCalm = null;
+
+function isCalm() {
+  return manualCalm === null ? systemCalm : manualCalm;
+}
+
+function renderPref() {
+  mqEl.textContent = '系统偏好：' +
+    (systemCalm ? '减少动态' : '正常') +
+    '  当前：' + (isCalm() ? '降级' : '完整');
+  toggle.textContent = isCalm() ? '恢复完整' : '切换降级';
+}
+
+mq.addEventListener('change', (e) => {
+  systemCalm = e.matches;
+  manualCalm = null;
+  rebuild();
+  renderPref();
+});
+
+toggle.addEventListener('click', () => {
+  manualCalm = !isCalm();
+  rebuild();
+  renderPref();
+});
+
+let parts = [];
+
+function rebuild() {
+  const calm = isCalm();
+  const n = calm ? 14 : 46;
+  parts = [];
+  for (let i = 0; i < n; i++) {
+    parts.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 80,
+      vy: (Math.random() - 0.5) * 80,
+      r: 2 + Math.random() * 6,
+      phase: Math.random() * 6.28,
+    });
+  }
+}
+
+rebuild();
+renderPref();
+
+// 切到后台就停，回来再开
+let raf = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(raf);
+  } else {
+    last = 0;
+    raf = requestAnimationFrame(frame);
+  }
+});
+
+let last = 0;
+let t = 0;
+
+function frame(now) {
+  if (!last) last = now;
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;
+  t += dt;
+
+  const calm = isCalm();
+
+  ctx.fillStyle = '#fcfbf6';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const p of parts) {
+    if (calm) {
+      // 降级：不动，只做很轻的呼吸
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + INK + ',' + (0.18 + 0.1 * Math.sin(t * 0.8 + p.phase)) + ')';
+      ctx.fill();
+    } else {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (p.x < 0) p.x = W;
+      if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H;
+      if (p.y > H) p.y = 0;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + INK + ',0.45)';
+      ctx.fill();
+    }
+  }
+
+  raf = requestAnimationFrame(frame);
+}
+
+raf = requestAnimationFrame(frame);`,
+      },
     ],
   },
 ];
