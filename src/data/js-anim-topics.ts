@@ -24,14 +24,13 @@ export const jsAnimTopics: Topic[] = [
 
 每一章都可以直接改代码，右边实时看效果。
 
-左侧目录分四组：
+左侧目录分三组：
 
 - **一、canvas 动画基础**（9 章）—— 湖面用到的 canvas 技术
 - **二、工程化**（3 章）—— 参数面板、性能诊断、降级
-- **三、互动登录**（4 章）—— 指针跟随、rAF 合并、错误抖动、输入框状态
-- **四、叶扇展开**（4 章）—— transform-origin、CSS 变量、错峰、重播
+- **三、叶扇展开**（4 章）—— transform-origin、CSS 变量、错峰、重播
 
-后两组没有 canvas，全是 DOM + CSS，但它们回答的是同样的问题：**怎么让变化看起来是对的**。`,
+最后一组没有 canvas，全是 DOM + CSS，但它回答的是同样的问题：**怎么让变化看起来是对的**。`,
     html: `<div class="cover">
   <h1>js 动画学习</h1>
   <p>从一块 canvas 到一片湖面</p>
@@ -1886,485 +1885,11 @@ raf = requestAnimationFrame(frame);`,
       },
 
       /* ============================================================
-         三、互动登录
-         ============================================================ */
-      {
-        id: 'login',
-        label: '三、互动登录',
-        desc: `动画馆里「互动登录」那一页的拆解。它没有 canvas，全靠 DOM + CSS + transform。
-
-四章分别对应四个问题：
-
-1. **指针跟随**——鼠标位置怎么变成眼睛的位移，而且不抖
-2. **一帧只算一次**——\`mousemove\` 一帧会触发好几次，怎么合并
-3. **错误抖动**——一次性的「拒绝」反馈怎么写才不僵硬
-4. **输入框状态**——聚焦环、浮动标签、密码可见切换
-
-这四个问题在任何带交互的页面上都会遇到，和「登录」本身关系不大。`,
-        html: `<div class="cover"><h1>互动登录</h1><p>4 章 · 指针 / 节流 / 反馈 / 状态</p></div>`,
-        css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#1b1a1f; color:#d6d2cb; font-family:system-ui,sans-serif; }
-.cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
-.cover p { margin:0; font-size:12px; color:#8a8578; letter-spacing:0.14em; }`,
-        js: `// 展开「三、互动登录」。`,
-        children: [
-          /* ---------------------------------------------------------- */
-          {
-            id: 'lg-pointer',
-            label: '01 指针跟随',
-            desc: `鼠标位置要变成角色的动作，中间隔着三步：
-
-**① 归一化**
-直接用 \`clientX\` 没用——屏幕大小不同，位移量就不同。先换算成 0–1 的比例，再映射到 \`[-1, 1]\`：
-
-\`\`\`
-nx = (e.clientX - rect.left) / rect.width;    // 0..1
-nx = nx * 2 - 1;                              // -1..1
-\`\`\`
-
-**② 平滑**
-直接把 \`nx\` 赋给位置会「跳」，因为它来自离散的鼠标事件。用线性插值（lerp）追过去：
-
-\`\`\`
-cur += (target - cur) * 0.12;
-\`\`\`
-
-0.12 是跟随速度：越小越迟钝，越大越跟手。这个系数要**和帧率无关**，严格写法是：
-
-\`\`\`
-const k = 1 - Math.pow(1 - 0.12, dt * 60);
-cur += (target - cur) * k;
-\`\`\`
-
-**③ 衰减到 0**
-鼠标离开窗口时，目标要回到原点，而不是停在最后一次的位置。
-
-移动鼠标试试。`,
-            html: `<div class="stage">
-  <div class="face">
-    <div class="eye"><i class="pupil" id="p1"></i></div>
-    <div class="eye"><i class="pupil" id="p2"></i></div>
-  </div>
-  <div class="hud" id="hud"></div>
-</div>`,
-            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #f5efe2; cursor: crosshair; }
-.stage { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
-.face { display: flex; gap: 26px; }
-.eye {
-  width: 74px; height: 74px; border-radius: 50%;
-  background: #fdfbf6;
-  box-shadow: inset 0 0 0 2px rgba(84,72,50,0.22);
-  display: grid; place-items: center;
-  position: relative;
-}
-.pupil {
-  width: 26px; height: 26px; border-radius: 50%;
-  background: #3a3226;
-  transform: translate(0, 0);
-  will-change: transform;
-}
-.hud {
-  position: absolute; left: 12px; bottom: 12px;
-  font: 11px/1.7 ui-monospace, monospace; color: #8a7f68; white-space: pre;
-}`,
-            js: `const pupils = [document.getElementById('p1'), document.getElementById('p2')];
-const hud = document.getElementById('hud');
-
-// 归一化目标：-1 .. 1
-let tx = 0, ty = 0;
-// 当前值（每帧向目标靠近）
-let cx = 0, cy = 0;
-
-function onMove(e) {
-  // 以窗口中心为原点做归一化，比用元素 rect 更省一次布局查询
-  tx = (e.clientX / window.innerWidth) * 2 - 1;
-  ty = (e.clientY / window.innerHeight) * 2 - 1;
-}
-
-window.addEventListener('pointermove', onMove);
-window.addEventListener('pointerleave', () => { tx = 0; ty = 0; });
-
-let last = 0;
-
-function frame(now) {
-  if (!last) last = now;
-  let dt = (now - last) / 1000;
-  last = now;
-  if (dt > 0.1) dt = 0.1;
-
-  // 和帧率无关的 lerp 系数
-  const k = 1 - Math.pow(1 - 0.16, dt * 60);
-  cx += (tx - cx) * k;
-  cy += (ty - cy) * k;
-
-  for (const p of pupils) {
-    p.style.transform = 'translate(' + (cx * 14).toFixed(1) + 'px,' + (cy * 12).toFixed(1) + 'px)';
-  }
-
-  hud.textContent =
-    'target  ' + tx.toFixed(2) + ' , ' + ty.toFixed(2) + '\\n' +
-    'current ' + cx.toFixed(2) + ' , ' + cy.toFixed(2) + '\\n' +
-    'lerp k = ' + k.toFixed(3);
-
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);`,
-          },
-
-          /* ---------------------------------------------------------- */
-          {
-            id: 'lg-raf',
-            label: '02 一帧只算一次',
-            desc: `\`mousemove\` 是**设备事件**：高刷新率鼠标一秒能发 1000 次，而屏幕只刷 60 次。
-
-如果你在 \`mousemove\` 里直接改样式，会有两个问题：
-
-- 同一帧里改了很多次，浏览器只认最后一次 —— 白算
-- 每次读 \`getBoundingClientRect()\` 都可能触发**强制同步布局**
-
-**做法**：事件里只存值，真正的计算放到 rAF 里。
-
-\`\`\`
-let pending = null;
-let ticking = false;
-
-function onMove(e) { pending = e; if (!ticking) { ticking = true; requestAnimationFrame(apply); } }
-
-function apply() { ticking = false; /* 用 pending 算一次 */ }
-\`\`\`
-
-下面左右两个计数器：左边是**事件次数**，右边是**实际处理次数**。开关可以对比两种写法。`,
-            html: `<canvas id="c"></canvas>
-<div class="bar">
-  <span id="info">-</span>
-  <button id="toggle">切换：合并</button>
-</div>`,
-            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #10151a; cursor: crosshair; }
-canvas { display: block; width: 100%; height: 100%; }
-.bar {
-  position: fixed; left: 10px; right: 10px; bottom: 10px;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  font: 11px/1.6 ui-monospace, monospace; color: #8fa3b5;
-}
-.bar button {
-  font: inherit; padding: 4px 10px; border-radius: 5px; cursor: pointer;
-  border: 1px solid rgba(143,163,181,0.35);
-  background: rgba(20,28,36,0.9); color: #cfe0ee;
-}`,
-            js: `const cvs = document.getElementById('c');
-const ctx = cvs.getContext('2d');
-const info = document.getElementById('info');
-const toggle = document.getElementById('toggle');
-
-let W = 0, H = 0;
-function resize() {
-  W = cvs.clientWidth; H = cvs.clientHeight;
-  cvs.width = W; H = H; cvs.height = H;
-}
-window.addEventListener('resize', resize);
-resize();
-
-let merged = true;          // 是否合并
-let events = 0;             // 事件次数
-let handled = 0;            // 实际处理次数
-let evPerSec = 0, hdPerSec = 0;
-let pending = null;
-let ticking = false;
-
-let mx = W / 2, my = H / 2;   // 实际用到的坐标
-
-function apply() {
-  ticking = false;
-  if (!pending) return;
-  mx = pending.x;
-  my = pending.y;
-  pending = null;
-  handled++;
-}
-
-function onMove(e) {
-  events++;
-  if (merged) {
-    pending = { x: e.clientX, y: e.clientY };
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(apply);
-    }
-  } else {
-    // 不合并：每次事件都直接算
-    mx = e.clientX;
-    my = e.clientY;
-    handled++;
-  }
-}
-
-window.addEventListener('pointermove', onMove);
-
-toggle.addEventListener('click', () => {
-  merged = !merged;
-  toggle.textContent = '切换：' + (merged ? '合并' : '不合并');
-});
-
-let last = 0;
-let acc = 0;
-
-function frame(now) {
-  if (!last) last = now;
-  let dt = (now - last) / 1000;
-  last = now;
-  if (dt > 0.1) dt = 0.1;
-
-  acc += dt;
-  if (acc >= 0.5) {
-    evPerSec = events / acc;
-    hdPerSec = handled / acc;
-    events = 0; handled = 0; acc = 0;
-  }
-
-  ctx.fillStyle = '#10151a';
-  ctx.fillRect(0, 0, W, H);
-
-  // 准星跟随（只用了处理后的坐标）
-  ctx.strokeStyle = 'rgba(120,200,255,0.55)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(mx, my, 26, 0, Math.PI * 2);
-  ctx.moveTo(mx - 40, my); ctx.lineTo(mx + 40, my);
-  ctx.moveTo(mx, my - 40); ctx.lineTo(mx, my + 40);
-  ctx.stroke();
-
-  info.textContent =
-    '事件 ' + evPerSec.toFixed(0) + '/s   处理 ' + hdPerSec.toFixed(0) + '/s' +
-    '   模式：' + (merged ? '合并' : '不合并');
-
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);`,
-          },
-
-          /* ---------------------------------------------------------- */
-          {
-            id: 'lg-shake',
-            label: '03 错误抖动',
-            desc: `密码错了要「拒绝」一下。抖动比红字更直接，但做不好会很廉价。
-
-**关键点**：
-
-**① 幅度要衰减**
-等幅抖动像机器在震。真正的「拒绝」是开头重、后面轻：
-
-\`\`\`
-@keyframes shake {
-  0%   { transform: translateX(0); }
-  15%  { transform: translateX(-9px); }
-  30%  { transform: translateX(8px); }
-  45%  { transform: translateX(-6px); }
-  60%  { transform: translateX(4px); }
-  80%  { transform: translateX(-2px); }
-  100% { transform: translateX(0); }
-}
-\`\`\`
-
-**② 用 \`animationend\` 收尾**
-抖完要把 class 去掉，否则下次再加同一个 class 不会重新播放。
-
-**③ 别每次都抖**
-连续两次错误之间留个冷却，否则连点会让页面一直在抖。
-
-输入任意密码试试——除了 \`123\` 都会抖。`,
-            html: `<div class="wrap">
-  <div class="card" id="card">
-    <div class="label">密码</div>
-    <input id="pw" type="password" placeholder="试试 123" />
-    <button id="go">登录</button>
-    <div class="msg" id="msg"></div>
-  </div>
-</div>`,
-            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #14161a; }
-.wrap { display: grid; place-items: center; height: 100%; }
-.card {
-  width: 240px; padding: 22px; border-radius: 12px;
-  background: #1c1f24;
-  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-  font-family: system-ui, sans-serif;
-  color: #d8dde3;
-}
-.label { font-size: 12px; color: #7d8794; margin-bottom: 8px; }
-input {
-  width: 100%; box-sizing: border-box;
-  padding: 10px 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: #14171b; color: #eef2f6;
-  font-size: 14px; outline: none;
-}
-input:focus { border-color: #6ea8ff; box-shadow: 0 0 0 3px rgba(110,168,255,0.18); }
-button {
-  width: 100%; margin-top: 12px; padding: 10px;
-  border: 0; border-radius: 8px; cursor: pointer;
-  background: #6ea8ff; color: #0b1016; font-weight: 600; font-size: 14px;
-}
-.msg { height: 18px; margin-top: 10px; font-size: 12px; color: #ff7b72; }
-
-.card.shake { animation: shake 0.5s cubic-bezier(0.36,0.07,0.19,0.97) both; }
-
-@keyframes shake {
-  0%   { transform: translateX(0); }
-  15%  { transform: translateX(-9px); }
-  30%  { transform: translateX(8px); }
-  45%  { transform: translateX(-6px); }
-  60%  { transform: translateX(4px); }
-  80%  { transform: translateX(-2px); }
-  100% { transform: translateX(0); }
-}`,
-            js: `const card = document.getElementById('card');
-const pw = document.getElementById('pw');
-const go = document.getElementById('go');
-const msg = document.getElementById('msg');
-
-let cooling = false;
-
-go.addEventListener('click', () => {
-  if (pw.value === '123') {
-    msg.style.color = '#67d391';
-    msg.textContent = '通过';
-    return;
-  }
-
-  // 冷却：上一次抖动还没结束就不再触发
-  if (cooling) return;
-  cooling = true;
-
-  msg.style.color = '#ff7b72';
-  msg.textContent = '密码不对';
-
-  // 先移除再添加，否则同一 class 不会重放
-  card.classList.remove('shake');
-  void card.offsetWidth;
-  card.classList.add('shake');
-
-  card.addEventListener('animationend', function done() {
-    card.classList.remove('shake');
-    card.removeEventListener('animationend', done);
-    cooling = false;
-  });
-});`,
-          },
-
-          /* ---------------------------------------------------------- */
-          {
-            id: 'lg-input',
-            label: '04 输入框状态',
-            desc: `输入框最容易被忽略，但它决定了整个表单的手感。
-
-**① 聚焦环用 \`box-shadow\`，不用 \`outline\`**
-\`outline\` 不可控，而且方角。用 \`box-shadow: 0 0 0 3px rgba(...)\` 可以做出贴合圆角的柔和光圈。
-
-**② 浮动标签用 \`:placeholder-shown\`**
-不需要 JS 判断有没有值：
-
-\`\`\`
-input:not(:placeholder-shown) + label { transform: translateY(-18px) scale(0.82); }
-\`\`\`
-
-前提是 \`placeholder=" "\`（一个空格），否则 \`:placeholder-shown\` 永远不成立。
-
-**③ 密码可见切换**
-切换 \`type\` 会丢焦点和光标位置，正确做法是先存 \`selectionStart\`，切完再还原。
-
-\`\`\`
-const pos = input.selectionStart;
-input.type = input.type === 'password' ? 'text' : 'password';
-input.setSelectionRange(pos, pos);
-\`\`\`
-
-试试聚焦输入框、输入内容、点右侧的眼睛。`,
-            html: `<div class="wrap">
-  <div class="field">
-    <input id="pw" type="password" placeholder=" " autocomplete="off" />
-    <label for="pw">密码</label>
-    <button id="eye" type="button" aria-label="显示密码">👁</button>
-  </div>
-</div>`,
-            css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #f6f3ec; }
-.wrap { display: grid; place-items: center; height: 100%; }
-
-.field {
-  position: relative;
-  width: 260px;
-}
-.field input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 20px 42px 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(84, 72, 50, 0.22);
-  background: #fffdf8;
-  font-size: 15px;
-  color: #3a3226;
-  outline: none;
-  transition: box-shadow 0.18s, border-color 0.18s;
-}
-.field input:focus {
-  border-color: #b08b4a;
-  box-shadow: 0 0 0 3px rgba(176, 139, 74, 0.18);
-}
-
-.field label {
-  position: absolute;
-  left: 15px;
-  top: 15px;
-  font: 13px system-ui, sans-serif;
-  color: #9c8f76;
-  pointer-events: none;
-  transform-origin: 0 50%;
-  transition: transform 0.16s ease, color 0.16s;
-}
-
-/* 有内容 或 聚焦时，标签上浮 */
-.field input:focus + label,
-.field input:not(:placeholder-shown) + label {
-  transform: translateY(-9px) scale(0.78);
-  color: #b08b4a;
-}
-
-.field button {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 0;
-  background: transparent;
-  font-size: 15px;
-  cursor: pointer;
-  opacity: 0.55;
-}
-.field button:hover { opacity: 1; }`,
-            js: `const pw = document.getElementById('pw');
-const eye = document.getElementById('eye');
-
-eye.addEventListener('click', () => {
-  const pos = pw.selectionStart;
-  const end = pw.selectionEnd;
-
-  pw.type = pw.type === 'password' ? 'text' : 'password';
-
-  // 切换 type 会丢光标，切完立刻还原
-  pw.focus();
-  try {
-    pw.setSelectionRange(pos, end);
-  } catch (err) {
-    // 某些浏览器对 password 类型不支持 setSelectionRange，忽略
-  }
-});`,
-          },
-        ],
-      },
-
-      /* ============================================================
-         四、叶扇展开
+         三、叶扇展开
          ============================================================ */
       {
         id: 'leaves',
-        label: '四、叶扇展开',
+        label: '三、叶扇展开',
         desc: `动画馆里「叶扇展开」那一页的拆解。整页没有一行 canvas，也没有 JS 动画——全是 CSS \`transform\` 和 \`@keyframes\`。
 
 四章：
@@ -2377,7 +1902,7 @@ eye.addEventListener('click', () => {
         css: `.cover { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:8px; background:#fdf3cf; color:#5a4718; font-family:system-ui,sans-serif; }
 .cover h1 { margin:0; font-size:26px; font-weight:500; letter-spacing:0.06em; }
 .cover p { margin:0; font-size:12px; color:#a08a52; letter-spacing:0.14em; }`,
-        js: `// 展开「四、叶扇展开」。`,
+        js: `// 展开「三、叶扇展开」。`,
         children: [
           /* ---------------------------------------------------------- */
           {
@@ -2432,10 +1957,9 @@ eye.addEventListener('click', () => {
   margin-left: calc(var(--w) * -0.5vh);
   transform-origin: 50% var(--oy);
   transform: rotate(var(--rot));
-  border-radius: 50% 0 50% 50%;
-  background: linear-gradient(160deg, var(--from), var(--to));
   box-shadow: 0 10px 26px rgba(180,130,40,0.18);
 }
+.leaf svg { display: block; width: 100%; height: 100%; }
 .bar {
   position: fixed; left: 10px; right: 10px; bottom: 10px;
   display: flex; align-items: center; gap: 10px;
@@ -2451,11 +1975,44 @@ const LEAVES = [
   { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c' },
 ];
 
+const LEAF_PATH = 'M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z';
+const VEIN_D = [
+  'M100 396 C100 300 99 160 100 10',
+  'M99 332 C80 308 64 278 55 246',
+  'M100 274 C83 252 68 226 60 198',
+  'M101 218 C87 200 74 176 68 152',
+  'M102 164 C91 148 82 128 77 108',
+  'M101 332 C120 308 136 278 145 246',
+  'M100 274 C117 252 132 226 140 198',
+  'M99 218 C113 200 126 176 132 152',
+];
+const VEINS = VEIN_D.map(function (d) { return '<path d="' + d + '" />'; }).join('');
+
+// 和动画馆里「叶扇展开」用的是同一条路径
+function leafSVG(i, from, to) {
+  const g = 'lg' + i;
+  const h = 'lh' + i;
+  return '<svg viewBox="0 0 200 400" preserveAspectRatio="none">' +
+    '<defs>' +
+      '<linearGradient id="' + g + '" x1="0.15" y1="1" x2="0.8" y2="0">' +
+        '<stop offset="0" stop-color="' + from + '"/><stop offset="1" stop-color="' + to + '"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="' + h + '" x1="0" y1="1" x2="1" y2="0.4">' +
+        '<stop offset="0" stop-color="#ffffff" stop-opacity="0.42"/>' +
+        '<stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>' +
+      '</linearGradient>' +
+    '</defs>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + g + ')"/>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + h + ')"/>' +
+    '<g fill="none" stroke="#3f6b1e" stroke-opacity="0.16" stroke-width="2.4" stroke-linecap="round">' + VEINS + '</g>' +
+  '</svg>';
+}
+
 const wrap = document.createElement('div');
 wrap.className = 'leaves';
 stage.appendChild(wrap);
 
-for (const l of LEAVES) {
+for (const [i, l] of LEAVES.entries()) {
   const el = document.createElement('div');
   el.className = 'leaf';
   el.style.setProperty('--w', l.w);
@@ -2464,6 +2021,7 @@ for (const l of LEAVES) {
   el.style.setProperty('--oy', '100%');
   el.style.setProperty('--from', l.from);
   el.style.setProperty('--to', l.to);
+  el.innerHTML = leafSVG(i, l.from, l.to);
   wrap.appendChild(el);
 }
 
@@ -2516,10 +2074,9 @@ o.addEventListener('input', () => {
   margin-left: calc(var(--w) * -0.5vh);
   transform-origin: 50% 100%;
   transform: rotate(var(--rot));
-  border-radius: 50% 0 50% 50%;
-  background: linear-gradient(160deg, var(--from), var(--to));
   box-shadow: 0 10px 26px rgba(180,130,40,0.18);
 }
+.leaf svg { display: block; width: 100%; height: 100%; }
 .stage.play .leaf {
   animation: unfold 1.5s cubic-bezier(0.18,0.9,0.28,1.02) var(--delay) backwards;
 }
@@ -2546,11 +2103,44 @@ const LEAVES = [
   { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c', delay: 0.14 },
 ];
 
+const LEAF_PATH = 'M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z';
+const VEIN_D = [
+  'M100 396 C100 300 99 160 100 10',
+  'M99 332 C80 308 64 278 55 246',
+  'M100 274 C83 252 68 226 60 198',
+  'M101 218 C87 200 74 176 68 152',
+  'M102 164 C91 148 82 128 77 108',
+  'M101 332 C120 308 136 278 145 246',
+  'M100 274 C117 252 132 226 140 198',
+  'M99 218 C113 200 126 176 132 152',
+];
+const VEINS = VEIN_D.map(function (d) { return '<path d="' + d + '" />'; }).join('');
+
+// 和动画馆里「叶扇展开」用的是同一条路径
+function leafSVG(i, from, to) {
+  const g = 'lg' + i;
+  const h = 'lh' + i;
+  return '<svg viewBox="0 0 200 400" preserveAspectRatio="none">' +
+    '<defs>' +
+      '<linearGradient id="' + g + '" x1="0.15" y1="1" x2="0.8" y2="0">' +
+        '<stop offset="0" stop-color="' + from + '"/><stop offset="1" stop-color="' + to + '"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="' + h + '" x1="0" y1="1" x2="1" y2="0.4">' +
+        '<stop offset="0" stop-color="#ffffff" stop-opacity="0.42"/>' +
+        '<stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>' +
+      '</linearGradient>' +
+    '</defs>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + g + ')"/>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + h + ')"/>' +
+    '<g fill="none" stroke="#3f6b1e" stroke-opacity="0.16" stroke-width="2.4" stroke-linecap="round">' + VEINS + '</g>' +
+  '</svg>';
+}
+
 const wrap = document.createElement('div');
 wrap.className = 'leaves';
 stage.appendChild(wrap);
 
-for (const l of LEAVES) {
+for (const [i, l] of LEAVES.entries()) {
   const el = document.createElement('div');
   el.className = 'leaf';
   el.style.setProperty('--w', l.w);
@@ -2560,6 +2150,7 @@ for (const l of LEAVES) {
   el.style.setProperty('--sweep', '110deg');
   el.style.setProperty('--from', l.from);
   el.style.setProperty('--to', l.to);
+  el.innerHTML = leafSVG(i, l.from, l.to);
   wrap.appendChild(el);
 }
 
@@ -2625,10 +2216,9 @@ requestAnimationFrame(play);`,
   margin-left: calc(var(--w) * -0.5vh);
   transform-origin: 50% 100%;
   transform: rotate(var(--rot));
-  border-radius: 50% 0 50% 50%;
-  background: linear-gradient(160deg, var(--from), var(--to));
   box-shadow: 0 10px 26px rgba(180,130,40,0.18);
 }
+.leaf svg { display: block; width: 100%; height: 100%; }
 .stage.play .leaf {
   animation: unfold 1.4s cubic-bezier(0.18,0.9,0.28,1.02) var(--delay) backwards;
 }
@@ -2655,11 +2245,44 @@ const LEAVES = [
   { w: 38, h: 70, rot: 36,  from: '#ffc25c', to: '#ef7c2c', order: 0 },
 ];
 
+const LEAF_PATH = 'M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z';
+const VEIN_D = [
+  'M100 396 C100 300 99 160 100 10',
+  'M99 332 C80 308 64 278 55 246',
+  'M100 274 C83 252 68 226 60 198',
+  'M101 218 C87 200 74 176 68 152',
+  'M102 164 C91 148 82 128 77 108',
+  'M101 332 C120 308 136 278 145 246',
+  'M100 274 C117 252 132 226 140 198',
+  'M99 218 C113 200 126 176 132 152',
+];
+const VEINS = VEIN_D.map(function (d) { return '<path d="' + d + '" />'; }).join('');
+
+// 和动画馆里「叶扇展开」用的是同一条路径
+function leafSVG(i, from, to) {
+  const g = 'lg' + i;
+  const h = 'lh' + i;
+  return '<svg viewBox="0 0 200 400" preserveAspectRatio="none">' +
+    '<defs>' +
+      '<linearGradient id="' + g + '" x1="0.15" y1="1" x2="0.8" y2="0">' +
+        '<stop offset="0" stop-color="' + from + '"/><stop offset="1" stop-color="' + to + '"/>' +
+      '</linearGradient>' +
+      '<linearGradient id="' + h + '" x1="0" y1="1" x2="1" y2="0.4">' +
+        '<stop offset="0" stop-color="#ffffff" stop-opacity="0.42"/>' +
+        '<stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>' +
+      '</linearGradient>' +
+    '</defs>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + g + ')"/>' +
+    '<path d="' + LEAF_PATH + '" fill="url(#' + h + ')"/>' +
+    '<g fill="none" stroke="#3f6b1e" stroke-opacity="0.16" stroke-width="2.4" stroke-linecap="round">' + VEINS + '</g>' +
+  '</svg>';
+}
+
 const wrap = document.createElement('div');
 wrap.className = 'leaves';
 stage.appendChild(wrap);
 
-for (const l of LEAVES) {
+for (const [i, l] of LEAVES.entries()) {
   const el = document.createElement('div');
   el.className = 'leaf';
   el.style.setProperty('--w', l.w);
@@ -2668,6 +2291,7 @@ for (const l of LEAVES) {
   el.dataset.order = l.order;
   el.style.setProperty('--from', l.from);
   el.style.setProperty('--to', l.to);
+  el.innerHTML = leafSVG(i, l.from, l.to);
   wrap.appendChild(el);
 }
 
@@ -2733,31 +2357,47 @@ el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, fill: 'both' });
 
 点舞台反复重播，观察是否每次都从头开始。`,
             html: `<div class="stage" id="stage">
-  <div class="ring" id="ring"></div>
+  <div class="leaf" id="leaf"></div>
 </div>
 <div class="bar"><span id="info">点舞台重播</span></div>`,
             css: `html, body { margin: 0; height: 100%; overflow: hidden; background: #10141a; }
 .stage { position: absolute; inset: 0; display: grid; place-items: center; cursor: pointer; }
-.ring {
-  width: 120px; height: 120px; border-radius: 50%;
-  border: 2px solid #6ea8ff;
+.leaf {
+  width: 22vh;
+  height: 44vh;
+  transform-origin: 50% 100%;
+  transform: rotate(0deg);
   opacity: 0;
 }
-.stage.play .ring {
-  animation: pop 1.2s cubic-bezier(0.18,0.9,0.28,1.02) both;
+.leaf svg { display: block; width: 100%; height: 100%; }
+.stage.play .leaf {
+  animation: unfurl 1.4s cubic-bezier(0.18,0.9,0.28,1.02) both;
 }
-@keyframes pop {
-  from { opacity: 0; transform: scale(0.2); }
-  60%  { opacity: 1; transform: scale(1.06); }
-  to   { opacity: 0.9; transform: scale(1); }
+@keyframes unfurl {
+  from { opacity: 0; transform: rotate(-110deg) scale(0.9); }
+  60%  { opacity: 1; transform: rotate(6deg) scale(1.02); }
+  to   { opacity: 1; transform: rotate(0deg) scale(1); }
 }
 .bar {
   position: fixed; left: 10px; right: 10px; bottom: 10px;
   font: 11px/1.6 ui-monospace, monospace; color: #8fa3b5; text-align: center;
 }`,
             js: `const stage = document.getElementById('stage');
-const ring = document.getElementById('ring');
+const leaf = document.getElementById('leaf');
 const info = document.getElementById('info');
+
+const LEAF_PATH = 'M100 400 C46 340 22 246 30 164 C37 92 66 30 100 4 C136 44 172 128 173 214 C174 302 146 378 100 400Z';
+const VEINS = '<path d="M100 396 C100 300 99 160 100 10"/><path d="M99 332 C80 308 64 278 55 246"/><path d="M100 274 C83 252 68 226 60 198"/><path d="M101 218 C87 200 74 176 68 152"/><path d="M102 164 C91 148 82 128 77 108"/><path d="M101 332 C120 308 136 278 145 246"/><path d="M100 274 C117 252 132 226 140 198"/><path d="M99 218 C113 200 126 176 132 152"/>';
+leaf.innerHTML = '<svg viewBox="0 0 200 400" preserveAspectRatio="none">' +
+  '<defs><linearGradient id="g4" x1="0.15" y1="1" x2="0.8" y2="0">' +
+  '<stop offset="0" stop-color="#9bd45c"/><stop offset="1" stop-color="#4f9b2c"/></linearGradient>' +
+  '<linearGradient id="h4" x1="0" y1="1" x2="1" y2="0.4">' +
+  '<stop offset="0" stop-color="#ffffff" stop-opacity="0.42"/>' +
+  '<stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/></linearGradient></defs>' +
+  '<path d="' + LEAF_PATH + '" fill="url(#g4)"/>' +
+  '<path d="' + LEAF_PATH + '" fill="url(#h4)"/>' +
+  '<g fill="none" stroke="#3f6b1e" stroke-opacity="0.16" stroke-width="2.4" stroke-linecap="round">' + VEINS + '</g>' +
+  '</svg>';
 
 let count = 0;
 
